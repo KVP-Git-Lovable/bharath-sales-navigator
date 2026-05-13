@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useManagedInterval } from '@/utils/intervalManager';
+import { useManagedInterval, debounce } from '@/utils/intervalManager';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { supabase } from '@/integrations/supabase/client';
 import { Layout } from '@/components/Layout';
