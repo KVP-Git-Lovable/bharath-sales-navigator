@@ -1700,10 +1700,16 @@ const Operations = () => {
               <TabsContent value="orders">
                 {/* Orders Tab Header */}
                 {(() => {
-                  const totalValue = filteredOrderData.reduce((s, o) => s + Number(o.total_amount || 0), 0);
-                  const creditCount = filteredOrderData.filter(o => o.is_credit_order).length;
-                  const paidCount = filteredOrderData.filter(o => !o.is_credit_order && o.payment_status !== 'pending').length;
-                  const pendingAmt = filteredOrderData.reduce((s, o) => s + Number(o.credit_pending_amount || 0), 0);
+                   const totalValue = filteredOrderData.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+                   const isFullyPaid = (o: OrderData) => {
+                     const paid = Number(o.credit_paid_amount || 0);
+                     const total = Number(o.total_amount || 0);
+                     if (o.is_credit_order) return Number(o.credit_pending_amount || 0) <= 0 && paid >= total;
+                     return total > 0 && paid >= total;
+                   };
+                   const paidCount = filteredOrderData.filter(isFullyPaid).length;
+                   const creditCount = filteredOrderData.filter(o => o.is_credit_order && Number(o.credit_pending_amount || 0) > 0).length;
+                   const pendingAmt = filteredOrderData.reduce((s, o) => s + Number(o.credit_pending_amount || 0), 0);
                   return (
                     <div className="mb-4 rounded-xl border bg-gradient-to-br from-primary/5 via-background to-accent/5 p-5">
                       <div className="flex flex-wrap items-start justify-between gap-4">
