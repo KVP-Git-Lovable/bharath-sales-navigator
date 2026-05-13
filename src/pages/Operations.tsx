@@ -487,13 +487,20 @@ const Operations = () => {
           user_id,
           created_at,
           updated_at,
+          subtotal,
+          discount_amount,
           total_amount,
           status,
           retailer_name,
+          retailer_id,
+          counter_customer_id,
           is_credit_order,
           credit_pending_amount,
+          credit_paid_amount,
+          payment_method,
+          payment_status,
           invoice_number,
-          order_items(product_name, quantity, rate, total)
+          order_items(product_name, quantity, rate, total, sgst_amount, cgst_amount, hsn_code, unit)
         `)
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
@@ -530,13 +537,28 @@ const Operations = () => {
 
       // Get user data separately
       const userIds = [...new Set(ordersData?.map(o => o.user_id) || [])];
-      const { data: usersData } = await supabase
-        .from('profiles')
-        .select('id, full_name, username')
-        .in('id', userIds);
+      const retailerIds = [...new Set((ordersData || []).map(o => o.retailer_id).filter(Boolean) as string[])];
+      const counterIds = [...new Set((ordersData || []).map(o => o.counter_customer_id).filter(Boolean) as string[])];
+      const orderIds = (ordersData || []).map(o => o.id);
+
+      const [{ data: usersData }, { data: retailersData }, { data: counterData }, { data: invoicesData }] = await Promise.all([
+        supabase.from('profiles').select('id, full_name, username').in('id', userIds),
+        retailerIds.length
+          ? supabase.from('retailers').select('id, phone').in('id', retailerIds)
+          : Promise.resolve({ data: [] as any[] }),
+        counterIds.length
+          ? supabase.from('counter_customers').select('id, phone').in('id', counterIds)
+          : Promise.resolve({ data: [] as any[] }),
+        orderIds.length
+          ? supabase.from('invoices').select('id, order_id').in('order_id', orderIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
 
       const formattedData = ordersData?.map(order => {
         const user = usersData?.find(u => u.id === order.user_id);
+        const retailer = retailersData?.find((r: any) => r.id === order.retailer_id);
+        const counter = counterData?.find((c: any) => c.id === order.counter_customer_id);
+        const invoice = invoicesData?.find((i: any) => i.order_id === order.id);
         
         // Check if order was edited (updated_at differs from created_at by more than 5 seconds)
         const createdTime = new Date(order.created_at).getTime();
@@ -547,15 +569,22 @@ const Operations = () => {
           id: order.id,
           user_name: user?.full_name || user?.username || 'Unknown',
           retailer_name: order.retailer_name || 'Unknown',
+          retailer_phone: (retailer?.phone || counter?.phone || null) as string | null,
           created_at: order.created_at,
           updated_at: order.updated_at || order.created_at,
           total_amount: order.total_amount,
+          subtotal: Number(order.subtotal || 0),
+          discount_amount: Number(order.discount_amount || 0),
           status: order.status,
           items: order.order_items || [],
           is_edited: isEdited,
           is_credit_order: order.is_credit_order || false,
           credit_pending_amount: order.credit_pending_amount || 0,
-          invoice_number: order.invoice_number || null
+          credit_paid_amount: Number(order.credit_paid_amount || 0),
+          payment_method: order.payment_method || null,
+          payment_status: order.payment_status || null,
+          invoice_number: order.invoice_number || null,
+          invoice_id: invoice?.id || null,
         };
       }) || [];
 
