@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers, ChevronsUpDown, Check, Search } from 'lucide-react';
+import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers, ChevronsUpDown, Check, Search, Sliders } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SchemeFormFieldsProps {
@@ -108,6 +108,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
       case 'time_based_offer': return <Clock size={16} />;
       case 'first_order_discount': return <Star size={16} />;
       case 'category_wide_discount': return <Tag size={16} />;
+      case 'manual_per_unit_discount': return <Sliders size={16} />;
       default: return <Percent size={16} />;
     }
   };
@@ -606,6 +607,57 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
           </>
         );
 
+      case 'manual_per_unit_discount':
+        return (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="maxDiscountPerUnit">Max Discount per Unit (₹) *</Label>
+                <Input
+                  id="maxDiscountPerUnit"
+                  type="number"
+                  min={0}
+                  value={schemeForm.max_discount_per_unit || ""}
+                  onChange={(e) => setSchemeForm({ ...schemeForm, max_discount_per_unit: parseFloat(e.target.value) || 0 })}
+                  placeholder="e.g. 40"
+                />
+              </div>
+              <div>
+                <Label htmlFor="discountUnit">Per Unit</Label>
+                <Select
+                  value={schemeForm.discount_unit || 'kg'}
+                  onValueChange={(value) => setSchemeForm({ ...schemeForm, discount_unit: value })}
+                >
+                  <SelectTrigger id="discountUnit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map(unit => (
+                      <SelectItem key={unit.value} value={unit.value}>{unit.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="conditionQty">Min Quantity (optional)</Label>
+              <Input
+                id="conditionQty"
+                type="number"
+                min={0}
+                value={schemeForm.condition_quantity || ""}
+                onChange={(e) => setSchemeForm({ ...schemeForm, condition_quantity: parseFloat(e.target.value) || 0 })}
+                placeholder="Leave blank for no minimum"
+              />
+            </div>
+            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded border">
+              Sales reps can apply this scheme to <strong>one line item</strong> per order and enter any per-unit discount from
+              ₹0 up to <strong>₹{schemeForm.max_discount_per_unit || 0}/{schemeForm.discount_unit || 'kg'}</strong>.
+              The chosen amount × quantity becomes the line discount.
+            </div>
+          </>
+        );
+
       default:
         return null;
     }
@@ -706,6 +758,12 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
               <div className="flex items-center gap-2">
                 {getSchemeTypeIcon('category_wide_discount')}
                 Category-Wide Discount
+              </div>
+            </SelectItem>
+            <SelectItem value="manual_per_unit_discount">
+              <div className="flex items-center gap-2">
+                {getSchemeTypeIcon('manual_per_unit_discount')}
+                Manual Per-Unit Discount
               </div>
             </SelectItem>
           </SelectContent>

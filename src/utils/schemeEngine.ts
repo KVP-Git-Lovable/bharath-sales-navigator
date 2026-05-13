@@ -26,6 +26,11 @@ export interface AppliedScheme {
     original_rate?: number;
     unit?: string;
   }[];
+  // For manual_per_unit_discount
+  per_unit_discount?: number;
+  unit?: string;
+  applied_to_item_id?: string;
+  applied_to_product_name?: string;
 }
 
 export interface ItemSchemeDetail {
@@ -37,6 +42,9 @@ export interface ItemSchemeDetail {
   // BOGO specific fields
   freeItemName?: string;
   freeItemQty?: number;
+  // Manual per-unit discount fields
+  perUnitDiscount?: number;
+  unit?: string;
 }
 
 export interface SchemeCalculationResult {
@@ -74,6 +82,18 @@ export interface ProductScheme {
   // Multi-product support
   target_product_ids?: string[] | null;
   per_product_discounts?: Record<string, { discount_percentage: number }> | null;
+  // Manual per-unit discount support
+  max_discount_per_unit?: number | null;
+  discount_unit?: string | null;
+}
+
+/**
+ * Manual selection made by salesperson for a manual_per_unit_discount scheme.
+ * Keyed by scheme id.
+ */
+export interface ManualSchemeSelection {
+  itemId: string;          // cart line id (matches SchemeItem.id)
+  perUnitDiscount: number; // amount entered, ≤ scheme.max_discount_per_unit
 }
 
 /**
@@ -239,17 +259,20 @@ function isQuantityConditionMet(scheme: ProductScheme, quantity: number): boolea
 function calculateSchemeDiscount(
   scheme: ProductScheme, 
   items: SchemeItem[], 
-  subtotal: number
+  subtotal: number,
+  manualSelection?: ManualSchemeSelection
 ): { 
   discount: number; 
   itemDiscounts: Record<string, number>; 
   itemSchemeDetails: Record<string, ItemSchemeDetail[]>;
-  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] 
+  freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[];
+  manualMeta?: { perUnitDiscount: number; unit: string; itemId: string; productName: string };
 } {
   let discount = 0;
   const itemDiscounts: Record<string, number> = {};
   const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
   let freeItems: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] | undefined;
+  let manualMeta: { perUnitDiscount: number; unit: string; itemId: string; productName: string } | undefined;
 
   // Get applicable items
   const applicableItems = items.filter(item => schemeAppliesToItem(scheme, item));
@@ -258,6 +281,46 @@ function calculateSchemeDiscount(
 
   // Calculate based on scheme type
   switch (scheme.scheme_type) {
+    case 'manual_per_unit_discount': {
+      // Salesperson must have made a selection
+      if (!manualSelection) break;
+      const cap = Number(scheme.max_discount_per_unit || 0);
+      if (cap <= 0) break;
+
+      // The chosen item must still exist in the cart and be applicable to this scheme
+      const item = items.find(i => i.id === manualSelection.itemId);
+      if (!item) break;
+      if (!schemeAppliesToItem(scheme, item)) break;
+      // Optional min-quantity gate
+      if (!isQuantityConditionMet(scheme, item.quantity)) break;
+
+      const perUnit = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
+      if (perUnit <= 0) break;
+
+      const itemDiscount = perUnit * item.quantity;
+      discount = itemDiscount;
+      itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+
+      const unit = scheme.discount_unit || 'unit';
+      if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+      itemSchemeDetails[item.id].push({
+        schemeId: scheme.id,
+        schemeName: scheme.name,
+        schemeType: scheme.scheme_type,
+        discountAmount: itemDiscount,
+        perUnitDiscount: perUnit,
+        unit,
+      });
+
+      manualMeta = {
+        perUnitDiscount: perUnit,
+        unit,
+        itemId: item.id,
+        productName: item.name || '',
+      };
+      break;
+    }
+
     case 'percentage_discount':
     case 'percentage': {
       const hasMultiProduct = scheme.target_product_ids && scheme.target_product_ids.length > 0;
@@ -473,7 +536,7 @@ function calculateSchemeDiscount(
       break;
   }
 
-  return { discount, itemDiscounts, itemSchemeDetails, freeItems };
+  return { discount, itemDiscounts, itemSchemeDetails, freeItems, manualMeta };
 }
 
 /**
@@ -482,7 +545,8 @@ function calculateSchemeDiscount(
 export function calculateOrderWithSchemes(
   items: SchemeItem[],
   allSchemes: ProductScheme[],
-  appliedSchemeIds: string[] = []
+  appliedSchemeIds: string[] = [],
+  manualSelections: Record<string, ManualSchemeSelection> = {}
 ): SchemeCalculationResult {
   // Calculate subtotal
   const subtotal = items.reduce((sum, item) => sum + (item.rate * item.quantity), 0);
@@ -503,8 +567,9 @@ export function calculateOrderWithSchemes(
       discount,
       itemDiscounts: schemeItemDiscounts,
       itemSchemeDetails: schemeItemDetails,
-      freeItems
-    } = calculateSchemeDiscount(scheme, items, subtotal);
+      freeItems,
+      manualMeta
+    } = calculateSchemeDiscount(scheme, items, subtotal, manualSelections[scheme.id]);
 
     const hasFreeItems = !!(freeItems && freeItems.length > 0);
 
@@ -532,7 +597,11 @@ export function calculateOrderWithSchemes(
         discount_amount: discount,
         discount_percentage: scheme.discount_percentage || undefined,
         product_id: scheme.product_id,
-        free_items: freeItems
+        free_items: freeItems,
+        per_unit_discount: manualMeta?.perUnitDiscount,
+        unit: manualMeta?.unit,
+        applied_to_item_id: manualMeta?.itemId,
+        applied_to_product_name: manualMeta?.productName,
       });
     }
   }
@@ -586,6 +655,13 @@ export function formatSchemeDetailsForInvoice(appliedSchemes: AppliedScheme[]): 
     
     if (scheme.discount_percentage) {
       detail += ` (${scheme.discount_percentage}% off)`;
+    }
+    if (scheme.scheme_type === 'manual_per_unit_discount' && scheme.per_unit_discount) {
+      detail += ` (₹${scheme.per_unit_discount}/${scheme.unit || 'unit'}`;
+      if (scheme.applied_to_product_name) {
+        detail += ` on ${scheme.applied_to_product_name}`;
+      }
+      detail += `)`;
     }
     
     detail += ` - Saved ₹${scheme.discount_amount.toFixed(2)}`;

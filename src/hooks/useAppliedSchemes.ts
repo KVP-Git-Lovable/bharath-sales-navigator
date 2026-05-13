@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SchemePolicies } from './useSchemePolicies';
+import type { ManualSchemeSelection } from '@/utils/schemeEngine';
 
 const STORAGE_KEY_PREFIX = 'applied_schemes:';
+const MANUAL_KEY_PREFIX = 'applied_schemes_manual:';
 
 export interface ProductSchemeBasic {
   id: string;
@@ -15,9 +17,12 @@ export interface ProductSchemeBasic {
  */
 export function useAppliedSchemes(visitId: string, retailerId: string) {
   const storageKey = `${STORAGE_KEY_PREFIX}${visitId || 'temp'}:${retailerId || 'unknown'}`;
+  const manualKey = `${MANUAL_KEY_PREFIX}${visitId || 'temp'}:${retailerId || 'unknown'}`;
   
   const [appliedSchemeIds, setAppliedSchemeIds] = useState<string[]>([]);
+  const [manualSelections, setManualSelectionsState] = useState<Record<string, ManualSchemeSelection>>({});
   const isInitialSync = useRef(true);
+  const isManualInitialSync = useRef(true);
   const previousStorageKey = useRef<string | null>(null);
 
   // Re-sync state when storage key changes (different retailer/visit)
@@ -26,6 +31,7 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
     if (previousStorageKey.current === storageKey) return;
     previousStorageKey.current = storageKey;
     isInitialSync.current = true;
+    isManualInitialSync.current = true;
     
     try {
       const stored = localStorage.getItem(storageKey);
@@ -35,7 +41,15 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
     } catch {
       setAppliedSchemeIds([]);
     }
-  }, [storageKey]);
+
+    try {
+      const storedManual = localStorage.getItem(manualKey);
+      const parsedManual = storedManual ? JSON.parse(storedManual) : {};
+      setManualSelectionsState(parsedManual && typeof parsedManual === 'object' ? parsedManual : {});
+    } catch {
+      setManualSelectionsState({});
+    }
+  }, [storageKey, manualKey]);
 
   // Persist to localStorage whenever appliedSchemeIds changes
   useEffect(() => {
@@ -55,6 +69,23 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
       console.error('[useAppliedSchemes] Error saving to localStorage:', error);
     }
   }, [appliedSchemeIds, storageKey]);
+
+  // Persist manual selections
+  useEffect(() => {
+    if (isManualInitialSync.current) {
+      isManualInitialSync.current = false;
+      return;
+    }
+    try {
+      if (Object.keys(manualSelections).length > 0) {
+        localStorage.setItem(manualKey, JSON.stringify(manualSelections));
+      } else {
+        localStorage.removeItem(manualKey);
+      }
+    } catch (error) {
+      console.error('[useAppliedSchemes] Error saving manual selections:', error);
+    }
+  }, [manualSelections, manualKey]);
 
   /**
    * Apply a scheme with optional policy enforcement
@@ -104,17 +135,26 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
       console.log('[useAppliedSchemes] Removed scheme:', schemeId, 'Remaining:', updated.length);
       return updated;
     });
+    // Also clear any manual selection tied to this scheme
+    setManualSelectionsState(prev => {
+      if (!prev[schemeId]) return prev;
+      const next = { ...prev };
+      delete next[schemeId];
+      return next;
+    });
   }, []);
 
   const clearSchemes = useCallback(() => {
     setAppliedSchemeIds([]);
+    setManualSelectionsState({});
     try {
       localStorage.removeItem(storageKey);
+      localStorage.removeItem(manualKey);
     } catch {
       // Ignore
     }
     console.log('[useAppliedSchemes] Cleared all schemes');
-  }, [storageKey]);
+  }, [storageKey, manualKey]);
 
   const isSchemeApplied = useCallback((schemeId: string) => {
     return appliedSchemeIds.includes(schemeId);
@@ -129,12 +169,29 @@ export function useAppliedSchemes(visitId: string, retailerId: string) {
     console.log('[useAppliedSchemes] Set only scheme:', schemeId);
   }, []);
 
+  /**
+   * Save the manual per-unit selection for a scheme. Pass null to clear.
+   */
+  const setManualSelection = useCallback((schemeId: string, selection: ManualSchemeSelection | null) => {
+    setManualSelectionsState(prev => {
+      const next = { ...prev };
+      if (selection === null) {
+        delete next[schemeId];
+      } else {
+        next[schemeId] = selection;
+      }
+      return next;
+    });
+  }, []);
+
   return {
     appliedSchemeIds,
+    manualSelections,
     applyScheme,
     removeScheme,
     clearSchemes,
     isSchemeApplied,
-    setOnlyScheme
+    setOnlyScheme,
+    setManualSelection,
   };
 }

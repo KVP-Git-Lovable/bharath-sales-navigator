@@ -11616,6 +11616,7 @@ export type Database = {
           description: string | null
           discount_amount: number | null
           discount_percentage: number | null
+          discount_unit: string | null
           end_date: string | null
           exclusion_group: string | null
           free_product_id: string | null
@@ -11624,6 +11625,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_first_order_only: boolean | null
+          max_discount_per_unit: number | null
           max_usage_count: number | null
           min_order_value: number | null
           name: string
@@ -11655,6 +11657,7 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
+          discount_unit?: string | null
           end_date?: string | null
           exclusion_group?: string | null
           free_product_id?: string | null
@@ -11663,6 +11666,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
+          max_discount_per_unit?: number | null
           max_usage_count?: number | null
           min_order_value?: number | null
           name: string
@@ -11694,6 +11698,7 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
+          discount_unit?: string | null
           end_date?: string | null
           exclusion_group?: string | null
           free_product_id?: string | null
@@ -11702,6 +11707,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
+          max_discount_per_unit?: number | null
           max_usage_count?: number | null
           min_order_value?: number | null
           name?: string

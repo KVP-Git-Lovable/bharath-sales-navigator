@@ -110,7 +110,10 @@ const initialSchemeForm = {
   multi_product_mode: false,
   target_product_ids: [] as string[],
   discount_mode: 'same' as 'same' | 'different',
-  per_product_discounts: {} as Record<string, { discount_percentage: number }>
+  per_product_discounts: {} as Record<string, { discount_percentage: number }>,
+  // Manual per-unit discount fields
+  max_discount_per_unit: 0,
+  discount_unit: 'kg',
 };
 
 export const SchemeMaster = () => {
@@ -308,7 +311,13 @@ export const SchemeMaster = () => {
             priority: schemeForm.priority,
             exclusion_group: schemeForm.exclusion_group || null,
             target_product_ids: targetProductIds,
-            per_product_discounts: perProductDiscounts
+            per_product_discounts: perProductDiscounts,
+            max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (Number(schemeForm.max_discount_per_unit) || 0)
+              : null,
+            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_unit || 'kg')
+              : null,
           })
           .eq('id', schemeForm.id);
         
@@ -346,7 +355,13 @@ export const SchemeMaster = () => {
             priority: schemeForm.priority,
             exclusion_group: schemeForm.exclusion_group || null,
             target_product_ids: targetProductIds,
-            per_product_discounts: perProductDiscounts
+            per_product_discounts: perProductDiscounts,
+            max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (Number(schemeForm.max_discount_per_unit) || 0)
+              : null,
+            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_unit || 'kg')
+              : null,
           })
           .select('id')
           .single();
@@ -500,7 +515,10 @@ export const SchemeMaster = () => {
       multi_product_mode: isMultiProduct,
       target_product_ids: schemeAny.target_product_ids || [],
       discount_mode: hasPerProductDiscounts ? 'different' : 'same',
-      per_product_discounts: schemeAny.per_product_discounts || {}
+      per_product_discounts: schemeAny.per_product_discounts || {},
+      // Manual per-unit discount fields
+      max_discount_per_unit: schemeAny.max_discount_per_unit || 0,
+      discount_unit: schemeAny.discount_unit || 'kg',
     });
     // Load applicability rules for this scheme
     loadApplicabilityRules(scheme.id);
