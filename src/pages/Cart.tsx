@@ -1972,7 +1972,11 @@ export const Cart = () => {
 
                 <div className="flex justify-between text-base font-bold border-t pt-2">
                   <span>Total:</span>
-                  <span>₹{formatRounded(getFinalTotal())}</span>
+                  <span>₹{formatExact(getFinalTotal())}</span>
+                </div>
+                <div className="flex justify-between text-[11px] text-muted-foreground -mt-1">
+                  <span>(excl. GST)</span>
+                  <span>₹{formatExact(getAmountAfterDiscount())}</span>
                 </div>
 
                 {pendingAmountFromPrevious > 0 && <div className="space-y-1.5 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
