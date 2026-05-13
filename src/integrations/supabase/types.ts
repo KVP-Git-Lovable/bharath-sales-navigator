@@ -68,6 +68,7 @@ export type Database = {
           activity_place: string | null
           activity_type: string
           budget: number | null
+          collective_target: number | null
           comments: string | null
           created_at: string
           description: string | null
@@ -80,7 +81,9 @@ export type Database = {
           from_date: string | null
           half_day_type: string | null
           id: string
+          individual_target: number | null
           landmark: string | null
+          price_book_id: string | null
           remarks: string | null
           retailer_id: string | null
           retailer_name: string | null
@@ -89,6 +92,8 @@ export type Database = {
           start_latitude: number | null
           start_longitude: number | null
           start_time: string | null
+          status: string | null
+          target_mode: string | null
           to_date: string | null
           total_days: number | null
           user_id: string
@@ -100,6 +105,7 @@ export type Database = {
           activity_place?: string | null
           activity_type?: string
           budget?: number | null
+          collective_target?: number | null
           comments?: string | null
           created_at?: string
           description?: string | null
@@ -112,7 +118,9 @@ export type Database = {
           from_date?: string | null
           half_day_type?: string | null
           id?: string
+          individual_target?: number | null
           landmark?: string | null
+          price_book_id?: string | null
           remarks?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
@@ -121,6 +129,8 @@ export type Database = {
           start_latitude?: number | null
           start_longitude?: number | null
           start_time?: string | null
+          status?: string | null
+          target_mode?: string | null
           to_date?: string | null
           total_days?: number | null
           user_id: string
@@ -132,6 +142,7 @@ export type Database = {
           activity_place?: string | null
           activity_type?: string
           budget?: number | null
+          collective_target?: number | null
           comments?: string | null
           created_at?: string
           description?: string | null
@@ -144,7 +155,9 @@ export type Database = {
           from_date?: string | null
           half_day_type?: string | null
           id?: string
+          individual_target?: number | null
           landmark?: string | null
+          price_book_id?: string | null
           remarks?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
@@ -153,6 +166,8 @@ export type Database = {
           start_latitude?: number | null
           start_longitude?: number | null
           start_time?: string | null
+          status?: string | null
+          target_mode?: string | null
           to_date?: string | null
           total_days?: number | null
           user_id?: string
@@ -2644,9 +2659,13 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
-          name: string
+          loyalty_points: number | null
+          name: string | null
           notes: string | null
-          phone: string | null
+          phone: string
+          tags: string[] | null
+          total_orders: number | null
+          total_spent: number | null
           updated_at: string
           user_id: string
         }
@@ -2655,9 +2674,13 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
-          name: string
+          loyalty_points?: number | null
+          name?: string | null
           notes?: string | null
-          phone?: string | null
+          phone: string
+          tags?: string[] | null
+          total_orders?: number | null
+          total_spent?: number | null
           updated_at?: string
           user_id: string
         }
@@ -2666,9 +2689,13 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
-          name?: string
+          loyalty_points?: number | null
+          name?: string | null
           notes?: string | null
-          phone?: string | null
+          phone?: string
+          tags?: string[] | null
+          total_orders?: number | null
+          total_spent?: number | null
           updated_at?: string
           user_id?: string
         }
@@ -5588,6 +5615,41 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_team_members: {
+        Row: {
+          event_id: string
+          id: string
+          individual_target: number | null
+          joined_at: string | null
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          id?: string
+          individual_target?: number | null
+          joined_at?: string | null
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          individual_target?: number | null
+          joined_at?: string | null
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_team_members_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
             referencedColumns: ["id"]
           },
         ]
@@ -9141,6 +9203,7 @@ export type Database = {
           dispatched_at: string | null
           distributor_id: string | null
           distributor_name: string | null
+          event_id: string | null
           id: string
           idempotency_key: string | null
           invoice_generated_at: string | null
@@ -9156,6 +9219,7 @@ export type Database = {
           previous_pending_cleared: number | null
           retailer_id: string | null
           retailer_name: string
+          sales_channel: string
           short_items: Json | null
           status: string
           subtotal: number
@@ -9186,6 +9250,7 @@ export type Database = {
           dispatched_at?: string | null
           distributor_id?: string | null
           distributor_name?: string | null
+          event_id?: string | null
           id?: string
           idempotency_key?: string | null
           invoice_generated_at?: string | null
@@ -9201,6 +9266,7 @@ export type Database = {
           previous_pending_cleared?: number | null
           retailer_id?: string | null
           retailer_name: string
+          sales_channel?: string
           short_items?: Json | null
           status?: string
           subtotal: number
@@ -9231,6 +9297,7 @@ export type Database = {
           dispatched_at?: string | null
           distributor_id?: string | null
           distributor_name?: string | null
+          event_id?: string | null
           id?: string
           idempotency_key?: string | null
           invoice_generated_at?: string | null
@@ -9246,6 +9313,7 @@ export type Database = {
           previous_pending_cleared?: number | null
           retailer_id?: string | null
           retailer_name?: string
+          sales_channel?: string
           short_items?: Json | null
           status?: string
           subtotal?: number
@@ -9268,6 +9336,13 @@ export type Database = {
             columns: ["counter_customer_id"]
             isOneToOne: false
             referencedRelation: "counter_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
             referencedColumns: ["id"]
           },
           {
