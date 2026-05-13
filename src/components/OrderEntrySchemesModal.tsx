@@ -36,6 +36,8 @@ import { toast } from "@/hooks/use-toast";
 import { ProductScheme } from "@/hooks/useOfflineSchemes";
 import { isSchemeConditionMet, schemeHasConditions, SchemeItem, calculateSchemeDiscountForComparison } from "@/utils/schemeEngine";
 import { SchemePolicies } from "@/hooks/useSchemePolicies";
+import type { ManualSchemeSelection } from "@/utils/schemeEngine";
+import { ManualPerUnitApplyDialog } from "@/components/ManualPerUnitApplyDialog";
 
 interface Product {
   id: string;
@@ -48,6 +50,7 @@ interface Product {
 interface OrderRow {
   id: string;
   product?: Product;
+  variant?: any;
   quantity: number;
 }
 
@@ -63,6 +66,8 @@ interface OrderEntrySchemesModalProps {
   schemePolicies?: SchemePolicies;
   onApplyScheme: (scheme: ProductScheme, product?: Product, quantity?: number) => void;
   onRemoveScheme: (schemeId: string) => void;
+  manualSelections?: Record<string, ManualSchemeSelection>;
+  onSetManualSelection?: (schemeId: string, selection: ManualSchemeSelection | null) => void;
 }
 
 const getSchemeTypeIcon = (type: string) => {
@@ -98,6 +103,8 @@ const getSchemeTypeLabel = (type: string) => {
       return 'First Order';
     case 'category_wide_discount':
       return 'Category';
+    case 'manual_per_unit_discount':
+      return 'Per-Unit (Manual)';
     default:
       return type;
   }
@@ -181,9 +188,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
   appliedSchemeIds,
   schemePolicies,
   onApplyScheme,
-  onRemoveScheme
+  onRemoveScheme,
+  manualSelections = {},
+  onSetManualSelection,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [pickerScheme, setPickerScheme] = useState<ProductScheme | null>(null);
 
   // Check if more schemes can be applied based on policies
   const canApplyMore = useMemo(() => {
@@ -244,11 +254,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
     return orderRows
       .filter(row => row.product && row.quantity > 0)
       .map(row => ({
-        id: row.product!.id,
+        id: row.variant?.id || row.product!.id,
         product_id: row.product!.id,
+        variant_id: row.variant?.id,
         quantity: row.quantity,
-        rate: row.product!.rate,
-        name: row.product!.name
+        rate: row.variant?.price ?? row.product!.rate,
+        name: row.variant?.variant_name || row.product!.name
       }));
   }, [orderRows]);
 
@@ -282,6 +293,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
 
   // Handle apply scheme
   const handleApply = (scheme: ProductScheme) => {
+    // Manual per-unit schemes open the picker dialog instead of toggling
+    if (scheme.scheme_type === 'manual_per_unit_discount') {
+      setPickerScheme(scheme);
+      return;
+    }
+
     // Find the product for this scheme
     let targetProduct: Product | undefined;
     let minQuantity = 1;
