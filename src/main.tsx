@@ -13,6 +13,48 @@ import { initDownloadNotifications } from './utils/fileDownloader';
 
 console.log('🚀 App starting...');
 
+// Recover from stale Vite optimized-dep references after a dev/preview restart.
+// When Vite re-bundles deps, its `?v=<hash>` URL changes; pages still holding the
+// old reference fail with "Failed to fetch dynamically imported module ... .vite/deps/...".
+// Detect that specific error once and force a clean reload so users aren't stuck
+// (e.g. on the invoice generator pulling in jspdf).
+(() => {
+  let recovering = false;
+  const isStaleViteDepError = (msg?: string) =>
+    !!msg &&
+    msg.includes('Failed to fetch dynamically imported module') &&
+    msg.includes('/.vite/deps/');
+
+  const recover = async (reason: string) => {
+    if (recovering) return;
+    recovering = true;
+    console.warn('♻️ Recovering from stale module load:', reason);
+    try {
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+    } catch (e) {
+      console.warn('Cache/SW cleanup failed during recovery:', e);
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('_r', Date.now().toString());
+    window.location.replace(url.toString());
+  };
+
+  window.addEventListener('error', (e) => {
+    if (isStaleViteDepError(e?.message)) recover(e.message);
+  });
+  window.addEventListener('unhandledrejection', (e: any) => {
+    const msg = e?.reason?.message || String(e?.reason || '');
+    if (isStaleViteDepError(msg)) recover(msg);
+  });
+})();
+
 // Initialize and render app immediately
 const root = document.getElementById("root");
 if (!root) {
