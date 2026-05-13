@@ -1084,20 +1084,31 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                           </Command>
                         </PopoverContent>
                       </Popover>
-                      {row.product && (
-                        <>
-                          <span className="text-[9px] text-muted-foreground mt-0.5">
-                            ₹{getPricePerUnit(row.product, row.variant, row.unit).toFixed(2)} per {row.unit}
-                          </span>
-                          {/* Show applied scheme details */}
-                          {(() => {
-                            // Use variant ID if available for correct lookup
-                            const itemId = row.variant?.id || row.product.id;
-                            const itemSchemes = orderCalculation.itemSchemeDetails?.[itemId] || [];
-                            
-                            if (itemSchemes.length === 0 || row.quantity === 0) return null;
-                            
-                            return (
+                       {row.product && (() => {
+                         const originalRate = getPricePerUnit(row.product, row.variant, row.unit);
+                         const itemId = row.variant?.id || row.product.id;
+                         const itemSchemes = orderCalculation.itemSchemeDetails?.[itemId] || [];
+                         const totalDiscount = itemSchemes.reduce((s, x) => s + (x.discountAmount || 0), 0);
+                         const hasDiscount = totalDiscount > 0 && row.quantity > 0;
+                         const perUnitDiscount = hasDiscount ? totalDiscount / row.quantity : 0;
+                         const effectiveRate = Math.max(0, originalRate - perUnitDiscount);
+                         return (
+                           <>
+                             {hasDiscount ? (
+                               <span className="text-[9px] mt-0.5 flex items-center gap-1 flex-wrap">
+                                 <span className="line-through text-muted-foreground">
+                                   ₹{originalRate.toFixed(2)}
+                                 </span>
+                                 <span className="text-green-600 font-medium">
+                                   ₹{effectiveRate.toFixed(2)} per {row.unit}
+                                 </span>
+                               </span>
+                             ) : (
+                               <span className="text-[9px] text-muted-foreground mt-0.5">
+                                 ₹{originalRate.toFixed(2)} per {row.unit}
+                               </span>
+                             )}
+                             {itemSchemes.length > 0 && row.quantity > 0 && (
                               <div className="mt-0.5 space-y-0.5">
                                 {itemSchemes.map((scheme, idx) => (
                                   <div key={idx} className="flex items-center gap-1 text-[9px] md:text-[10px] text-green-600">
@@ -1119,10 +1130,10 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                                   </div>
                                 ))}
                               </div>
-                            );
-                          })()}
-                        </>
-                      )}
+                             )}
+                           </>
+                         );
+                       })()}
                     </div>
                     
                     {/* Unit Column */}
