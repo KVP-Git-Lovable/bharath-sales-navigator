@@ -22,6 +22,8 @@ import { OperationsSummaryBoxes } from '@/components/operations/OperationsSummar
 import EditOrderDialog from '@/components/EditOrderDialog';
 import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDialog';
 import { SignedImage } from '@/components/ui/signed-image';
+import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
+import { FileText, Phone } from 'lucide-react';
 
 interface CheckInOutData {
   id: string;
@@ -60,15 +62,22 @@ interface OrderData {
   id: string;
   user_name: string;
   retailer_name: string;
+  retailer_phone: string | null;
   created_at: string;
   updated_at: string;
   total_amount: number;
+  subtotal: number;
+  discount_amount: number;
   status: string;
   items: any[];
   is_edited: boolean;
   is_credit_order: boolean;
   credit_pending_amount: number;
+  credit_paid_amount: number;
+  payment_method: string | null;
+  payment_status: string | null;
   invoice_number: string | null;
+  invoice_id: string | null;
 }
 
 interface StockData {
