@@ -610,16 +610,37 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
       case 'manual_per_unit_discount':
         return (
           <>
+            <div>
+              <Label>Discount Type</Label>
+              <RadioGroup
+                value={schemeForm.discount_value_type || 'amount'}
+                onValueChange={(value) => setSchemeForm({ ...schemeForm, discount_value_type: value })}
+                className="flex gap-4 mt-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="amount" id="dvt-amount" />
+                  <Label htmlFor="dvt-amount" className="font-normal cursor-pointer">Flat Amount (₹/unit)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="percentage" id="dvt-pct" />
+                  <Label htmlFor="dvt-pct" className="font-normal cursor-pointer">Percentage (% off rate)</Label>
+                </div>
+              </RadioGroup>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="maxDiscountPerUnit">Max Discount per Unit (₹) *</Label>
+                <Label htmlFor="maxDiscountPerUnit">
+                  {schemeForm.discount_value_type === 'percentage'
+                    ? 'Max Discount (%) *'
+                    : 'Max Discount per Unit (₹) *'}
+                </Label>
                 <Input
                   id="maxDiscountPerUnit"
                   type="number"
                   min={0}
                   value={schemeForm.max_discount_per_unit || ""}
                   onChange={(e) => setSchemeForm({ ...schemeForm, max_discount_per_unit: parseFloat(e.target.value) || 0 })}
-                  placeholder="e.g. 40"
+                  placeholder={schemeForm.discount_value_type === 'percentage' ? 'e.g. 10' : 'e.g. 40'}
                 />
               </div>
               <div>
@@ -651,9 +672,12 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
               />
             </div>
             <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded border">
-              Sales reps can apply this scheme to <strong>one line item</strong> per order and enter any per-unit discount from
-              ₹0 up to <strong>₹{schemeForm.max_discount_per_unit || 0}/{schemeForm.discount_unit || 'kg'}</strong>.
-              The chosen amount × quantity becomes the line discount.
+              Sales reps can apply this scheme to <strong>one line item</strong> per order and enter any value from{' '}
+              {schemeForm.discount_value_type === 'percentage' ? (
+                <>0% up to <strong>{schemeForm.max_discount_per_unit || 0}%</strong>. Line discount = rate × % × quantity.</>
+              ) : (
+                <>₹0 up to <strong>₹{schemeForm.max_discount_per_unit || 0}/{schemeForm.discount_unit || 'kg'}</strong>. Line discount = ₹/unit × quantity.</>
+              )}
             </div>
           </>
         );
