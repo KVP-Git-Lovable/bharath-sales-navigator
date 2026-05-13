@@ -1109,75 +1109,82 @@ const Operations = () => {
     await downloadCSV(csvContent, `${filename}-${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
-  // Initial data fetch (ensure users are loaded before building check-ins)
-  useEffect(() => {
-    (async () => {
-      await fetchUsers();
-      await fetchCheckInData();
-      await fetchOrderData();
-      await fetchStockData();
-      await fetchCompetitorData();
-      await fetchReturnStockData();
-      await fetchCancelledOrders();
-    })();
-  }, [userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, competitorDateFilter, returnStockDateFilter, cancelledDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
+  // Initial users fetch (once)
+  useEffect(() => { fetchUsers(); }, []);
 
-  // Use managed interval for auto-refresh (pauses when app is hidden)
+  // Per-dataset effects: only re-fetch when own filters change
+  useEffect(() => { fetchOrderData(false); }, [fetchOrderData]);
+  useEffect(() => { fetchCheckInData(false); }, [fetchCheckInData]);
+  useEffect(() => { fetchStockData(false); }, [fetchStockData]);
+  useEffect(() => { fetchCompetitorData(false); }, [fetchCompetitorData]);
+  useEffect(() => { fetchReturnStockData(false); }, [fetchReturnStockData]);
+  useEffect(() => { fetchCancelledOrders(false); }, [fetchCancelledOrders]);
+
+  // Refs to latest fetch fns so realtime / interval don't resubscribe
+  const fetchOrderDataRef = useRef(fetchOrderData);
+  const fetchCheckInDataRef = useRef(fetchCheckInData);
+  const fetchStockDataRef = useRef(fetchStockData);
+  const fetchCompetitorDataRef = useRef(fetchCompetitorData);
+  const fetchReturnStockDataRef = useRef(fetchReturnStockData);
+  const fetchCancelledOrdersRef = useRef(fetchCancelledOrders);
+  useEffect(() => { fetchOrderDataRef.current = fetchOrderData; }, [fetchOrderData]);
+  useEffect(() => { fetchCheckInDataRef.current = fetchCheckInData; }, [fetchCheckInData]);
+  useEffect(() => { fetchStockDataRef.current = fetchStockData; }, [fetchStockData]);
+  useEffect(() => { fetchCompetitorDataRef.current = fetchCompetitorData; }, [fetchCompetitorData]);
+  useEffect(() => { fetchReturnStockDataRef.current = fetchReturnStockData; }, [fetchReturnStockData]);
+  useEffect(() => { fetchCancelledOrdersRef.current = fetchCancelledOrders; }, [fetchCancelledOrders]);
+
+  // Silent 60s background refresh of the active tab only
   const refreshActiveTab = useCallback(() => {
-    if (activeTab === 'checkins') fetchCheckInData();
-    if (activeTab === 'orders') fetchOrderData();
-    if (activeTab === 'stock') fetchStockData();
-    if (activeTab === 'competitor') fetchCompetitorData();
-    if (activeTab === 'returnstock') fetchReturnStockData();
-    if (activeTab === 'cancelled') fetchCancelledOrders();
+    if (activeTab === 'checkins') fetchCheckInDataRef.current(true);
+    if (activeTab === 'orders') fetchOrderDataRef.current(true);
+    if (activeTab === 'stock') fetchStockDataRef.current(true);
+    if (activeTab === 'competitor') fetchCompetitorDataRef.current(true);
+    if (activeTab === 'returnstock') fetchReturnStockDataRef.current(true);
+    if (activeTab === 'cancelled') fetchCancelledOrdersRef.current(true);
   }, [activeTab]);
-  
+
   useManagedInterval(
     `operations-refresh-${activeTab}`,
     refreshActiveTab,
-    60000, // Increased from 30s to 60s
+    60000,
     { enabled: autoRefresh, runWhenHidden: false }
   );
 
-  // Real-time subscriptions
+  // Real-time subscriptions — subscribe ONCE per autoRefresh toggle.
+  // Callbacks read from refs so filter changes don't tear down channels.
   useEffect(() => {
     if (!autoRefresh) return;
 
-    const visitsChannel = supabase
-      .channel('visits-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, () => {
-        fetchCheckInData();
-      })
-      .subscribe();
+    const silentRefetchOrders = debounce(() => fetchOrderDataRef.current(true), 800);
+    const silentRefetchCheckins = debounce(() => fetchCheckInDataRef.current(true), 800);
+    const silentRefetchStock = debounce(() => fetchStockDataRef.current(true), 800);
+    const silentRefetchReturns = debounce(() => fetchReturnStockDataRef.current(true), 800);
 
     const ordersChannel = supabase
-      .channel('orders-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrderData();
-      })
+      .channel('operations-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, silentRefetchOrders)
       .subscribe();
-
+    const visitsChannel = supabase
+      .channel('operations-visits')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, silentRefetchCheckins)
+      .subscribe();
     const stockChannel = supabase
-      .channel('stock-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, () => {
-        fetchStockData();
-      })
+      .channel('operations-stock')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, silentRefetchStock)
       .subscribe();
-
-    const returnStockChannel = supabase
-      .channel('return-stock-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'van_return_grn' }, () => {
-        fetchReturnStockData();
-      })
+    const returnChannel = supabase
+      .channel('operations-returns')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'van_return_grn' }, silentRefetchReturns)
       .subscribe();
 
     return () => {
-      supabase.removeChannel(visitsChannel);
       supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(visitsChannel);
       supabase.removeChannel(stockChannel);
-      supabase.removeChannel(returnStockChannel);
+      supabase.removeChannel(returnChannel);
     };
-  }, [autoRefresh, userFilter, checkinDateFilter, orderDateFilter, stockDateFilter, returnStockDateFilter, checkinCustomRange, orderCustomRange, stockCustomRange]);
+  }, [autoRefresh]);
 
   if (loading) {
     return (
