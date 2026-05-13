@@ -294,8 +294,13 @@ function calculateSchemeDiscount(
       const cap = Number(scheme.max_discount_per_unit || 0);
       if (cap <= 0) break;
 
-      // The chosen item must still exist in the cart and be applicable to this scheme
-      const item = items.find(i => i.id === manualSelection.itemId);
+      // The chosen item must still exist in the cart and be applicable to this scheme.
+      // Support older/manual IDs where variants were saved as plain variant ids.
+      const item = items.find(i => {
+        if (i.id === manualSelection.itemId) return true;
+        if (!i.variant_id) return false;
+        return i.variant_id === manualSelection.itemId;
+      });
       if (!item) break;
       if (!schemeAppliesToItem(scheme, item)) break;
       // Optional min-quantity gate
