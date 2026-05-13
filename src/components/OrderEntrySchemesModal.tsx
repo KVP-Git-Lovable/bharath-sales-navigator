@@ -345,6 +345,14 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
     const hasConditions = schemeHasConditions(scheme);
     const conditionMet = schemeItems.length > 0 && isSchemeConditionMet(scheme, schemeItems, subtotal);
     const isPurePercentage = scheme.scheme_type === 'percentage_discount' && !hasConditions;
+    const isManualPerUnit = scheme.scheme_type === 'manual_per_unit_discount';
+    const manualSel = manualSelections[scheme.id];
+    const manualValueType: 'amount' | 'percentage' =
+      (scheme.discount_value_type as 'amount' | 'percentage') === 'percentage' ? 'percentage' : 'amount';
+    const manualUnit = scheme.discount_unit || 'unit';
+    const manualLineName = manualSel
+      ? schemeItems.find(i => i.id === manualSel.itemId)?.name
+      : undefined;
     
     // In "All Offers" tab, show condition status for schemes with conditions
     const showConditionStatus = showInAllTab && hasConditions && !conditionMet;
