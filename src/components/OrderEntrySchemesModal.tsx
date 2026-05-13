@@ -466,8 +466,23 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Benefit:</span>
-              <span className="font-medium text-primary">{getBenefitText(scheme)}</span>
+              <span className="font-medium text-primary">
+                {isManualPerUnit
+                  ? `Up to ${manualValueType === 'percentage' ? `${scheme.max_discount_per_unit}%` : `₹${scheme.max_discount_per_unit}`} / ${manualUnit} (manual)`
+                  : getBenefitText(scheme)}
+              </span>
             </div>
+            {isManualPerUnit && isApplied && manualSel && (
+              <div className="flex justify-between text-[11px] pt-1 border-t border-border/40">
+                <span className="text-muted-foreground">Applied to:</span>
+                <span className="font-medium">
+                  {manualLineName || 'item'} ·{' '}
+                  {manualValueType === 'percentage'
+                    ? `${manualSel.perUnitDiscount}% / ${manualUnit}`
+                    : `₹${manualSel.perUnitDiscount} / ${manualUnit}`}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -482,6 +497,16 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                   <Check className="w-2.5 h-2.5 mr-0.5" />
                   Applied
                 </Badge>
+                {isManualPerUnit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => setPickerScheme(scheme)}
+                  >
+                    Edit
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
