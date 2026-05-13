@@ -97,9 +97,13 @@ const Operations = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
   const navigate = useNavigate();
   
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try { return localStorage.getItem('operations_active_tab') || 'orders'; } catch { return 'orders'; }
+  });
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState<string>(() => {
+    try { return localStorage.getItem('operations_search_term') || ''; } catch { return ''; }
+  });
   const [userFilter, setUserFilter] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem('operations_user_filter');
@@ -115,16 +119,33 @@ const Operations = () => {
     try { localStorage.setItem('operations_user_filter', JSON.stringify(userFilter)); } catch {}
   }, [userFilter]);
   const [summaryDateFilter, setSummaryDateFilter] = useState<'today' | 'week' | 'month'>('today');
-  
-  // Separate date filters for each section
-  const [checkinDateFilter, setCheckinDateFilter] = useState('today');
-  const [orderDateFilter, setOrderDateFilter] = useState('today');
-  const [stockDateFilter, setStockDateFilter] = useState('today');
-  
-  // Custom date ranges
-  const [checkinCustomRange, setCheckinCustomRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
-  const [orderCustomRange, setOrderCustomRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
-  const [stockCustomRange, setStockCustomRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
+
+  // Helper: hydrate string filter from localStorage
+  const hydrateString = (key: string, fallback: string): string => {
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+  };
+  // Helper: hydrate {from,to} Date range from localStorage
+  const hydrateRange = (key: string): { from: Date | null; to: Date | null } => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return { from: null, to: null };
+      const parsed = JSON.parse(raw);
+      return {
+        from: parsed?.from ? new Date(parsed.from) : null,
+        to: parsed?.to ? new Date(parsed.to) : null,
+      };
+    } catch { return { from: null, to: null }; }
+  };
+
+  // Separate date filters for each section (persisted)
+  const [checkinDateFilter, setCheckinDateFilter] = useState(() => hydrateString('operations_checkin_date_filter', 'today'));
+  const [orderDateFilter, setOrderDateFilter] = useState(() => hydrateString('operations_order_date_filter', 'today'));
+  const [stockDateFilter, setStockDateFilter] = useState(() => hydrateString('operations_stock_date_filter', 'today'));
+
+  // Custom date ranges (persisted)
+  const [checkinCustomRange, setCheckinCustomRange] = useState<{ from: Date | null; to: Date | null }>(() => hydrateRange('operations_checkin_custom_range'));
+  const [orderCustomRange, setOrderCustomRange] = useState<{ from: Date | null; to: Date | null }>(() => hydrateRange('operations_order_custom_range'));
+  const [stockCustomRange, setStockCustomRange] = useState<{ from: Date | null; to: Date | null }>(() => hydrateRange('operations_stock_custom_range'));
   
   // Data states
   const [checkInData, setCheckInData] = useState<CheckInOutData[]>([]);
@@ -144,9 +165,43 @@ const Operations = () => {
   const [loadingCancelled, setLoadingCancelled] = useState(false);
   
   // Date filter for competitor and return stock
-  const [competitorDateFilter, setCompetitorDateFilter] = useState('today');
-  const [returnStockDateFilter, setReturnStockDateFilter] = useState('today');
-  const [cancelledDateFilter, setCancelledDateFilter] = useState('today');
+  const [competitorDateFilter, setCompetitorDateFilter] = useState(() => hydrateString('operations_competitor_date_filter', 'today'));
+  const [returnStockDateFilter, setReturnStockDateFilter] = useState(() => hydrateString('operations_return_stock_date_filter', 'today'));
+  const [cancelledDateFilter, setCancelledDateFilter] = useState(() => hydrateString('operations_cancelled_date_filter', 'today'));
+
+  // Persist all filter state back to localStorage
+  useEffect(() => { try { localStorage.setItem('operations_active_tab', activeTab); } catch {} }, [activeTab]);
+  useEffect(() => { try { localStorage.setItem('operations_search_term', searchTerm); } catch {} }, [searchTerm]);
+  useEffect(() => { try { localStorage.setItem('operations_checkin_date_filter', checkinDateFilter); } catch {} }, [checkinDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_order_date_filter', orderDateFilter); } catch {} }, [orderDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_stock_date_filter', stockDateFilter); } catch {} }, [stockDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_competitor_date_filter', competitorDateFilter); } catch {} }, [competitorDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_return_stock_date_filter', returnStockDateFilter); } catch {} }, [returnStockDateFilter]);
+  useEffect(() => { try { localStorage.setItem('operations_cancelled_date_filter', cancelledDateFilter); } catch {} }, [cancelledDateFilter]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('operations_checkin_custom_range', JSON.stringify({
+        from: checkinCustomRange.from?.toISOString() ?? null,
+        to: checkinCustomRange.to?.toISOString() ?? null,
+      }));
+    } catch {}
+  }, [checkinCustomRange]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('operations_order_custom_range', JSON.stringify({
+        from: orderCustomRange.from?.toISOString() ?? null,
+        to: orderCustomRange.to?.toISOString() ?? null,
+      }));
+    } catch {}
+  }, [orderCustomRange]);
+  useEffect(() => {
+    try {
+      localStorage.setItem('operations_stock_custom_range', JSON.stringify({
+        from: stockCustomRange.from?.toISOString() ?? null,
+        to: stockCustomRange.to?.toISOString() ?? null,
+      }));
+    } catch {}
+  }, [stockCustomRange]);
   
   // Summary counters
   const [todayStats, setTodayStats] = useState({
