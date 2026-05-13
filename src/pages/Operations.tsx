@@ -716,8 +716,8 @@ const Operations = () => {
   }, [userFilter, orderDateFilter, orderCustomRange]);
 
   // Fetch stock data
-  const fetchStockData = async () => {
-    setLoadingStock(true);
+  const fetchStockData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingStock(true);
     try {
       let query = supabase
         .from('stock')
@@ -794,15 +794,15 @@ const Operations = () => {
       setTodayStats(prev => ({ ...prev, stockUpdates: todayStock }));
     } catch (error) {
       console.error('Error fetching stock data:', error);
-      toast.error('Failed to fetch stock data');
+      if (!silent) toast.error('Failed to fetch stock data');
     } finally {
-      setLoadingStock(false);
+      if (!silent) setLoadingStock(false);
     }
-  };
+  }, [userFilter, stockDateFilter, stockCustomRange]);
 
   // Fetch competitor data
-  const fetchCompetitorData = async () => {
-    setLoadingCompetitor(true);
+  const fetchCompetitorData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCompetitor(true);
     try {
       const competitorToday = new Date();
       const startOfToday = new Date(competitorToday.getFullYear(), competitorToday.getMonth(), competitorToday.getDate());
@@ -882,15 +882,15 @@ const Operations = () => {
       setCompetitorData(formattedData);
     } catch (error) {
       console.error('Error fetching competitor data:', error);
-      toast.error('Failed to fetch competitor data');
+      if (!silent) toast.error('Failed to fetch competitor data');
     } finally {
-      setLoadingCompetitor(false);
+      if (!silent) setLoadingCompetitor(false);
     }
-  };
+  }, [userFilter, competitorDateFilter]);
 
   // Fetch return stock data
-  const fetchReturnStockData = async () => {
-    setLoadingReturnStock(true);
+  const fetchReturnStockData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingReturnStock(true);
     try {
       const returnToday = new Date();
       const startOfToday = new Date(returnToday.getFullYear(), returnToday.getMonth(), returnToday.getDate());
@@ -985,15 +985,15 @@ const Operations = () => {
       setReturnStockData(formattedData);
     } catch (error) {
       console.error('Error fetching return stock data:', error);
-      toast.error('Failed to fetch return stock data');
+      if (!silent) toast.error('Failed to fetch return stock data');
     } finally {
-      setLoadingReturnStock(false);
+      if (!silent) setLoadingReturnStock(false);
     }
-  };
+  }, [userFilter, returnStockDateFilter]);
 
   // Fetch cancelled orders data
-  const fetchCancelledOrders = async () => {
-    setLoadingCancelled(true);
+  const fetchCancelledOrders = useCallback(async (silent = false) => {
+    if (!silent) setLoadingCancelled(true);
     try {
       const today = new Date();
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -1077,11 +1077,11 @@ const Operations = () => {
       }
     } catch (error) {
       console.error('Error fetching cancelled orders:', error);
-      toast.error('Failed to fetch cancelled orders');
+      if (!silent) toast.error('Failed to fetch cancelled orders');
     } finally {
-      setLoadingCancelled(false);
+      if (!silent) setLoadingCancelled(false);
     }
-  };
+  }, [userFilter, cancelledDateFilter]);
 
 
   const filterData = (data: any[], searchFields: string[]) => {
