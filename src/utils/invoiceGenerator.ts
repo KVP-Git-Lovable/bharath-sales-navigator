@@ -1,4 +1,7 @@
-// jspdf, jspdf-autotable loaded dynamically in functions
+// Static imports avoid "Failed to fetch dynamically imported module" errors
+// that surface after deploys when stale chunk hashes are gone from CDN.
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
