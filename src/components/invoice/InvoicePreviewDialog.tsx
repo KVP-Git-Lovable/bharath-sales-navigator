@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
+import * as pdfjsLib from "pdfjs-dist";
+// Vite worker import
+// @ts-ignore
+import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 interface InvoicePreviewDialogProps {
   orderId: string;
@@ -27,24 +33,43 @@ export const InvoicePreviewDialog = ({
 }: InvoicePreviewDialogProps) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [resolvedNumber, setResolvedNumber] = useState<string | null>(invoiceNumber || null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    let createdUrl: string | null = null;
     (async () => {
       setLoading(true);
       try {
         const { blob, invoiceNumber: num } = await fetchAndGenerateInvoice(orderId);
         if (cancelled) return;
-        const url = URL.createObjectURL(blob);
-        createdUrl = url;
         setPdfBlob(blob);
-        setPdfUrl(url);
         if (num) setResolvedNumber(num);
+
+        // Render via pdf.js into canvases (works inside sandboxed iframes)
+        const buf = await blob.arrayBuffer();
+        if (cancelled) return;
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const container = containerRef.current;
+        if (!container) return;
+        container.innerHTML = "";
+        const containerWidth = container.clientWidth - 32; // padding
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 1 });
+          const scale = Math.min(2, Math.max(1, containerWidth / viewport.width));
+          const scaled = page.getViewport({ scale });
+          const canvas = document.createElement("canvas");
+          canvas.width = scaled.width;
+          canvas.height = scaled.height;
+          canvas.className = "shadow-md rounded bg-white mx-auto block mb-4 max-w-full h-auto";
+          const ctx = canvas.getContext("2d")!;
+          await page.render({ canvasContext: ctx, viewport: scaled, canvas }).promise;
+          if (cancelled) return;
+          container.appendChild(canvas);
+        }
       } catch (err: any) {
         console.error("Invoice preview failed", err);
         toast.error(err?.message || "Failed to load invoice");
@@ -55,15 +80,14 @@ export const InvoicePreviewDialog = ({
     })();
     return () => {
       cancelled = true;
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
     };
   }, [open, orderId]);
 
   // Reset on close
   useEffect(() => {
     if (!open) {
-      setPdfUrl(null);
       setPdfBlob(null);
+      if (containerRef.current) containerRef.current.innerHTML = "";
     }
   }, [open]);
 
@@ -104,33 +128,13 @@ export const InvoicePreviewDialog = ({
             Download
           </Button>
         </DialogHeader>
-        <div className="flex-1 bg-muted/30 min-h-[70vh] relative">
+        <div className="flex-1 bg-muted/30 min-h-[70vh] relative overflow-y-auto">
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground gap-2">
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground gap-2 z-10 bg-muted/30">
               <Loader2 className="h-4 w-4 animate-spin" /> Generating invoice…
             </div>
           )}
-          {pdfUrl && (
-            <object
-              data={pdfUrl}
-              type="application/pdf"
-              className="w-full h-full min-h-[70vh]"
-            >
-              <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Inline PDF preview is blocked by your browser.
-                </p>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => window.open(pdfUrl, "_blank")}>
-                    Open in new tab
-                  </Button>
-                  <Button size="sm" onClick={handleDownload}>
-                    <Download className="h-4 w-4 mr-2" /> Download
-                  </Button>
-                </div>
-              </div>
-            </object>
-          )}
+          <div ref={containerRef} className="p-4" />
         </div>
       </DialogContent>
     </Dialog>
