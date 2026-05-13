@@ -31,6 +31,7 @@ export interface AppliedScheme {
   unit?: string;
   applied_to_item_id?: string;
   applied_to_product_name?: string;
+  value_type?: 'amount' | 'percentage';
 }
 
 export interface ItemSchemeDetail {
@@ -45,6 +46,8 @@ export interface ItemSchemeDetail {
   // Manual per-unit discount fields
   perUnitDiscount?: number;
   unit?: string;
+  // For manual_per_unit_discount: 'amount' or 'percentage'
+  valueType?: 'amount' | 'percentage';
 }
 
 export interface SchemeCalculationResult {
@@ -85,6 +88,8 @@ export interface ProductScheme {
   // Manual per-unit discount support
   max_discount_per_unit?: number | null;
   discount_unit?: string | null;
+  // 'amount' (₹/unit) or 'percentage' (% off rate per unit). Defaults to 'amount'.
+  discount_value_type?: string | null;
 }
 
 /**
@@ -94,6 +99,8 @@ export interface ProductScheme {
 export interface ManualSchemeSelection {
   itemId: string;          // cart line id (matches SchemeItem.id)
   perUnitDiscount: number; // amount entered, ≤ scheme.max_discount_per_unit
+  // Optional: when 'percentage', perUnitDiscount represents a % off the line rate
+  valueType?: 'amount' | 'percentage';
 }
 
 /**
@@ -266,13 +273,13 @@ function calculateSchemeDiscount(
   itemDiscounts: Record<string, number>; 
   itemSchemeDetails: Record<string, ItemSchemeDetail[]>;
   freeItems?: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[];
-  manualMeta?: { perUnitDiscount: number; unit: string; itemId: string; productName: string };
+  manualMeta?: { perUnitDiscount: number; unit: string; itemId: string; productName: string; valueType: 'amount' | 'percentage' };
 } {
   let discount = 0;
   const itemDiscounts: Record<string, number> = {};
   const itemSchemeDetails: Record<string, ItemSchemeDetail[]> = {};
   let freeItems: { product_name: string; quantity: number; product_id?: string; original_rate?: number; unit?: string; triggering_item_id?: string }[] | undefined;
-  let manualMeta: { perUnitDiscount: number; unit: string; itemId: string; productName: string } | undefined;
+  let manualMeta: { perUnitDiscount: number; unit: string; itemId: string; productName: string; valueType: 'amount' | 'percentage' } | undefined;
 
   // Get applicable items
   const applicableItems = items.filter(item => schemeAppliesToItem(scheme, item));
@@ -294,7 +301,19 @@ function calculateSchemeDiscount(
       // Optional min-quantity gate
       if (!isQuantityConditionMet(scheme, item.quantity)) break;
 
-      const perUnit = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
+      const valueType: 'amount' | 'percentage' =
+        (scheme.discount_value_type as 'amount' | 'percentage') === 'percentage'
+          ? 'percentage'
+          : 'amount';
+
+      const entered = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
+      if (entered <= 0) break;
+
+      // For percentage: perUnit = rate * pct/100; line discount = perUnit * qty
+      const perUnit =
+        valueType === 'percentage'
+          ? (Number(item.rate) || 0) * (entered / 100)
+          : entered;
       if (perUnit <= 0) break;
 
       const itemDiscount = perUnit * item.quantity;
@@ -308,15 +327,18 @@ function calculateSchemeDiscount(
         schemeName: scheme.name,
         schemeType: scheme.scheme_type,
         discountAmount: itemDiscount,
-        perUnitDiscount: perUnit,
+        perUnitDiscount: entered,
         unit,
+        valueType,
+        ...(valueType === 'percentage' ? { discountPercentage: entered } : {}),
       });
 
       manualMeta = {
-        perUnitDiscount: perUnit,
+        perUnitDiscount: entered,
         unit,
         itemId: item.id,
         productName: item.name || '',
+        valueType,
       };
       break;
     }
@@ -602,6 +624,7 @@ export function calculateOrderWithSchemes(
         unit: manualMeta?.unit,
         applied_to_item_id: manualMeta?.itemId,
         applied_to_product_name: manualMeta?.productName,
+        value_type: manualMeta?.valueType,
       });
     }
   }
@@ -657,7 +680,11 @@ export function formatSchemeDetailsForInvoice(appliedSchemes: AppliedScheme[]): 
       detail += ` (${scheme.discount_percentage}% off)`;
     }
     if (scheme.scheme_type === 'manual_per_unit_discount' && scheme.per_unit_discount) {
-      detail += ` (₹${scheme.per_unit_discount}/${scheme.unit || 'unit'}`;
+      if (scheme.value_type === 'percentage') {
+        detail += ` (${scheme.per_unit_discount}% off /${scheme.unit || 'unit'}`;
+      } else {
+        detail += ` (₹${scheme.per_unit_discount}/${scheme.unit || 'unit'}`;
+      }
       if (scheme.applied_to_product_name) {
         detail += ` on ${scheme.applied_to_product_name}`;
       }
