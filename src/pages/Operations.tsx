@@ -1834,6 +1834,7 @@ const Operations = () => {
                                   orderId={item.id}
                                   invoiceNumber={item.invoice_number}
                                   triggerLabel="View Invoice"
+                                  iconOnly
                                 />
                               </div>
                             </TableCell>
