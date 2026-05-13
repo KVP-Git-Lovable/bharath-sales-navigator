@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, DollarSign, User, RotateCcw, Pencil, Ban } from 'lucide-react';
+import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, DollarSign, User, RotateCcw, Pencil, Ban, ChevronDown, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -25,7 +25,9 @@ import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDial
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
 import { OrderInvoiceButton } from '@/components/invoice/OrderInvoiceButton';
-import { InvoicePreviewDialog } from '@/components/invoice/InvoicePreviewDialog';
+import { InvoicePreviewDialog, DownloadInvoiceButton } from '@/components/invoice/InvoicePreviewDialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Phone } from 'lucide-react';
 
 interface CheckInOutData {
@@ -99,7 +101,7 @@ const Operations = () => {
   const [activeTab, setActiveTab] = useState('orders');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [userFilter, setUserFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState<string[]>([]); // empty = all users
   const [summaryDateFilter, setSummaryDateFilter] = useState<'today' | 'week' | 'month'>('today');
   
   // Separate date filters for each section
@@ -237,8 +239,8 @@ const Operations = () => {
         `)
         .or('check_in_time.not.is.null,skip_check_in_time.not.is.null');
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter for check-ins
@@ -540,8 +542,8 @@ const Operations = () => {
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter for orders
@@ -662,8 +664,8 @@ const Operations = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter for stock
@@ -756,8 +758,8 @@ const Operations = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter
@@ -842,8 +844,8 @@ const Operations = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter
@@ -1000,8 +1002,8 @@ const Operations = () => {
       });
 
       // Apply user filter
-      if (userFilter !== 'all') {
-        const filteredOrderIds = (ordersRes.data || []).filter((o: any) => o.user_id === userFilter).map((o: any) => o.id);
+      if (userFilter.length > 0) {
+        const filteredOrderIds = (ordersRes.data || []).filter((o: any) => userFilter.includes(o.user_id)).map((o: any) => o.id);
         setCancelledOrders(formatted.filter(f => filteredOrderIds.includes(f.order_id)));
       } else {
         setCancelledOrders(formatted);
@@ -1206,19 +1208,69 @@ const Operations = () => {
                     className="w-64"
                   />
                 </div>
-                <Select value={userFilter} onValueChange={setUserFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select User" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.full_name || user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-56 justify-between font-normal">
+                      <span className="truncate">
+                        {userFilter.length === 0
+                          ? 'All Users'
+                          : userFilter.length === 1
+                            ? (users.find(u => u.id === userFilter[0])?.full_name
+                                || users.find(u => u.id === userFilter[0])?.username
+                                || '1 user selected')
+                            : `${userFilter.length} users selected`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <div className="flex items-center justify-between px-3 py-2 border-b">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {userFilter.length} selected
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setUserFilter(users.map(u => u.id))}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:underline"
+                          onClick={() => setUserFilter([])}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {users.map(user => {
+                        const checked = userFilter.includes(user.id);
+                        return (
+                          <label
+                            key={user.id}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/50 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(v) => {
+                                setUserFilter(prev =>
+                                  v ? [...prev, user.id] : prev.filter(id => id !== user.id)
+                                );
+                              }}
+                            />
+                            <span className="truncate">{user.full_name || user.username}</span>
+                          </label>
+                        );
+                      })}
+                      {users.length === 0 && (
+                        <div className="px-3 py-4 text-xs text-muted-foreground text-center">No users</div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 
                 {/* Date Filter for Check-ins */}
                 {activeTab === 'checkins' && (
@@ -1821,12 +1873,16 @@ const Operations = () => {
                               <Badge variant="secondary">{item.items.length} items</Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="flex justify-center">
+                              <div className="inline-flex items-center gap-0.5 rounded-md border bg-muted/30 p-0.5">
                                 <InvoicePreviewDialog
                                   orderId={item.id}
                                   invoiceNumber={item.invoice_number}
                                   triggerLabel="View Invoice"
                                   iconOnly
+                                />
+                                <DownloadInvoiceButton
+                                  orderId={item.id}
+                                  invoiceNumber={item.invoice_number}
                                 />
                               </div>
                             </TableCell>

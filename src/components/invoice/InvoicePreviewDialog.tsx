@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Download, FileText, Loader2 } from "lucide-react";
+import { Download, Eye, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
@@ -11,6 +11,38 @@ import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
+// Module-level cache so re-opening / downloading is instant
+type CachedInvoice = { blob: Blob; invoiceNumber: string };
+const invoiceCache = new Map<string, CachedInvoice>();
+const inflight = new Map<string, Promise<CachedInvoice>>();
+
+async function getInvoice(orderId: string): Promise<CachedInvoice> {
+  const cached = invoiceCache.get(orderId);
+  if (cached) return cached;
+  const existing = inflight.get(orderId);
+  if (existing) return existing;
+  const p = (async () => {
+    const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
+    const entry = { blob, invoiceNumber: invoiceNumber || "invoice" };
+    invoiceCache.set(orderId, entry);
+    inflight.delete(orderId);
+    return entry;
+  })();
+  inflight.set(orderId, p);
+  return p;
+}
+
+function triggerDownload(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${name}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 interface InvoicePreviewDialogProps {
   orderId: string;
@@ -43,32 +75,40 @@ export const InvoicePreviewDialog = ({
     (async () => {
       setLoading(true);
       try {
-        const { blob, invoiceNumber: num } = await fetchAndGenerateInvoice(orderId);
+        const { blob, invoiceNumber: num } = await getInvoice(orderId);
         if (cancelled) return;
         setPdfBlob(blob);
         if (num) setResolvedNumber(num);
 
-        // Render via pdf.js into canvases (works inside sandboxed iframes)
+        // Render via pdf.js into canvases (works inside sandboxed iframes).
+        // Render page 1 immediately, then the rest progressively for fast first paint.
         const buf = await blob.arrayBuffer();
         if (cancelled) return;
         const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
         const container = containerRef.current;
         if (!container) return;
         container.innerHTML = "";
-        const containerWidth = container.clientWidth - 32; // padding
-        for (let i = 1; i <= pdf.numPages; i++) {
+        const containerWidth = container.clientWidth - 32;
+        const renderPage = async (i: number) => {
           const page = await pdf.getPage(i);
           const viewport = page.getViewport({ scale: 1 });
-          const scale = Math.min(2, Math.max(1, containerWidth / viewport.width));
+          const scale = Math.min(1.5, Math.max(1, containerWidth / viewport.width));
           const scaled = page.getViewport({ scale });
           const canvas = document.createElement("canvas");
           canvas.width = scaled.width;
           canvas.height = scaled.height;
           canvas.className = "shadow-md rounded bg-white mx-auto block mb-4 max-w-full h-auto";
           const ctx = canvas.getContext("2d")!;
-          await page.render({ canvasContext: ctx, viewport: scaled, canvas }).promise;
-          if (cancelled) return;
           container.appendChild(canvas);
+          await page.render({ canvasContext: ctx, viewport: scaled, canvas }).promise;
+        };
+        // First page first for fast perceived load
+        await renderPage(1);
+        if (cancelled) return;
+        setLoading(false);
+        for (let i = 2; i <= pdf.numPages; i++) {
+          if (cancelled) return;
+          await renderPage(i);
         }
       } catch (err: any) {
         console.error("Invoice preview failed", err);
@@ -93,14 +133,7 @@ export const InvoicePreviewDialog = ({
 
   const handleDownload = () => {
     if (!pdfBlob) return;
-    const url = URL.createObjectURL(pdfBlob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${resolvedNumber || "invoice"}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    triggerDownload(pdfBlob, resolvedNumber || "invoice");
     toast.success("Invoice downloaded");
   };
 
@@ -108,12 +141,12 @@ export const InvoicePreviewDialog = ({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size={iconOnly ? "icon" : "sm"}
           title={triggerLabel}
           className={cn(iconOnly && "h-8 w-8 p-0", className)}
         >
-          <FileText className={cn("h-4 w-4", !iconOnly && "mr-2")} />
+          <Eye className={cn("h-4 w-4", !iconOnly && "mr-2")} />
           {!iconOnly && triggerLabel}
         </Button>
       </DialogTrigger>
@@ -138,5 +171,44 @@ export const InvoicePreviewDialog = ({
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+/** Standalone download button for the Invoice column. */
+export const DownloadInvoiceButton = ({
+  orderId,
+  invoiceNumber,
+  className,
+}: {
+  orderId: string;
+  invoiceNumber?: string | null;
+  className?: string;
+}) => {
+  const [busy, setBusy] = useState(false);
+  const handleClick = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { blob, invoiceNumber: num } = await getInvoice(orderId);
+      triggerDownload(blob, invoiceNumber || num || "invoice");
+      toast.success("Invoice downloaded");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Failed to download invoice");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={cn("h-8 w-8", className)}
+      title="Download Invoice"
+      onClick={handleClick}
+      disabled={busy}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+    </Button>
   );
 };
