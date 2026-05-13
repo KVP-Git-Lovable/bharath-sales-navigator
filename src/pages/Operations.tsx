@@ -533,8 +533,7 @@ const Operations = () => {
           credit_paid_amount,
           payment_method,
           payment_status,
-          invoice_number,
-          order_items(product_name, quantity, rate, total, sgst_amount, cgst_amount, hsn_code, unit)
+          invoice_number
         `)
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
@@ -575,7 +574,7 @@ const Operations = () => {
       const counterIds = [...new Set((ordersData || []).map(o => o.counter_customer_id).filter(Boolean) as string[])];
       const orderIds = (ordersData || []).map(o => o.id);
 
-      const [{ data: usersData }, { data: retailersData }, { data: counterData }, { data: invoicesData }] = await Promise.all([
+      const [{ data: usersData }, { data: retailersData }, { data: counterData }, { data: invoicesData }, { data: itemsData }] = await Promise.all([
         supabase.from('profiles').select('id, full_name, username').in('id', userIds),
         retailerIds.length
           ? supabase.from('retailers').select('id, phone').in('id', retailerIds)
@@ -586,6 +585,12 @@ const Operations = () => {
         orderIds.length
           ? supabase.from('invoices').select('id, order_id').in('order_id', orderIds)
           : Promise.resolve({ data: [] as any[] }),
+        orderIds.length
+          ? supabase
+              .from('order_items')
+              .select('order_id, product_name, quantity, rate, total, sgst_amount, cgst_amount, hsn_code, unit')
+              .in('order_id', orderIds)
+          : Promise.resolve({ data: [] as any[] }),
       ]);
 
       const formattedData = ordersData?.map(order => {
@@ -593,6 +598,7 @@ const Operations = () => {
         const retailer = retailersData?.find((r: any) => r.id === order.retailer_id);
         const counter = counterData?.find((c: any) => c.id === order.counter_customer_id);
         const invoice = invoicesData?.find((i: any) => i.order_id === order.id);
+        const itemsForOrder = (itemsData || []).filter((it: any) => it.order_id === order.id);
         
         // Check if order was edited (updated_at differs from created_at by more than 5 seconds)
         const createdTime = new Date(order.created_at).getTime();
@@ -610,7 +616,7 @@ const Operations = () => {
           subtotal: Number(order.subtotal || 0),
           discount_amount: Number(order.discount_amount || 0),
           status: order.status,
-          items: order.order_items || [],
+          items: itemsForOrder,
           is_edited: isEdited,
           is_credit_order: order.is_credit_order || false,
           credit_pending_amount: order.credit_pending_amount || 0,
