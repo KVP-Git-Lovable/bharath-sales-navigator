@@ -153,7 +153,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   const { policies: schemePolicies, loading: policiesLoading } = useSchemePolicies();
   
   // Applied schemes persistence
-  const { appliedSchemeIds, applyScheme, removeScheme, clearSchemes, setOnlyScheme } = useAppliedSchemes(visitId, retailerId);
+  const { appliedSchemeIds, manualSelections, applyScheme, removeScheme, clearSchemes, setOnlyScheme, setManualSelection } = useAppliedSchemes(visitId, retailerId);
   
   // Track auto-applied schemes to prevent infinite loops
   const autoAppliedSchemesRef = useRef<Set<string>>(new Set());
@@ -902,8 +902,8 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         };
       });
     
-    return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds);
-  }, [orderRows, schemes, appliedSchemeIds]);
+    return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds, manualSelections);
+  }, [orderRows, schemes, appliedSchemeIds, manualSelections]);
 
   const getTotalValue = () => {
     return parseFloat(orderCalculation.subtotal.toFixed(2));
@@ -1332,6 +1332,8 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         onRemoveScheme={(schemeId) => {
           removeScheme(schemeId);
         }}
+        manualSelections={manualSelections}
+        onSetManualSelection={setManualSelection}
       />
     </div>
   );

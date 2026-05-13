@@ -36,6 +36,8 @@ import { toast } from "@/hooks/use-toast";
 import { ProductScheme } from "@/hooks/useOfflineSchemes";
 import { isSchemeConditionMet, schemeHasConditions, SchemeItem, calculateSchemeDiscountForComparison } from "@/utils/schemeEngine";
 import { SchemePolicies } from "@/hooks/useSchemePolicies";
+import type { ManualSchemeSelection } from "@/utils/schemeEngine";
+import { ManualPerUnitApplyDialog } from "@/components/ManualPerUnitApplyDialog";
 
 interface Product {
   id: string;
@@ -48,6 +50,7 @@ interface Product {
 interface OrderRow {
   id: string;
   product?: Product;
+  variant?: any;
   quantity: number;
 }
 
@@ -63,6 +66,8 @@ interface OrderEntrySchemesModalProps {
   schemePolicies?: SchemePolicies;
   onApplyScheme: (scheme: ProductScheme, product?: Product, quantity?: number) => void;
   onRemoveScheme: (schemeId: string) => void;
+  manualSelections?: Record<string, ManualSchemeSelection>;
+  onSetManualSelection?: (schemeId: string, selection: ManualSchemeSelection | null) => void;
 }
 
 const getSchemeTypeIcon = (type: string) => {
@@ -98,6 +103,8 @@ const getSchemeTypeLabel = (type: string) => {
       return 'First Order';
     case 'category_wide_discount':
       return 'Category';
+    case 'manual_per_unit_discount':
+      return 'Per-Unit (Manual)';
     default:
       return type;
   }
@@ -181,9 +188,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
   appliedSchemeIds,
   schemePolicies,
   onApplyScheme,
-  onRemoveScheme
+  onRemoveScheme,
+  manualSelections = {},
+  onSetManualSelection,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [pickerScheme, setPickerScheme] = useState<ProductScheme | null>(null);
 
   // Check if more schemes can be applied based on policies
   const canApplyMore = useMemo(() => {
@@ -244,11 +254,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
     return orderRows
       .filter(row => row.product && row.quantity > 0)
       .map(row => ({
-        id: row.product!.id,
+        id: row.variant?.id || row.product!.id,
         product_id: row.product!.id,
+        variant_id: row.variant?.id,
         quantity: row.quantity,
-        rate: row.product!.rate,
-        name: row.product!.name
+        rate: row.variant?.price ?? row.product!.rate,
+        name: row.variant?.variant_name || row.product!.name
       }));
   }, [orderRows]);
 
@@ -282,6 +293,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
 
   // Handle apply scheme
   const handleApply = (scheme: ProductScheme) => {
+    // Manual per-unit schemes open the picker dialog instead of toggling
+    if (scheme.scheme_type === 'manual_per_unit_discount') {
+      setPickerScheme(scheme);
+      return;
+    }
+
     // Find the product for this scheme
     let targetProduct: Product | undefined;
     let minQuantity = 1;
@@ -328,6 +345,14 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
     const hasConditions = schemeHasConditions(scheme);
     const conditionMet = schemeItems.length > 0 && isSchemeConditionMet(scheme, schemeItems, subtotal);
     const isPurePercentage = scheme.scheme_type === 'percentage_discount' && !hasConditions;
+    const isManualPerUnit = scheme.scheme_type === 'manual_per_unit_discount';
+    const manualSel = manualSelections[scheme.id];
+    const manualValueType: 'amount' | 'percentage' =
+      (scheme.discount_value_type as 'amount' | 'percentage') === 'percentage' ? 'percentage' : 'amount';
+    const manualUnit = scheme.discount_unit || 'unit';
+    const manualLineName = manualSel
+      ? schemeItems.find(i => i.id === manualSel.itemId)?.name
+      : undefined;
     
     // In "All Offers" tab, show condition status for schemes with conditions
     const showConditionStatus = showInAllTab && hasConditions && !conditionMet;
@@ -441,8 +466,23 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Benefit:</span>
-              <span className="font-medium text-primary">{getBenefitText(scheme)}</span>
+              <span className="font-medium text-primary">
+                {isManualPerUnit
+                  ? `Up to ${manualValueType === 'percentage' ? `${scheme.max_discount_per_unit}%` : `₹${scheme.max_discount_per_unit}`} / ${manualUnit} (manual)`
+                  : getBenefitText(scheme)}
+              </span>
             </div>
+            {isManualPerUnit && isApplied && manualSel && (
+              <div className="flex justify-between text-[11px] pt-1 border-t border-border/40">
+                <span className="text-muted-foreground">Applied to:</span>
+                <span className="font-medium">
+                  {manualLineName || 'item'} ·{' '}
+                  {manualValueType === 'percentage'
+                    ? `${manualSel.perUnitDiscount}% / ${manualUnit}`
+                    : `₹${manualSel.perUnitDiscount} / ${manualUnit}`}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
@@ -457,6 +497,16 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                   <Check className="w-2.5 h-2.5 mr-0.5" />
                   Applied
                 </Badge>
+                {isManualPerUnit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => setPickerScheme(scheme)}
+                  >
+                    Edit
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -511,6 +561,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
@@ -597,5 +648,35 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         )}
       </DialogContent>
     </Dialog>
+
+    <ManualPerUnitApplyDialog
+      isOpen={!!pickerScheme}
+      onClose={() => setPickerScheme(null)}
+      scheme={pickerScheme}
+      cartLines={orderRows
+        .filter(r => r.product && r.quantity > 0)
+        .map(r => ({
+          id: r.variant?.id || r.product!.id,
+          productId: r.product!.id,
+          variantId: r.variant?.id,
+          name: r.variant?.variant_name || r.product!.name,
+          quantity: r.quantity,
+          rate: r.variant?.price ?? r.product!.rate,
+          unit: r.product!.unit,
+        }))}
+      initialSelection={pickerScheme ? manualSelections[pickerScheme.id] : undefined}
+      onConfirm={(selection) => {
+        if (!pickerScheme) return;
+        onSetManualSelection?.(pickerScheme.id, selection);
+        if (!appliedSchemeIds.includes(pickerScheme.id)) {
+          onApplyScheme(pickerScheme);
+        }
+        toast({
+          title: 'Offer Applied',
+          description: `${pickerScheme.name} added to selected line`,
+        });
+      }}
+    />
+    </>
   );
 };

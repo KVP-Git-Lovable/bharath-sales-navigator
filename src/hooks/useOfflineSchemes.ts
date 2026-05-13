@@ -26,6 +26,12 @@ export interface ProductScheme {
   is_first_order_only: boolean | null;
   product_name?: string;
   free_product_name?: string;
+  // Manual per-unit discount support
+  max_discount_per_unit?: number | null;
+  discount_unit?: string | null;
+  discount_value_type?: string | null;
+  // Multi-product targeting
+  target_product_ids?: string[] | null;
 }
 
 export const useOfflineSchemes = () => {
