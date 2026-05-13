@@ -1201,7 +1201,30 @@ const Operations = () => {
     return null;
   }
 
-  // (filteredX arrays moved to useMemo above the early-return guard)
+  const filteredCheckInData = useMemo(
+    () => filterData(checkInData, ['user_name', 'retailer_name']),
+    [checkInData, searchTerm]
+  );
+  const filteredOrderData = useMemo(
+    () => filterData(orderData, ['user_name', 'retailer_name']),
+    [orderData, searchTerm]
+  );
+  const filteredStockData = useMemo(
+    () => filterData(stockData, ['user_name', 'retailer_name', 'product_name']),
+    [stockData, searchTerm]
+  );
+  const filteredCompetitorData = useMemo(
+    () => filterData(competitorData, ['user_name', 'retailer_name', 'competitor_name']),
+    [competitorData, searchTerm]
+  );
+  const filteredReturnStockData = useMemo(
+    () => filterData(returnStockData, ['user_name', 'retailer_name', 'van_name']),
+    [returnStockData, searchTerm]
+  );
+  const filteredCancelledOrders = useMemo(
+    () => filterData(cancelledOrders, ['retailer_name', 'cancelled_by_name', 'reason']),
+    [cancelledOrders, searchTerm]
+  );
 
   return (
     <Layout>
