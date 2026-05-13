@@ -95,7 +95,7 @@ const Operations = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
   const navigate = useNavigate();
   
-  const [activeTab, setActiveTab] = useState('checkins');
+  const [activeTab, setActiveTab] = useState('orders');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [userFilter, setUserFilter] = useState('all');
