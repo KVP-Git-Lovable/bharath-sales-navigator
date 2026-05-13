@@ -15049,7 +15049,6 @@ export type Database = {
           id: string
           is_applicable: boolean
           product_variant_id: string
-          tax_master_id: string
           updated_at: string
         }
         Insert: {
@@ -15057,7 +15056,6 @@ export type Database = {
           id?: string
           is_applicable?: boolean
           product_variant_id: string
-          tax_master_id: string
           updated_at?: string
         }
         Update: {
@@ -15065,7 +15063,6 @@ export type Database = {
           id?: string
           is_applicable?: boolean
           product_variant_id?: string
-          tax_master_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -15074,13 +15071,6 @@ export type Database = {
             columns: ["product_variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tax_product_map_tax_master_id_fkey"
-            columns: ["tax_master_id"]
-            isOneToOne: false
-            referencedRelation: "tax_masters"
             referencedColumns: ["id"]
           },
         ]
