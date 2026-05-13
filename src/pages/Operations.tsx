@@ -23,6 +23,7 @@ import EditOrderDialog from '@/components/EditOrderDialog';
 import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDialog';
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
+import { OrderInvoiceButton } from '@/components/invoice/OrderInvoiceButton';
 import { FileText, Phone } from 'lucide-react';
 
 interface CheckInOutData {
@@ -138,15 +139,37 @@ const Operations = () => {
     stockUpdates: 0
   });
 
-  const getPaymentTypeLabel = (o: { is_credit_order?: boolean; credit_paid_amount?: number; payment_status?: string | null }) => {
+  const getPaymentTypeLabel = (o: { is_credit_order?: boolean; credit_paid_amount?: number; credit_pending_amount?: number; total_amount?: number; payment_status?: string | null }) => {
     const paid = Number(o.credit_paid_amount || 0);
+    const pending = Number(o.credit_pending_amount || 0);
+    const total = Number(o.total_amount || 0);
     if (o.is_credit_order) {
-      if (paid > 0) return 'Partial Payment';
-      return 'Full Credit';
+      if (paid <= 0) return 'Full Credit';
+      if (pending > 0 || paid < total) return 'Partial Payment';
+      return 'Full Payment';
     }
+    // Non-credit order: derive from amount paid vs total (payment_status is unreliable)
+    if (total > 0 && paid >= total) return 'Full Payment';
+    if (paid > 0) return 'Partial Payment';
     if (o.payment_status === 'partial') return 'Partial Payment';
-    if (o.payment_status === 'pending') return 'Pending';
-    return 'Full Payment';
+    return 'Pending';
+  };
+
+  // Format an order-item quantity using its stored unit.
+  // Grams >= 1000 are shown as KG for readability.
+  const formatItemQty = (qty: number | string | null | undefined, unit: string | null | undefined): string => {
+    const n = Number(qty || 0);
+    const u = String(unit || '').trim();
+    const ul = u.toLowerCase();
+    if ((ul === 'grams' || ul === 'gram' || ul === 'g') && n >= 1000) {
+      const kg = n / 1000;
+      return `${kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(2)} KG`;
+    }
+    if ((ul === 'ml' || ul === 'milliliter' || ul === 'milliliters') && n >= 1000) {
+      const l = n / 1000;
+      return `${l % 1 === 0 ? l.toFixed(0) : l.toFixed(2)} L`;
+    }
+    return u ? `${n} ${u}` : String(n);
   };
   
   // Edit order dialog state
