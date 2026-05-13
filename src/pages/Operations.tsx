@@ -1139,14 +1139,6 @@ const Operations = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              onClick={() => navigate('/admin-controls')} 
-              variant="ghost" 
-              size="sm"
-              className="p-2"
-            >
-              <ArrowLeft size={20} />
-            </Button>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Operations Dashboard</h1>
               <p className="text-muted-foreground">Monitor real-time operations and data</p>
