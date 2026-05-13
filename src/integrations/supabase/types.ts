@@ -11632,7 +11632,6 @@ export type Database = {
           name: string
           per_product_discounts: Json | null
           priority: number | null
-          quantity_condition_type: string | null
           scheme_type: string
           source: string | null
           start_date: string | null
@@ -11673,7 +11672,6 @@ export type Database = {
           name: string
           per_product_discounts?: Json | null
           priority?: number | null
-          quantity_condition_type?: string | null
           scheme_type?: string
           source?: string | null
           start_date?: string | null
@@ -11714,7 +11712,6 @@ export type Database = {
           name?: string
           per_product_discounts?: Json | null
           priority?: number | null
-          quantity_condition_type?: string | null
           scheme_type?: string
           source?: string | null
           start_date?: string | null
