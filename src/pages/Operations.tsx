@@ -101,7 +101,20 @@ const Operations = () => {
   const [activeTab, setActiveTab] = useState('orders');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [userFilter, setUserFilter] = useState<string[]>([]); // empty = all users
+  const [userFilter, setUserFilter] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('operations_user_filter');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.filter((x) => typeof x === 'string');
+      }
+    } catch {}
+    return [];
+  });
+  const [userSearch, setUserSearch] = useState('');
+  useEffect(() => {
+    try { localStorage.setItem('operations_user_filter', JSON.stringify(userFilter)); } catch {}
+  }, [userFilter]);
   const [summaryDateFilter, setSummaryDateFilter] = useState<'today' | 'week' | 'month'>('today');
   
   // Separate date filters for each section
