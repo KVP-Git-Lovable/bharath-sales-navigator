@@ -1653,8 +1653,10 @@ const Operations = () => {
                       <TableRow>
                         <TableHead>User Name</TableHead>
                         <TableHead>Retailer Name</TableHead>
+                        <TableHead>Mobile</TableHead>
                         <TableHead>Order Date & Time</TableHead>
                         <TableHead>Order Value</TableHead>
+                        <TableHead>Payment</TableHead>
                         <TableHead>Items</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -1662,13 +1664,13 @@ const Operations = () => {
                     <TableBody>
                       {loadingOrders ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8">
+                          <TableCell colSpan={8} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
                           </TableCell>
                         </TableRow>
                       ) : filteredOrderData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                             No order data found
                           </TableCell>
                         </TableRow>
@@ -1687,12 +1689,33 @@ const Operations = () => {
                               </div>
                             </TableCell>
                             <TableCell>
+                              {item.retailer_phone ? (
+                                <a href={`tel:${item.retailer_phone}`} className="text-sm inline-flex items-center gap-1 text-primary hover:underline">
+                                  <Phone size={12} /> {item.retailer_phone}
+                                </a>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                                 {format(new Date(item.created_at), 'MMM dd, HH:mm')}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <span className="font-medium">₹{item.total_amount.toLocaleString()}</span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-0.5 text-xs">
+                                <span className="font-medium capitalize">
+                                  {getPaymentTypeLabel(item)}
+                                </span>
+                                {item.payment_method && (
+                                  <span className="text-muted-foreground capitalize">
+                                    Mode: {item.payment_method.replace(/_/g, ' ')}
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary">{item.items.length} items</Badge>
@@ -1705,7 +1728,7 @@ const Operations = () => {
                                       <Eye size={16} />
                                     </Button>
                                   </DialogTrigger>
-                                  <DialogContent className="max-w-3xl">
+                                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                                     <DialogHeader>
                                       <DialogTitle className="flex items-center gap-2">
                                         Order Details
@@ -1727,11 +1750,37 @@ const Operations = () => {
                                           <p className="text-sm text-muted-foreground">{item.retailer_name}</p>
                                         </div>
                                         <div>
+                                          <label className="text-sm font-medium">Mobile</label>
+                                          <p className="text-sm text-muted-foreground">{item.retailer_phone || '—'}</p>
+                                        </div>
+                                        <div>
                                           <label className="text-sm font-medium">Order Date & Time</label>
                                           <p className="text-sm text-muted-foreground">
                                             {format(new Date(item.created_at), 'PPpp')}
                                           </p>
                                         </div>
+                                        <div>
+                                          <label className="text-sm font-medium">Payment Type</label>
+                                          <p className="text-sm text-muted-foreground capitalize">{getPaymentTypeLabel(item)}</p>
+                                        </div>
+                                        <div>
+                                          <label className="text-sm font-medium">Payment Mode</label>
+                                          <p className="text-sm text-muted-foreground capitalize">
+                                            {item.payment_method ? item.payment_method.replace(/_/g, ' ') : '—'}
+                                          </p>
+                                        </div>
+                                        {item.is_credit_order && (
+                                          <>
+                                            <div>
+                                              <label className="text-sm font-medium">Paid</label>
+                                              <p className="text-sm text-muted-foreground">₹{Number(item.credit_paid_amount || 0).toLocaleString()}</p>
+                                            </div>
+                                            <div>
+                                              <label className="text-sm font-medium">Pending</label>
+                                              <p className="text-sm text-destructive">₹{Number(item.credit_pending_amount || 0).toLocaleString()}</p>
+                                            </div>
+                                          </>
+                                        )}
                                         <div>
                                           <label className="text-sm font-medium">Total Amount</label>
                                           <p className="text-sm font-medium">₹{item.total_amount.toLocaleString()}</p>
@@ -1746,33 +1795,85 @@ const Operations = () => {
                                         )}
                                       </div>
                                       <div>
-                                        <label className="text-sm font-medium">Order Items</label>
+                                        <label className="text-sm font-medium">Order Items (with GST breakdown)</label>
                                         <div className="mt-2 border rounded-md">
                                           <Table>
                                             <TableHeader>
                                               <TableRow>
                                                 <TableHead>Product</TableHead>
-                                                <TableHead>Quantity</TableHead>
-                                                <TableHead>Rate</TableHead>
-                                                <TableHead>Total</TableHead>
+                                                <TableHead className="text-right">Qty</TableHead>
+                                                <TableHead className="text-right">Unit Price</TableHead>
+                                                <TableHead className="text-right">Taxable (excl. GST)</TableHead>
+                                                <TableHead className="text-right">SGST</TableHead>
+                                                <TableHead className="text-right">CGST</TableHead>
+                                                <TableHead className="text-right">Total (incl. GST)</TableHead>
                                               </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                              {item.items.map((orderItem, index) => (
-                                                <TableRow key={index}>
-                                                  <TableCell>{orderItem.product_name}</TableCell>
-                                                  <TableCell>{orderItem.quantity}</TableCell>
-                                                  <TableCell>₹{orderItem.rate}</TableCell>
-                                                  <TableCell>₹{orderItem.total}</TableCell>
-                                                </TableRow>
-                                              ))}
+                                              {item.items.map((orderItem: any, index: number) => {
+                                                const qty = Number(orderItem.quantity || 0);
+                                                const rate = Number(orderItem.rate || 0);
+                                                const sgst = Number(orderItem.sgst_amount || 0);
+                                                const cgst = Number(orderItem.cgst_amount || 0);
+                                                const total = Number(orderItem.total || 0);
+                                                const taxable = Math.max(0, total - sgst - cgst);
+                                                return (
+                                                  <TableRow key={index}>
+                                                    <TableCell>{orderItem.product_name}</TableCell>
+                                                    <TableCell className="text-right">{qty}</TableCell>
+                                                    <TableCell className="text-right">₹{rate.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right">₹{taxable.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell className="text-right">₹{sgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell className="text-right">₹{cgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
+                                                    <TableCell className="text-right font-medium">₹{total.toLocaleString(undefined, { maximumFractionDigits: 2 })}</TableCell>
+                                                  </TableRow>
+                                                );
+                                              })}
                                             </TableBody>
                                           </Table>
                                         </div>
+                                        {(() => {
+                                          const totals = item.items.reduce((acc: any, it: any) => {
+                                            const sgst = Number(it.sgst_amount || 0);
+                                            const cgst = Number(it.cgst_amount || 0);
+                                            const total = Number(it.total || 0);
+                                            acc.sgst += sgst;
+                                            acc.cgst += cgst;
+                                            acc.taxable += Math.max(0, total - sgst - cgst);
+                                            acc.total += total;
+                                            return acc;
+                                          }, { sgst: 0, cgst: 0, taxable: 0, total: 0 });
+                                          return (
+                                            <div className="mt-3 flex justify-end">
+                                              <div className="text-sm space-y-1 min-w-[260px]">
+                                                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal (excl. GST)</span><span>₹{totals.taxable.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                                                <div className="flex justify-between"><span className="text-muted-foreground">SGST</span><span>₹{totals.sgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                                                <div className="flex justify-between"><span className="text-muted-foreground">CGST</span><span>₹{totals.cgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                                                {item.discount_amount > 0 && (
+                                                  <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>- ₹{Number(item.discount_amount).toLocaleString()}</span></div>
+                                                )}
+                                                <div className="flex justify-between font-semibold border-t pt-1"><span>Grand Total</span><span>₹{Number(item.total_amount).toLocaleString()}</span></div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
+                                      {item.invoice_id && (
+                                        <div className="flex justify-end">
+                                          <InvoicePDFGenerator invoiceId={item.invoice_id} buttonLabel="Download Invoice" buttonIcon={<FileText className="mr-2 h-4 w-4" />} />
+                                        </div>
+                                      )}
                                     </div>
                                   </DialogContent>
                                 </Dialog>
+                                {item.invoice_id && (
+                                  <InvoicePDFGenerator
+                                    invoiceId={item.invoice_id}
+                                    buttonLabel=""
+                                    buttonIcon={<FileText size={16} />}
+                                    className="h-8 w-8 p-0"
+                                  />
+                                )}
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
