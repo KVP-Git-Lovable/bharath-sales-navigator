@@ -1821,7 +1821,13 @@ export const Cart = () => {
             const ratePerDisplayUnit = displayUnit?.toLowerCase() === 'kg' && item.unit?.toLowerCase() === 'grams'
               ? getDisplayRate(item) * 1000
               : getDisplayRate(item);
-            
+
+            // Effective per-unit rate after scheme discount (mirrors Order Entry)
+            const perUnitDiscount = item.quantity > 0 ? discount / item.quantity : 0;
+            const ratePerDisplayUnitAfterDiscount = displayUnit?.toLowerCase() === 'kg' && item.unit?.toLowerCase() === 'grams'
+              ? Math.max(0, ratePerDisplayUnit - perUnitDiscount * 1000)
+              : Math.max(0, ratePerDisplayUnit - perUnitDiscount);
+
             // Get scheme details for this item
             const itemSchemes = orderCalculation.itemSchemeDetails?.[item.id] || [];
             
@@ -1831,7 +1837,15 @@ export const Cart = () => {
                         {/* Product Info - Compact */}
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-sm truncate leading-tight">{displayName}</h3>
-                          <p className="text-xs text-muted-foreground">₹{ratePerDisplayUnit.toFixed(2)}/{displayUnit}</p>
+                          {hasDiscount ? (
+                            <p className="text-xs text-muted-foreground">
+                              <span className="line-through mr-1">₹{ratePerDisplayUnit.toFixed(2)}</span>
+                              <span className="text-success font-medium">₹{ratePerDisplayUnitAfterDiscount.toFixed(2)}</span>
+                              /{displayUnit}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">₹{ratePerDisplayUnit.toFixed(2)}/{displayUnit}</p>
+                          )}
                           
                           {/* Show applied scheme details */}
                           {itemSchemes.length > 0 && (
