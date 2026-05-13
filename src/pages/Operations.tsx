@@ -25,6 +25,7 @@ import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDial
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
 import { OrderInvoiceButton } from '@/components/invoice/OrderInvoiceButton';
+import { InvoicePreviewDialog } from '@/components/invoice/InvoicePreviewDialog';
 import { FileText, Phone } from 'lucide-react';
 
 interface CheckInOutData {
@@ -1764,19 +1765,20 @@ const Operations = () => {
                         <TableHead className="text-right">Order Value</TableHead>
                         <TableHead>Payment</TableHead>
                         <TableHead>Items</TableHead>
+                        <TableHead className="text-center">Invoice</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {loadingOrders ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8">
+                          <TableCell colSpan={9} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
                           </TableCell>
                         </TableRow>
                       ) : filteredOrderData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                             No order data found
                           </TableCell>
                         </TableRow>
