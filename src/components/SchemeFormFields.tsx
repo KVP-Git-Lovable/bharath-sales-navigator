@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers, ChevronsUpDown, Check, Search } from 'lucide-react';
+import { Plus, X, Calendar, Package, Percent, DollarSign, Gift, Users, Clock, Star, Tag, Layers, ChevronsUpDown, Check, Search, Sliders } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SchemeFormFieldsProps {
@@ -108,6 +108,7 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
       case 'time_based_offer': return <Clock size={16} />;
       case 'first_order_discount': return <Star size={16} />;
       case 'category_wide_discount': return <Tag size={16} />;
+      case 'manual_per_unit_discount': return <Sliders size={16} />;
       default: return <Percent size={16} />;
     }
   };
