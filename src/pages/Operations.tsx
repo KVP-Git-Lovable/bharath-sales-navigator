@@ -1830,11 +1830,11 @@ const Operations = () => {
                                 />
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-end gap-1">
+                            <TableCell className="text-right">
+                              <div className="inline-flex items-center gap-0.5 rounded-md border bg-muted/30 p-0.5">
                                 <Dialog>
                                   <DialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" title="View">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
                                       <Eye size={16} />
                                     </Button>
                                   </DialogTrigger>
@@ -1987,7 +1987,8 @@ const Operations = () => {
                                 </Dialog>
                                 <Button 
                                   variant="ghost" 
-                                  size="sm" 
+                                  size="icon"
+                                  className="h-8 w-8"
                                   title="Edit Order"
                                   onClick={() => {
                                     setSelectedOrderForEdit({ id: item.id, retailer_name: item.retailer_name });
@@ -1998,9 +1999,9 @@ const Operations = () => {
                                 </Button>
                                 <Button 
                                   variant="ghost" 
-                                  size="sm" 
+                                  size="icon"
                                   title="Cancel Order"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => {
                                     setSelectedOrderForCancel({
                                       order: {
