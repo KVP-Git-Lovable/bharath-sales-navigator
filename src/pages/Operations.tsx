@@ -582,8 +582,8 @@ const Operations = () => {
   }, [userFilter, checkinDateFilter, checkinCustomRange, users]);
 
   // Fetch order data
-  const fetchOrderData = async () => {
-    setLoadingOrders(true);
+  const fetchOrderData = useCallback(async (silent = false) => {
+    if (!silent) setLoadingOrders(true);
     try {
       let query = supabase
         .from('orders')
@@ -709,11 +709,11 @@ const Operations = () => {
       setTodayStats(prev => ({ ...prev, orders: todayOrders }));
     } catch (error) {
       console.error('Error fetching order data:', error);
-      toast.error('Failed to fetch order data');
+      if (!silent) toast.error('Failed to fetch order data');
     } finally {
-      setLoadingOrders(false);
+      if (!silent) setLoadingOrders(false);
     }
-  };
+  }, [userFilter, orderDateFilter, orderCustomRange]);
 
   // Fetch stock data
   const fetchStockData = async () => {
