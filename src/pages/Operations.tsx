@@ -721,8 +721,7 @@ const Operations = () => {
           impact_level,
           created_at,
           competition_master(competitor_name),
-          competition_skus(sku_name),
-          retailers(name)
+          competition_skus(sku_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -757,12 +756,24 @@ const Operations = () => {
         usersData = profiles || [];
       }
 
+      // Fetch retailer names separately (no FK relationship for embed)
+      const retailerIds = [...new Set((data || []).map(d => d.retailer_id).filter(Boolean) as string[])];
+      let retailersData: any[] = [];
+      if (retailerIds.length > 0) {
+        const { data: rows } = await supabase
+          .from('retailers')
+          .select('id, name')
+          .in('id', retailerIds);
+        retailersData = rows || [];
+      }
+
       const formattedData = data?.map(item => {
         const user = usersData.find(u => u.id === item.user_id);
+        const retailer = retailersData.find(r => r.id === item.retailer_id);
         return {
           ...item,
           user_name: user?.full_name || user?.username || 'Unknown',
-          retailer_name: (item.retailers as any)?.name || 'Unknown',
+          retailer_name: retailer?.name || 'Unknown',
           competitor_name: (item.competition_master as any)?.competitor_name || 'Unknown',
           sku_name: (item.competition_skus as any)?.sku_name || '-'
         };
@@ -1658,18 +1669,63 @@ const Operations = () => {
 
               {/* Orders Tab */}
               <TabsContent value="orders">
-                <div className="rounded-md border">
+                {/* Orders Tab Header */}
+                {(() => {
+                  const totalValue = filteredOrderData.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+                  const creditCount = filteredOrderData.filter(o => o.is_credit_order).length;
+                  const paidCount = filteredOrderData.filter(o => !o.is_credit_order && o.payment_status !== 'pending').length;
+                  const pendingAmt = filteredOrderData.reduce((s, o) => s + Number(o.credit_pending_amount || 0), 0);
+                  return (
+                    <div className="mb-4 rounded-xl border bg-gradient-to-br from-primary/5 via-background to-accent/5 p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Package size={20} className="text-primary" />
+                          </div>
+                          <div>
+                            <h2 className="text-xl font-semibold tracking-tight">Order Management</h2>
+                            <p className="text-sm text-muted-foreground">
+                              Track confirmed orders, payment status, and download invoices in one place.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full sm:w-auto">
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Orders</div>
+                            <div className="text-lg font-semibold">{filteredOrderData.length}</div>
+                          </div>
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Value</div>
+                            <div className="text-lg font-semibold">₹{totalValue.toLocaleString('en-IN')}</div>
+                          </div>
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Paid</div>
+                            <div className="text-lg font-semibold text-emerald-600">{paidCount}</div>
+                          </div>
+                          <div className="rounded-lg border bg-card px-3 py-2">
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Credit Pending</div>
+                            <div className="text-lg font-semibold text-amber-600">
+                              {creditCount} <span className="text-xs font-normal text-muted-foreground">(₹{pendingAmt.toLocaleString('en-IN')})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="rounded-xl border bg-card overflow-hidden">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="hover:bg-transparent">
                         <TableHead>User Name</TableHead>
                         <TableHead>Retailer Name</TableHead>
                         <TableHead>Mobile</TableHead>
                         <TableHead>Order Date & Time</TableHead>
-                        <TableHead>Order Value</TableHead>
+                        <TableHead className="text-right">Order Value</TableHead>
                         <TableHead>Payment</TableHead>
                         <TableHead>Items</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1687,7 +1743,7 @@ const Operations = () => {
                         </TableRow>
                       ) : (
                         filteredOrderData.map((item) => (
-                          <TableRow key={item.id}>
+                          <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
                             <TableCell className="font-medium">{item.user_name}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
@@ -1713,8 +1769,8 @@ const Operations = () => {
                                 {format(new Date(item.created_at), 'MMM dd, HH:mm')}
                               </Badge>
                             </TableCell>
-                            <TableCell>
-                              <span className="font-medium">₹{item.total_amount.toLocaleString()}</span>
+                            <TableCell className="text-right">
+                              <span className="font-semibold">₹{item.total_amount.toLocaleString('en-IN')}</span>
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-0.5 text-xs">
@@ -1732,7 +1788,7 @@ const Operations = () => {
                               <Badge variant="secondary">{item.items.length} items</Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center justify-end gap-1">
                                 <Dialog>
                                   <DialogTrigger asChild>
                                     <Button variant="ghost" size="sm" title="View">
