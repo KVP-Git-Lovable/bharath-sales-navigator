@@ -111,11 +111,25 @@ export const InvoicePreviewDialog = ({
             </div>
           )}
           {pdfUrl && (
-            <iframe
-              title="Invoice preview"
-              src={pdfUrl}
-              className="w-full h-full min-h-[70vh] border-0"
-            />
+            <object
+              data={pdfUrl}
+              type="application/pdf"
+              className="w-full h-full min-h-[70vh]"
+            >
+              <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Inline PDF preview is blocked by your browser.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => window.open(pdfUrl, "_blank")}>
+                    Open in new tab
+                  </Button>
+                  <Button size="sm" onClick={handleDownload}>
+                    <Download className="h-4 w-4 mr-2" /> Download
+                  </Button>
+                </div>
+              </div>
+            </object>
           )}
         </div>
       </DialogContent>
