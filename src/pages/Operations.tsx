@@ -1829,6 +1829,15 @@ const Operations = () => {
                               <Badge variant="secondary">{item.items.length} items</Badge>
                             </TableCell>
                             <TableCell>
+                              <div className="flex justify-center">
+                                <InvoicePreviewDialog
+                                  orderId={item.id}
+                                  invoiceNumber={item.invoice_number}
+                                  triggerLabel="View Invoice"
+                                />
+                              </div>
+                            </TableCell>
+                            <TableCell>
                               <div className="flex items-center justify-end gap-1">
                                 <Dialog>
                                   <DialogTrigger asChild>
@@ -1983,11 +1992,6 @@ const Operations = () => {
                                     </div>
                                   </DialogContent>
                                 </Dialog>
-                                <OrderInvoiceButton
-                                  orderId={item.id}
-                                  iconOnly
-                                  icon={<FileText size={16} />}
-                                />
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
