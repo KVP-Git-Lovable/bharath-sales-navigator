@@ -24,7 +24,6 @@ import EditOrderDialog from '@/components/EditOrderDialog';
 import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDialog';
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
-import { OrderInvoiceButton } from '@/components/invoice/OrderInvoiceButton';
 import { InvoicePreviewDialog, DownloadInvoiceButton } from '@/components/invoice/InvoicePreviewDialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -2066,8 +2065,16 @@ const Operations = () => {
                                           );
                                         })()}
                                       </div>
-                                      <div className="flex justify-end">
-                                        <OrderInvoiceButton orderId={item.id} label="Download Invoice" icon={<FileText className="mr-2 h-4 w-4" />} />
+                                      <div className="flex justify-end gap-1">
+                                        <InvoicePreviewDialog
+                                          orderId={item.id}
+                                          invoiceNumber={item.invoice_number}
+                                          triggerLabel="View Invoice"
+                                        />
+                                        <DownloadInvoiceButton
+                                          orderId={item.id}
+                                          invoiceNumber={item.invoice_number}
+                                        />
                                       </div>
                                     </div>
                                   </DialogContent>
