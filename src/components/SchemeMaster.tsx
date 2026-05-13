@@ -402,9 +402,9 @@ export const SchemeMaster = () => {
       setSchemeForm(initialSchemeForm);
       setApplicabilityRules([]);
       fetchSchemes();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving scheme:', error);
-      toast.error('Failed to save scheme');
+      toast.error(error?.message || error?.details || 'Failed to save scheme');
     }
   };
 

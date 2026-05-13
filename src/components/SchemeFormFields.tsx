@@ -833,9 +833,11 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                     aria-expanded={productSearchOpen}
                     className="w-full justify-between font-normal"
                   >
-                    {schemeForm.product_id
-                      ? products.find(p => p.id === schemeForm.product_id)?.name || "Select product"
-                      : "Search and select product..."}
+                    {schemeForm.variant_id && schemeForm.variant_id !== 'all'
+                      ? products.find(p => p.id === schemeForm.variant_id)?.name || "Select product"
+                      : schemeForm.product_id
+                        ? products.find(p => p.id === schemeForm.product_id)?.name || "Select product"
+                        : "Search and select product..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -850,14 +852,21 @@ export const SchemeFormFields = ({ schemeForm, setSchemeForm, products, categori
                             key={product.id}
                             value={`${product.name} ${product.sku}`}
                             onSelect={() => {
-                              setSchemeForm({ ...schemeForm, product_id: product.id, variant_id: 'all' });
+                              setSchemeForm({
+                                ...schemeForm,
+                                product_id: product.type === 'variant' ? (product.parent_product_id || '') : product.id,
+                                variant_id: product.type === 'variant' ? product.id : 'all'
+                              });
                               setProductSearchOpen(false);
                             }}
                           >
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                schemeForm.product_id === product.id ? "opacity-100" : "opacity-0"
+                                ((product.type === 'variant' && schemeForm.variant_id === product.id) ||
+                                (product.type !== 'variant' && schemeForm.product_id === product.id && (!schemeForm.variant_id || schemeForm.variant_id === 'all')))
+                                  ? "opacity-100"
+                                  : "opacity-0"
                               )}
                             />
                             <span className="flex-1">{product.name}</span>
