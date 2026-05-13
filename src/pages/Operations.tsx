@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useManagedInterval } from '@/utils/intervalManager';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { supabase } from '@/integrations/supabase/client';
+import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1110,9 +1111,11 @@ const Operations = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
     );
   }
 
@@ -1129,6 +1132,7 @@ const Operations = () => {
   const filteredCancelledOrders = filterData(cancelledOrders, ['retailer_name', 'cancelled_by_name', 'reason']);
 
   return (
+    <Layout>
     <div className="min-h-screen bg-gradient-subtle p-4">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
