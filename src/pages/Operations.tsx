@@ -239,8 +239,8 @@ const Operations = () => {
         `)
         .or('check_in_time.not.is.null,skip_check_in_time.not.is.null');
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter for check-ins
@@ -542,8 +542,8 @@ const Operations = () => {
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter for orders
@@ -664,8 +664,8 @@ const Operations = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter for stock
@@ -758,8 +758,8 @@ const Operations = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter
@@ -844,8 +844,8 @@ const Operations = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (userFilter !== 'all') {
-        query = query.eq('user_id', userFilter);
+      if (userFilter.length > 0) {
+        query = query.in('user_id', userFilter);
       }
 
       // Apply date filter
@@ -1002,7 +1002,7 @@ const Operations = () => {
       });
 
       // Apply user filter
-      if (userFilter !== 'all') {
+      if (userFilter.length > 0) {
         const filteredOrderIds = (ordersRes.data || []).filter((o: any) => o.user_id === userFilter).map((o: any) => o.id);
         setCancelledOrders(formatted.filter(f => filteredOrderIds.includes(f.order_id)));
       } else {
