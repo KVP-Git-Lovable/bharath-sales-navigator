@@ -1,4 +1,7 @@
-// jspdf, jspdf-autotable loaded dynamically in functions
+// Static imports avoid "Failed to fetch dynamically imported module" errors
+// that surface after deploys when stale chunk hashes are gone from CDN.
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
@@ -239,8 +242,6 @@ const normalizeItemForDisplay = (item: any) => {
  * This is the ONLY template used throughout the application
  */
 export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob> {
-  const { default: jsPDF } = await import('jspdf');
-  const { default: autoTable } = await import('jspdf-autotable');
   const { orderId, company, retailer, cartItems, displayInvoiceNumber, displayInvoiceDate, displayInvoiceTime, beatName, salesmanName, schemeDetails, orderDiscount, orderTotal } = data;
   
   // Fetch display settings for customizable invoice fields

@@ -1450,7 +1450,7 @@ const Operations = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingCheckins ? (
+                      {loadingCheckins && filteredCheckInData.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={8} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
@@ -1845,7 +1845,7 @@ const Operations = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingOrders ? (
+                      {loadingOrders && filteredOrderData.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={9} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
@@ -2130,7 +2130,7 @@ const Operations = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingStock ? (
+                      {loadingStock && filteredStockData.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
@@ -2237,7 +2237,7 @@ const Operations = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingCompetitor ? (
+                      {loadingCompetitor && filteredCompetitorData.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
@@ -2305,7 +2305,7 @@ const Operations = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingReturnStock ? (
+                      {loadingReturnStock && filteredReturnStockData.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={9} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
@@ -2473,7 +2473,7 @@ const Operations = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {loadingCancelled ? (
+                      {loadingCancelled && filteredCancelledOrders.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center py-8">
                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
