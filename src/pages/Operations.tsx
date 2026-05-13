@@ -1208,19 +1208,69 @@ const Operations = () => {
                     className="w-64"
                   />
                 </div>
-                <Select value={userFilter} onValueChange={setUserFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select User" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Users</SelectItem>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.full_name || user.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-56 justify-between font-normal">
+                      <span className="truncate">
+                        {userFilter.length === 0
+                          ? 'All Users'
+                          : userFilter.length === 1
+                            ? (users.find(u => u.id === userFilter[0])?.full_name
+                                || users.find(u => u.id === userFilter[0])?.username
+                                || '1 user selected')
+                            : `${userFilter.length} users selected`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-0" align="start">
+                    <div className="flex items-center justify-between px-3 py-2 border-b">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {userFilter.length} selected
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setUserFilter(users.map(u => u.id))}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:underline"
+                          onClick={() => setUserFilter([])}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {users.map(user => {
+                        const checked = userFilter.includes(user.id);
+                        return (
+                          <label
+                            key={user.id}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/50 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(v) => {
+                                setUserFilter(prev =>
+                                  v ? [...prev, user.id] : prev.filter(id => id !== user.id)
+                                );
+                              }}
+                            />
+                            <span className="truncate">{user.full_name || user.username}</span>
+                          </label>
+                        );
+                      })}
+                      {users.length === 0 && (
+                        <div className="px-3 py-4 text-xs text-muted-foreground text-center">No users</div>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
                 
                 {/* Date Filter for Check-ins */}
                 {activeTab === 'checkins' && (
