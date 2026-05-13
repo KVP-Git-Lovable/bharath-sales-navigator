@@ -5,6 +5,22 @@ import { Download, Eye, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
+
+function isStaleDepError(err: any): boolean {
+  const msg = err?.message || String(err || "");
+  return (
+    msg.includes("Failed to fetch dynamically imported module") &&
+    msg.includes("/.vite/deps/")
+  );
+}
+
+function rethrowOrRecover(err: any): never {
+  if (isStaleDepError(err)) {
+    // Surface to the global recovery handler in main.tsx
+    window.dispatchEvent(new ErrorEvent("error", { message: err.message }));
+  }
+  throw err;
+}
 import * as pdfjsLib from "pdfjs-dist";
 // Bundle the pdf.js worker as a Web Worker via Vite — avoids URL/CSP issues
 // inside sandboxed preview iframes where dynamic worker URLs can fail to load.
@@ -30,11 +46,16 @@ async function getInvoice(orderId: string): Promise<CachedInvoice> {
   const existing = inflight.get(orderId);
   if (existing) return existing;
   const p = (async () => {
-    const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
-    const entry = { blob, invoiceNumber: invoiceNumber || "invoice" };
-    invoiceCache.set(orderId, entry);
-    inflight.delete(orderId);
-    return entry;
+    try {
+      const { blob, invoiceNumber } = await fetchAndGenerateInvoice(orderId);
+      const entry = { blob, invoiceNumber: invoiceNumber || "invoice" };
+      invoiceCache.set(orderId, entry);
+      inflight.delete(orderId);
+      return entry;
+    } catch (err) {
+      inflight.delete(orderId);
+      rethrowOrRecover(err);
+    }
   })();
   inflight.set(orderId, p);
   return p;
