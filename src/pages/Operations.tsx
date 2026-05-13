@@ -1873,12 +1873,16 @@ const Operations = () => {
                               <Badge variant="secondary">{item.items.length} items</Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="flex justify-center">
+                              <div className="inline-flex items-center gap-0.5 rounded-md border bg-muted/30 p-0.5">
                                 <InvoicePreviewDialog
                                   orderId={item.id}
                                   invoiceNumber={item.invoice_number}
                                   triggerLabel="View Invoice"
                                   iconOnly
+                                />
+                                <DownloadInvoiceButton
+                                  orderId={item.id}
+                                  invoiceNumber={item.invoice_number}
                                 />
                               </div>
                             </TableCell>
