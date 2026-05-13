@@ -319,6 +319,9 @@ export const SchemeMaster = () => {
             discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_unit || 'kg')
               : null,
+            discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
+              : null,
           })
           .eq('id', schemeForm.id);
         
@@ -362,6 +365,9 @@ export const SchemeMaster = () => {
               : null,
             discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_unit || 'kg')
+              : null,
+            discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
               : null,
           })
           .select('id')
