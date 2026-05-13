@@ -114,6 +114,7 @@ const initialSchemeForm = {
   // Manual per-unit discount fields
   max_discount_per_unit: 0,
   discount_unit: 'kg',
+  discount_value_type: 'amount' as 'amount' | 'percentage',
 };
 
 export const SchemeMaster = () => {
