@@ -11617,6 +11617,7 @@ export type Database = {
           discount_amount: number | null
           discount_percentage: number | null
           discount_unit: string | null
+          discount_value_type: string | null
           end_date: string | null
           exclusion_group: string | null
           free_product_id: string | null
@@ -11658,6 +11659,7 @@ export type Database = {
           discount_amount?: number | null
           discount_percentage?: number | null
           discount_unit?: string | null
+          discount_value_type?: string | null
           end_date?: string | null
           exclusion_group?: string | null
           free_product_id?: string | null
@@ -11699,6 +11701,7 @@ export type Database = {
           discount_amount?: number | null
           discount_percentage?: number | null
           discount_unit?: string | null
+          discount_value_type?: string | null
           end_date?: string | null
           exclusion_group?: string | null
           free_product_id?: string | null
