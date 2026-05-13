@@ -11632,7 +11632,6 @@ export type Database = {
           name: string
           per_product_discounts: Json | null
           priority: number | null
-          product_id: string | null
           quantity_condition_type: string | null
           scheme_type: string
           source: string | null
@@ -11674,7 +11673,6 @@ export type Database = {
           name: string
           per_product_discounts?: Json | null
           priority?: number | null
-          product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
           source?: string | null
@@ -11716,7 +11714,6 @@ export type Database = {
           name?: string
           per_product_discounts?: Json | null
           priority?: number | null
-          product_id?: string | null
           quantity_condition_type?: string | null
           scheme_type?: string
           source?: string | null
@@ -11745,13 +11742,6 @@ export type Database = {
           {
             foreignKeyName: "product_schemes_free_product_id_fkey"
             columns: ["free_product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_schemes_product_id_fkey"
-            columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]

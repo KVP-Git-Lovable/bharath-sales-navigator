@@ -164,7 +164,7 @@ export const Cart = () => {
   
   // Use scheme engine for calculations
   const { schemes, loading: schemesLoading } = useOfflineSchemes();
-  const { appliedSchemeIds, clearSchemes } = useAppliedSchemes(validVisitId || '', validRetailerId || '');
+  const { appliedSchemeIds, manualSelections, clearSchemes } = useAppliedSchemes(validVisitId || '', validRetailerId || '');
 
   // Reload cart items when storage key changes, on mount, or when storage updates
   React.useEffect(() => {
@@ -259,8 +259,8 @@ export const Cart = () => {
       name: item.name
     }));
     
-    return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds);
-  }, [cartItems, schemes, appliedSchemeIds]);
+    return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds, manualSelections);
+  }, [cartItems, schemes, appliedSchemeIds, manualSelections]);
 
   const computeItemSubtotal = (item: AnyCartItem) => {
     try {
