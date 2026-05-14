@@ -1487,10 +1487,11 @@ export const OrderEntry = () => {
       const baseQty = quantities[product.id] || 0;
       count += baseQty;
 
-      // Count all variant quantities
+      // Count all variant quantities using the same composite keys used everywhere else
       if (product.variants) {
         product.variants.forEach(variant => {
-          const variantQty = quantities[variant.id] || 0;
+          const variantCompositeId = `${product.id}_variant_${variant.id}`;
+          const variantQty = quantities[variantCompositeId] || 0;
           count += variantQty;
         });
       }
