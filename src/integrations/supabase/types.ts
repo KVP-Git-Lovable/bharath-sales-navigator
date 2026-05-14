@@ -9129,12 +9129,14 @@ export type Database = {
           id: string
           order_id: string
           original_rate: number | null
+          product_id: string | null
           product_name: string
           quantity: number
           rate: number
           sgst_amount: number | null
           total: number
           unit: string
+          variant_id: string | null
         }
         Insert: {
           category: string
@@ -9145,12 +9147,14 @@ export type Database = {
           id?: string
           order_id: string
           original_rate?: number | null
+          product_id?: string | null
           product_name: string
           quantity: number
           rate: number
           sgst_amount?: number | null
           total: number
           unit: string
+          variant_id?: string | null
         }
         Update: {
           category?: string
@@ -9161,12 +9165,14 @@ export type Database = {
           id?: string
           order_id?: string
           original_rate?: number | null
+          product_id?: string | null
           product_name?: string
           quantity?: number
           rate?: number
           sgst_amount?: number | null
           total?: number
           unit?: string
+          variant_id?: string | null
         }
         Relationships: [
           {
@@ -9174,6 +9180,20 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
