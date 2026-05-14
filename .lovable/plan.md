@@ -1,55 +1,40 @@
-## Goal
-Make variant products save and appear as real variants again when orders are placed from the app/mobile flow, while keeping base-product orders working as they do now.
+# Fix Operations date filters
 
-## What I found
-- The database sync function now supports both new and legacy variant payloads.
-- But the table-order flow is still inconsistent before save:
-  - `TableOrderForm` stores cart rows using a composite cart id like `baseProductId_variant_variantId` in `syncRowsToCart`.
-  - Other logic in the same component still treats variant items as `id = variant.id` and `product_id = variant.id`.
-- `Cart.tsx` only reconstructs `product_id` + `variant_id` correctly when the incoming cart item id is in the composite format.
-- That means some variant orders are still reaching save logic as plain product ids or ambiguous ids, so `variant_id` ends up null and the order item behaves like a base product.
+## Problem
+On `/operations`, the **Week** and **Month** filters are computed as "last 7 days" and "last 30 days" (rolling windows) instead of the current calendar week and current calendar month. That's why "This Month" on May 14 returns data from Apr 14 → May 14.
 
-## Plan
-1. Normalize variant IDs at the source in `TableOrderForm`
-   - Update all variant-related item builders in `TableOrderForm` to use one single format consistently:
-     - cart/display id: `baseProductId_variant_variantId`
-     - `product_id`: base product id
-     - `variant_id`: variant id
-   - Remove mixed logic that still uses `variant.id` alone as the item id.
+The custom date range works because it uses explicit start/end dates.
 
-2. Make cart/order payload building resilient
-   - Harden `Cart.tsx` so it prefers explicit `product_id` and `variant_id` when they exist, and only falls back to parsing the composite id.
-   - This prevents future regressions if one upstream flow changes shape slightly.
+## Root cause
+In `src/pages/Operations.tsx`, every filter section repeats the same buggy pattern:
 
-3. Verify all order-entry paths use the same variant contract
-   - Check the main order-entry/table flow and scheme modal flow so variants are passed forward using the same structure.
-   - Keep base products untouched.
+```ts
+// week
+const weekAgo = new Date(startOfToday);
+weekAgo.setDate(weekAgo.getDate() - 7);   // rolling 7 days, not Mon–Sun
 
-4. Validate against current DB behavior
-   - Re-check recent order-item rows after the code fix to confirm new variant orders store `variant_id` instead of null.
-   - Confirm base products still save normally.
-
-## Technical details
-Files most likely to change:
-- `src/components/TableOrderForm.tsx`
-- `src/pages/Cart.tsx`
-- potentially `src/components/OrderEntrySchemesModal.tsx` if it also emits the old shape
-
-Expected final payload contract:
-```text
-Base product:
-  id = <productId>
-  product_id = <productId>
-  variant_id = null
-
-Variant product:
-  id = <productId>_variant_<variantId>
-  product_id = <productId>
-  variant_id = <variantId>
+// month
+const monthAgo = new Date(startOfToday);
+monthAgo.setMonth(monthAgo.getMonth() - 1); // rolling 30 days, not 1st–last
 ```
 
-## Expected result
-After implementation, a newly placed variant order should:
-- save an `order_items` row with both `product_id` and `variant_id`
-- show the correct variant product on the order item page
-- continue working for base products and older mobile payloads
+This pattern is duplicated in ~6 sections (check-ins, orders, stock, competitor, return stock, cancelled orders).
+
+## Fix
+
+1. Add a small helper in `src/utils/dateUtils.ts` (file already centralizes date logic):
+   - `getCurrentWeekRange()` → `{ start, end }` Date objects, Monday 00:00 → Sunday 23:59:59 local
+   - `getCurrentMonthRange()` → 1st of current month 00:00 → last day 23:59:59 local
+   - `getLastMonthRange()` → 1st → last day of previous calendar month
+   Uses local-time constructors (`new Date(y, m, d)`), matching the existing `parseLocalDate` / `toLocalISODate` convention. No UTC shift.
+
+2. In `src/pages/Operations.tsx`, replace each `week` / `month` branch (6 occurrences) to use these helpers and apply both `.gte(start)` and `.lte(end)` so the upper bound is also bounded (today's "month" filter currently has no upper bound either, which is fine for now, but bounding it is cleaner and required for "Last Month").
+
+3. Extend the filter type from `'today' | 'week' | 'month'` to `'today' | 'week' | 'month' | 'lastMonth'` in each section's state, and add a "Last Month" option to the corresponding filter UI dropdowns/segments in Operations so users can select it.
+
+## Files touched
+- `src/utils/dateUtils.ts` — add 3 helpers
+- `src/pages/Operations.tsx` — swap rolling-window math for helpers in all 6 sections; add "Last Month" option to each filter UI
+
+## Out of scope
+Other pages (Analytics, PerformanceDashboard, Attendance, etc.) also use the same rolling-window pattern. I'll leave those untouched per your message which is scoped to Operations. Say the word if you want the same fix applied project-wide.
