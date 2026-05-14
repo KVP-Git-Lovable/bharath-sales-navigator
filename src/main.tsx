@@ -51,6 +51,10 @@ const cleanupServiceWorkersAndCaches = async () => {
   }
 };
 
+if (shouldDisableServiceWorker) {
+  void cleanupServiceWorkersAndCaches();
+}
+
 // Recover from stale Vite optimized-dep references after a dev/preview restart.
 // When Vite re-bundles deps, its `?v=<hash>` URL changes; pages still holding the
 // old reference fail with "Failed to fetch dynamically imported module ... .vite/deps/...".
@@ -121,7 +125,6 @@ console.log('✅ App rendered successfully');
         isNativeApp,
         isStandaloneApp,
       });
-      await cleanupServiceWorkersAndCaches();
     } else if ('serviceWorker' in navigator) {
       const { registerSW } = await import('virtual:pwa-register');
       const updateSW = registerSW({
