@@ -1612,18 +1612,19 @@ export const Cart = () => {
         const sgstAmount = itemTotal * 0.025;
         const cgstAmount = itemTotal * 0.025;
         
-        let productId: string | null = item.id;
-        let variantId: string | null = null;
-        if (item.id.includes('_variant_')) {
-          const parts = item.id.split('_variant_');
-          productId = parts[0] || null;
-          variantId = parts[1] || null;
-        }
         const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        let productId: string | null = (item as any).product_id || item.id;
+        let variantId: string | null = (item as any).variant_id || null;
+        if (item.id && item.id.includes('_variant_')) {
+          const parts = item.id.split('_variant_');
+          productId = parts[0] || productId;
+          variantId = parts[1] || variantId;
+        }
         if (!isUUID(productId)) productId = null;
         if (!isUUID(variantId)) variantId = null;
 
         return {
+          id: item.id,
           product_id: productId,
           variant_id: variantId,
           product_name: item.name,
