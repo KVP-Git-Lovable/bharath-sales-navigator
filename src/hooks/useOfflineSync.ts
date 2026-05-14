@@ -484,8 +484,7 @@ export function useOfflineSync() {
               });
             
             if (rpcError) {
-              // If RPC fails (e.g., function not deployed yet), fall back to direct inserts
-              console.warn('⚠️ RPC sync_order_with_items failed, falling back to direct inserts:', rpcError.message);
+              console.warn('⚠️ RPC sync_order_with_items returned an error:', rpcError.message);
               throw rpcError;
             }
             
