@@ -74,3 +74,35 @@ export const formatWeekdayShort = (d: Date): string => {
 export const getLocalTimestamp = (): string => {
   return new Date().toISOString();
 };
+
+/**
+ * Calendar period helpers — return local Date objects.
+ * Use for "This Week", "This Month", "Last Month" filter ranges.
+ */
+export interface DateRange { start: Date; end: Date; }
+
+/** Current calendar week, Mon 00:00:00 → Sun 23:59:59.999 (local). */
+export const getCurrentWeekRange = (weekStartsOn: 0 | 1 = 1): DateRange => {
+  const now = new Date();
+  const start = getLocalWeekStart(now, weekStartsOn);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+};
+
+/** Current calendar month, 1st 00:00:00 → last day 23:59:59.999 (local). */
+export const getCurrentMonthRange = (): DateRange => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  return { start, end };
+};
+
+/** Previous calendar month, 1st 00:00:00 → last day 23:59:59.999 (local). */
+export const getLastMonthRange = (): DateRange => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  return { start, end };
+};

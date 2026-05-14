@@ -17,6 +17,7 @@ import { ArrowLeft, Download, Search, Eye, RefreshCw, MapPin, Clock, Package, Do
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getCurrentWeekRange, getCurrentMonthRange, getLastMonthRange, toLocalISODate } from '@/utils/dateUtils';
 import { downloadCSV } from '@/utils/fileDownloader';
 import { PaymentProofsView } from '@/components/admin/PaymentProofsView';
 import { OperationsSummaryBoxes } from '@/components/operations/OperationsSummaryBoxes';
@@ -317,13 +318,14 @@ const Operations = () => {
       if (checkinDateFilter === 'today') {
         query = query.gte('planned_date', checkInStartOfToday.toISOString().split('T')[0]);
       } else if (checkinDateFilter === 'week') {
-        const weekAgo = new Date(checkInStartOfToday);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('planned_date', weekAgo.toISOString().split('T')[0]);
+        const { start, end } = getCurrentWeekRange();
+        query = query.gte('planned_date', toLocalISODate(start)).lte('planned_date', toLocalISODate(end));
       } else if (checkinDateFilter === 'month') {
-        const monthAgo = new Date(checkInStartOfToday);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('planned_date', monthAgo.toISOString().split('T')[0]);
+        const { start, end } = getCurrentMonthRange();
+        query = query.gte('planned_date', toLocalISODate(start)).lte('planned_date', toLocalISODate(end));
+      } else if (checkinDateFilter === 'lastMonth') {
+        const { start, end } = getLastMonthRange();
+        query = query.gte('planned_date', toLocalISODate(start)).lte('planned_date', toLocalISODate(end));
       } else if (checkinDateFilter === 'custom' && checkinCustomRange.from) {
         query = query.gte('planned_date', checkinCustomRange.from.toISOString().split('T')[0]);
         if (checkinCustomRange.to) {
@@ -620,13 +622,14 @@ const Operations = () => {
       if (orderDateFilter === 'today') {
         query = query.gte('created_at', orderStartOfToday.toISOString());
       } else if (orderDateFilter === 'week') {
-        const weekAgo = new Date(orderStartOfToday);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('created_at', weekAgo.toISOString());
+        const { start, end } = getCurrentWeekRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       } else if (orderDateFilter === 'month') {
-        const monthAgo = new Date(orderStartOfToday);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('created_at', monthAgo.toISOString());
+        const { start, end } = getCurrentMonthRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+      } else if (orderDateFilter === 'lastMonth') {
+        const { start, end } = getLastMonthRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       } else if (orderDateFilter === 'custom' && orderCustomRange.from) {
         query = query.gte('created_at', orderCustomRange.from.toISOString());
         if (orderCustomRange.to) {
@@ -742,13 +745,14 @@ const Operations = () => {
       if (stockDateFilter === 'today') {
         query = query.gte('created_at', stockStartOfToday.toISOString());
       } else if (stockDateFilter === 'week') {
-        const weekAgo = new Date(stockStartOfToday);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('created_at', weekAgo.toISOString());
+        const { start, end } = getCurrentWeekRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       } else if (stockDateFilter === 'month') {
-        const monthAgo = new Date(stockStartOfToday);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('created_at', monthAgo.toISOString());
+        const { start, end } = getCurrentMonthRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+      } else if (stockDateFilter === 'lastMonth') {
+        const { start, end } = getLastMonthRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       } else if (stockDateFilter === 'custom' && stockCustomRange.from) {
         query = query.gte('created_at', stockCustomRange.from.toISOString());
         if (stockCustomRange.to) {
@@ -833,13 +837,14 @@ const Operations = () => {
       if (competitorDateFilter === 'today') {
         query = query.gte('created_at', startOfToday.toISOString());
       } else if (competitorDateFilter === 'week') {
-        const weekAgo = new Date(startOfToday);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('created_at', weekAgo.toISOString());
+        const { start, end } = getCurrentWeekRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       } else if (competitorDateFilter === 'month') {
-        const monthAgo = new Date(startOfToday);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('created_at', monthAgo.toISOString());
+        const { start, end } = getCurrentMonthRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+      } else if (competitorDateFilter === 'lastMonth') {
+        const { start, end } = getLastMonthRange();
+        query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
       }
 
       const { data, error } = await query;
@@ -919,13 +924,14 @@ const Operations = () => {
       if (returnStockDateFilter === 'today') {
         query = query.gte('return_date', startOfToday.toISOString().split('T')[0]);
       } else if (returnStockDateFilter === 'week') {
-        const weekAgo = new Date(startOfToday);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('return_date', weekAgo.toISOString().split('T')[0]);
+        const { start, end } = getCurrentWeekRange();
+        query = query.gte('return_date', toLocalISODate(start)).lte('return_date', toLocalISODate(end));
       } else if (returnStockDateFilter === 'month') {
-        const monthAgo = new Date(startOfToday);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('return_date', monthAgo.toISOString().split('T')[0]);
+        const { start, end } = getCurrentMonthRange();
+        query = query.gte('return_date', toLocalISODate(start)).lte('return_date', toLocalISODate(end));
+      } else if (returnStockDateFilter === 'lastMonth') {
+        const { start, end } = getLastMonthRange();
+        query = query.gte('return_date', toLocalISODate(start)).lte('return_date', toLocalISODate(end));
       }
 
       const { data, error } = await query;
@@ -1006,13 +1012,14 @@ const Operations = () => {
       if (cancelledDateFilter === 'today') {
         query = query.gte('cancelled_at', startOfToday.toISOString());
       } else if (cancelledDateFilter === 'week') {
-        const weekAgo = new Date(startOfToday);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('cancelled_at', weekAgo.toISOString());
+        const { start, end } = getCurrentWeekRange();
+        query = query.gte('cancelled_at', start.toISOString()).lte('cancelled_at', end.toISOString());
       } else if (cancelledDateFilter === 'month') {
-        const monthAgo = new Date(startOfToday);
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('cancelled_at', monthAgo.toISOString());
+        const { start, end } = getCurrentMonthRange();
+        query = query.gte('cancelled_at', start.toISOString()).lte('cancelled_at', end.toISOString());
+      } else if (cancelledDateFilter === 'lastMonth') {
+        const { start, end } = getLastMonthRange();
+        query = query.gte('cancelled_at', start.toISOString()).lte('cancelled_at', end.toISOString());
       }
 
       const { data: logs, error } = await query;
@@ -1398,6 +1405,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1437,6 +1445,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1476,6 +1485,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
@@ -2307,6 +2317,7 @@ const Operations = () => {
                       <SelectItem value="today">Today</SelectItem>
                       <SelectItem value="week">This Week</SelectItem>
                       <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2373,6 +2384,7 @@ const Operations = () => {
                       <SelectItem value="today">Today</SelectItem>
                       <SelectItem value="week">This Week</SelectItem>
                       <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2520,6 +2532,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="all">All Time</SelectItem>
                       </SelectContent>
                     </Select>
