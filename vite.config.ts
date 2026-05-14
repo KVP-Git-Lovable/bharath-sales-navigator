@@ -63,9 +63,23 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       devOptions: {
-        enabled: true, // Enable PWA in dev mode for testing install prompt
+        enabled: false,
         type: 'module',
         navigateFallback: 'index.html'
+      },
+      includeAssets: ['icons/app-icon.png'],
+      injectRegister: null,
+      injectManifest: {
+        globPatterns: [
+          '**/*.{html,js,mjs,css,woff,woff2,ttf,eot,ico,png,jpg,jpeg,svg,gif,webp,json,txt}',
+        ],
+        globIgnores: [
+          '**/node_modules/**/*',
+          '**/*.map',
+          '**/lovable-uploads/**/*',
+        ],
+        maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
+        dontCacheBustURLsMatching: /\.[0-9a-f]{8}\./,
       }
     })
   ].filter(Boolean),
