@@ -5,6 +5,31 @@ import { addOrderToSnapshot } from '@/lib/myVisitsSnapshot';
 import { toast } from '@/hooks/use-toast';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 
+// Bump this when product/variant/scheme cache schema or RLS changes require
+// all installed clients to wipe their stale IndexedDB cache once.
+// v2: variant SELECT RLS was missing previously, leaving variants empty in cache.
+const PRODUCT_CACHE_VERSION = 2;
+const PRODUCT_CACHE_VERSION_KEY = 'product_cache_version';
+
+async function ensureProductCacheVersion(): Promise<boolean> {
+  try {
+    const stored = parseInt(localStorage.getItem(PRODUCT_CACHE_VERSION_KEY) || '0', 10);
+    if (stored < PRODUCT_CACHE_VERSION) {
+      await Promise.all([
+        offlineStorage.clear(STORES.PRODUCTS),
+        offlineStorage.clear(STORES.VARIANTS),
+        offlineStorage.clear(STORES.SCHEMES),
+      ]);
+      localStorage.setItem(PRODUCT_CACHE_VERSION_KEY, String(PRODUCT_CACHE_VERSION));
+      console.log(`🧹 Product cache cleared (bumped to v${PRODUCT_CACHE_VERSION})`);
+      return true; // cache was wiped
+    }
+  } catch (e) {
+    console.warn('Product cache version check failed:', e);
+  }
+  return false;
+}
+
 interface Product {
   id: string;
   sku: string;
@@ -141,6 +166,15 @@ export function useOfflineOrderEntry() {
     setLoading(false);
 
     try {
+      // One-time cache invalidation when version bumps (e.g. RLS fix for variants)
+      const wasWiped = await ensureProductCacheVersion();
+      if (wasWiped && isOnline) {
+        // Cache is empty by design - go straight to network
+        await syncProductsInBackground();
+        hasFetchedRef.current = true;
+        return;
+      }
+
       // 1. Load from cache INSTANTLY - no loading state blocking
       const cachedProducts = await offlineStorage.getAll(STORES.PRODUCTS);
       const cachedVariants = await offlineStorage.getAll(STORES.VARIANTS);
@@ -161,8 +195,17 @@ export function useOfflineOrderEntry() {
         hasFetchedRef.current = true;
         console.log(`✅ Loaded ${enrichedProducts.length} active products from cache instantly`);
         
+        // If cache has products but ZERO variants, the cache was populated under the
+        // old broken RLS - force an immediate (non-idle) re-sync so users see variants
+        // on their very next visit even on slow connections.
+        const noVariantsInCache = activeVariants.length === 0;
+
         // Background sync if online - DO NOT await, fire and forget
-        if (isOnline) {
+        if (isOnline && noVariantsInCache) {
+          syncProductsInBackground().catch(err =>
+            console.error('Forced variant re-sync failed:', err)
+          );
+        } else if (isOnline) {
           // Use requestIdleCallback or setTimeout to not block main thread
           requestIdleCallback?.(() => {
             syncProductsInBackground().catch(err => 
