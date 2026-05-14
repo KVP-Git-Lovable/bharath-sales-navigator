@@ -254,6 +254,8 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       
       return {
         id: itemId,
+        product_id: row.product!.id,
+        variant_id: row.variant ? row.variant.id : null,
         name: displayName || 'Unknown Product',
         category: row.product!.category?.name || 'Uncategorized',
         rate: ratePerGram, // Store rate per gram

@@ -1,70 +1,55 @@
 ## Goal
-Stop new orders from being saved with `0 items` in the existing app without requiring users to reinstall or rebuild the application.
+Make variant products save and appear as real variants again when orders are placed from the app/mobile flow, while keeping base-product orders working as they do now.
 
 ## What I found
-The most likely regression is in the current order item payload:
+- The database sync function now supports both new and legacy variant payloads.
+- But the table-order flow is still inconsistent before save:
+  - `TableOrderForm` stores cart rows using a composite cart id like `baseProductId_variant_variantId` in `syncRowsToCart`.
+  - Other logic in the same component still treats variant items as `id = variant.id` and `product_id = variant.id`.
+- `Cart.tsx` only reconstructs `product_id` + `variant_id` correctly when the incoming cart item id is in the composite format.
+- That means some variant orders are still reaching save logic as plain product ids or ambiguous ids, so `variant_id` ends up null and the order item behaves like a base product.
 
-1. **Variant orders are built incorrectly in `Cart.tsx`**
-   - For variant rows, the code now puts the **variant UUID into `product_id`**.
-   - But `order_items.product_id` is supposed to reference `products.id`.
-   - This can make item insertion fail for variant orders.
+## Plan
+1. Normalize variant IDs at the source in `TableOrderForm`
+   - Update all variant-related item builders in `TableOrderForm` to use one single format consistently:
+     - cart/display id: `baseProductId_variant_variantId`
+     - `product_id`: base product id
+     - `variant_id`: variant id
+   - Remove mixed logic that still uses `variant.id` alone as the item id.
 
-2. **Queued/background sync still strips `variant_id`**
-   - `useOfflineSync.ts` removes `variant_id` before calling `sync_order_with_items`.
-   - But the database now already has a `variant_id` column.
-   - So the sync path loses the variant linkage and can still fail or save incomplete item rows.
+2. Make cart/order payload building resilient
+   - Harden `Cart.tsx` so it prefers explicit `product_id` and `variant_id` when they exist, and only falls back to parsing the composite id.
+   - This prevents future regressions if one upstream flow changes shape slightly.
 
-3. **Free scheme items are risky**
-   - Free items can still send `product_id: 'FREE_ITEM'`.
-   - The RPC casts `product_id` to `uuid`, so this can break the entire batch insert when a free item is present.
+3. Verify all order-entry paths use the same variant contract
+   - Check the main order-entry/table flow and scheme modal flow so variants are passed forward using the same structure.
+   - Keep base products untouched.
 
-4. **Why this looks intermittent**
-   - Live traffic shows many recent orders do have rows in `order_items`.
-   - So this is likely not a total system outage.
-   - It is more likely affecting orders that include **variants and/or free scheme items**, which matches the current code regression.
-
-## Implementation plan
-### 1) Fix the order payload in `Cart.tsx`
-- For normal products:
-  - send `product_id = base product id`
-  - send `variant_id = null`
-- For variant products:
-  - send `product_id = base product id`
-  - send `variant_id = variant id`
-- For free items:
-  - never send `'FREE_ITEM'` into `product_id`
-  - send `null` when there is no real UUID
-
-### 2) Fix offline/background sync in `useOfflineSync.ts`
-- Stop stripping `variant_id`
-- Keep valid `variant_id` in the RPC payload
-- Keep `product_id` nullable when an item does not map to a real product UUID
-
-### 3) Harden the database RPC
-Update `public.sync_order_with_items` so it safely inserts:
-- `product_id` as nullable UUID
-- `variant_id` as nullable UUID
-- no failure when a free item has no real product UUID
-
-### 4) Validate against the existing UI read path
-- Confirm the screens that show order details (`VisitCard` and related order displays) correctly read `order_items`
-- Verify that after the payload fix, orders no longer appear as `0 items`
-
-### 5) Verify with real order scenarios
-Test these cases:
-- base product only
-- variant product
-- order with free scheme item
-- queued/offline order that later syncs online
+4. Validate against current DB behavior
+   - Re-check recent order-item rows after the code fix to confirm new variant orders store `variant_id` instead of null.
+   - Confirm base products still save normally.
 
 ## Technical details
-Files likely involved:
+Files most likely to change:
+- `src/components/TableOrderForm.tsx`
 - `src/pages/Cart.tsx`
-- `src/hooks/useOfflineSync.ts`
-- new Supabase migration to update `public.sync_order_with_items`
+- potentially `src/components/OrderEntrySchemesModal.tsx` if it also emits the old shape
 
-Expected permanent result:
-- existing web app users keep using the same app
-- installed users do not need a reinstall
-- new orders save line items reliably for base products, variants, and free scheme items
-- synced offline orders also persist their line items correctly
+Expected final payload contract:
+```text
+Base product:
+  id = <productId>
+  product_id = <productId>
+  variant_id = null
+
+Variant product:
+  id = <productId>_variant_<variantId>
+  product_id = <productId>
+  variant_id = <variantId>
+```
+
+## Expected result
+After implementation, a newly placed variant order should:
+- save an `order_items` row with both `product_id` and `variant_id`
+- show the correct variant product on the order item page
+- continue working for base products and older mobile payloads
