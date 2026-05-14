@@ -95,17 +95,17 @@ export function useOfflineOrderComplete() {
           *,
           category:product_categories(*)
         `)
-        .eq('is_active', true);
+        .or('is_active.eq.true,is_active.is.null');
 
       const { data: variantsData } = await supabase
         .from('product_variants')
         .select('*')
-        .eq('is_active', true);
+        .or('is_active.eq.true,is_active.is.null');
 
       const { data: schemesData } = await supabase
         .from('product_schemes')
         .select('*')
-        .eq('is_active', true);
+        .or('is_active.eq.true,is_active.is.null');
 
       const { data: categoriesData } = await supabase
         .from('product_categories')
