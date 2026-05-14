@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'service-worker.ts',
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
