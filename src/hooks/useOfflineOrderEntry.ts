@@ -87,15 +87,26 @@ export function useOfflineOrderEntry() {
         .or('is_active.eq.true,is_active.is.null');
 
       // Fetch all active variants (is_active true or null)
-      const { data: variantsData } = await supabase
+      const { data: variantsData, error: variantsError } = await supabase
         .from('product_variants')
         .select('*')
         .or('is_active.eq.true,is_active.is.null');
 
+      if (variantsError) throw variantsError;
+
+      const variantsByProductId = new Map<string, any[]>();
+
+      (variantsData || []).forEach((variant: any) => {
+        if (!variant?.product_id) return;
+        const existing = variantsByProductId.get(variant.product_id) || [];
+        existing.push(variant);
+        variantsByProductId.set(variant.product_id, existing);
+      });
+
       const enrichedProducts = (productsData || []).map((product: any) => ({
         ...product,
         schemes: (schemesData || []).filter((s: any) => s.product_id === product.id),
-        variants: (variantsData || []).filter((v: any) => v.product_id === product.id)
+        variants: variantsByProductId.get(product.id) || []
       }));
 
       setProducts(enrichedProducts);
@@ -147,12 +158,19 @@ export function useOfflineOrderEntry() {
       if (cachedProducts.length > 0) {
         // Filter only active products: is_active must be true or null/undefined (never false)
         const activeProducts = (cachedProducts || []).filter((p: any) => p.is_active !== false);
-        const activeVariants = (cachedVariants || []).filter((v: any) => v.is_active !== false);
+        const activeVariants = (cachedVariants || []).filter((v: any) => v.is_active !== false && !!v.product_id);
         const activeSchemes = (cachedSchemes || []).filter((s: any) => s.is_active !== false);
+
+        const variantsByProductId = new Map<string, any[]>();
+        activeVariants.forEach((variant: any) => {
+          const existing = variantsByProductId.get(variant.product_id) || [];
+          existing.push(variant);
+          variantsByProductId.set(variant.product_id, existing);
+        });
         
         const enrichedProducts = activeProducts.map((product: any) => ({
           ...product,
-          variants: activeVariants.filter((v: any) => v.product_id === product.id),
+          variants: variantsByProductId.get(product.id) || [],
           schemes: activeSchemes.filter((s: any) => s.product_id === product.id)
         }));
         setProducts(enrichedProducts);
@@ -196,12 +214,19 @@ export function useOfflineOrderEntry() {
 
         if (cachedProducts.length > 0) {
           const activeProducts = (cachedProducts || []).filter((p: any) => p.is_active !== false);
-          const activeVariants = (cachedVariants || []).filter((v: any) => v.is_active !== false);
+          const activeVariants = (cachedVariants || []).filter((v: any) => v.is_active !== false && !!v.product_id);
           const activeSchemes = (cachedSchemes || []).filter((s: any) => s.is_active !== false);
+
+          const variantsByProductId = new Map<string, any[]>();
+          activeVariants.forEach((variant: any) => {
+            const existing = variantsByProductId.get(variant.product_id) || [];
+            existing.push(variant);
+            variantsByProductId.set(variant.product_id, existing);
+          });
           
           const enrichedProducts = activeProducts.map((product: any) => ({
             ...product,
-            variants: activeVariants.filter((v: any) => v.product_id === product.id),
+            variants: variantsByProductId.get(product.id) || [],
             schemes: activeSchemes.filter((s: any) => s.product_id === product.id)
           }));
           setProducts(enrichedProducts);
