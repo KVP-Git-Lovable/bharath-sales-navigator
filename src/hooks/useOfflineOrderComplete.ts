@@ -249,7 +249,7 @@ export function useOfflineOrderComplete() {
       });
       return { success: false, offline: false, order: null };
     }
-  }, [isOnline]);
+  }, [connectivityStatus]);
 
   /**
    * Save competition data with offline support
