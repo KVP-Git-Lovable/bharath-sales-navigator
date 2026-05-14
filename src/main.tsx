@@ -77,10 +77,11 @@ console.log('✅ App rendered successfully');
     // Register service worker
     if ('serviceWorker' in navigator) {
       const { registerSW } = await import('virtual:pwa-register');
-      registerSW({
+      const updateSW = registerSW({
         immediate: true,
         onNeedRefresh() {
-          console.log('🔄 New content available, will refresh');
+          console.log('🔄 New content available, applying update now');
+          updateSW(true);
         },
         onOfflineReady() {
           console.log('📴 App ready to work offline');
