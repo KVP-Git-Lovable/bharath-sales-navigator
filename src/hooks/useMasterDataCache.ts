@@ -383,8 +383,8 @@ export function useMasterDataCache() {
     try {
       // Products
       onProgress('products', 'loading');
-      const { data: products } = await supabase.from('products').select('*').eq('is_active', true);
-      const { data: variants } = await supabase.from('product_variants').select('*').eq('is_active', true);
+      const { data: products } = await supabase.from('products').select('*').or('is_active.eq.true,is_active.is.null');
+      const { data: variants } = await supabase.from('product_variants').select('*').or('is_active.eq.true,is_active.is.null');
       if (products) {
         await offlineStorage.clear(STORES.PRODUCTS);
         for (const p of products) await offlineStorage.save(STORES.PRODUCTS, p);
@@ -399,7 +399,7 @@ export function useMasterDataCache() {
 
       // Schemes
       onProgress('schemes', 'loading');
-      const { data: schemes } = await supabase.from('product_schemes').select('*').eq('is_active', true);
+      const { data: schemes } = await supabase.from('product_schemes').select('*').or('is_active.eq.true,is_active.is.null');
       const { data: categories } = await supabase.from('product_categories').select('*');
       if (schemes) {
         await offlineStorage.clear(STORES.SCHEMES);
