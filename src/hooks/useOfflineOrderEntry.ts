@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
-import { addOrderToSnapshot } from '@/lib/myVisitsSnapshot';
-import { toast } from '@/hooks/use-toast';
-import { getLocalTodayDate } from '@/utils/dateUtils';
+import { submitOrderWithOfflineSupport } from '@/utils/offlineOrderUtils';
 
 interface Product {
   id: string;
@@ -218,165 +216,18 @@ export function useOfflineOrderEntry() {
     }
   }, [isOnline]);
 
-  // Submit order with offline support - optimized
+  // Route all order saves through the shared atomic order+items flow.
+  // This prevents header-only orders if item insertion fails on any screen.
   const submitOrder = async (orderData: any, orderItems: any[]) => {
-    const localOrderDate = orderData.order_date || getLocalTodayDate();
-
-    if (!isOnline) {
-      // Offline: Queue for sync
-      const orderId = crypto.randomUUID();
-      const offlineOrder = {
-        ...orderData,
-        id: orderId,
-        created_at: new Date().toISOString(),
-        order_date: localOrderDate,
-        status: orderData.status || 'confirmed',
-        // CRITICAL: Round total_amount consistently to prevent cache/snapshot inconsistencies
-        total_amount: Math.round(Number(orderData.total_amount ?? 0)),
-      };
-
-      const offlineItems = orderItems.map(item => ({
-        ...item,
-        order_id: orderId
-      }));
-
-      // Save to offline storage in parallel
-      await Promise.all([
-        offlineStorage.save(STORES.ORDERS, { ...offlineOrder, items: offlineItems }),
-        offlineStorage.addToSyncQueue('CREATE_ORDER', {
-          order: offlineOrder,
-          items: offlineItems
-        })
-      ]);
-
-      // Persist snapshot so My Visits "Today's Progress" updates even after navigation/app restart
-      try {
-        if (offlineOrder.user_id) {
-          await addOrderToSnapshot(offlineOrder.user_id, localOrderDate, {
-            id: offlineOrder.id,
-            retailer_id: offlineOrder.retailer_id,
-            user_id: offlineOrder.user_id,
-            // Use the already-rounded total_amount from offlineOrder
-            total_amount: offlineOrder.total_amount,
-            order_date: localOrderDate,
-            status: offlineOrder.status || 'confirmed',
-            visit_id: offlineOrder.visit_id,
-          });
-        }
-      } catch (e) {
-        console.warn('[useOfflineOrderEntry] Could not update snapshot (offline):', e);
-      }
-
-      toast({
-        title: "Order Saved Offline",
-        description: "Your order will be synced when you're back online",
-      });
-
-      // Trigger data refresh for Today's Progress
-      window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: localOrderDate } }));
-
-      return { success: true, offline: true, order: offlineOrder };
-    } else {
-      // Online: Submit with optimized single transaction
-      // CRITICAL: If online submission fails, fall back to offline queue to prevent data loss
-      try {
-        const { data: order, error: orderError } = await supabase
-          .from('orders')
-          .insert({ ...orderData, order_date: localOrderDate, status: orderData.status || 'confirmed' })
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-
-        // Batch insert all items at once
-        const itemsWithOrderId = orderItems.map(item => ({
-          ...item,
-          order_id: order.id
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(itemsWithOrderId);
-
-        if (itemsError) throw itemsError;
-
-        // Persist locally so progress works immediately after navigation
-        try {
-          const roundedTotalAmount = Math.round(Number(order.total_amount ?? 0));
-          const normalizedOrder = { ...order, items: orderItems, order_date: localOrderDate, status: order.status || 'confirmed', total_amount: roundedTotalAmount };
-          await offlineStorage.save(STORES.ORDERS, normalizedOrder);
-          if (normalizedOrder.user_id) {
-            await addOrderToSnapshot(normalizedOrder.user_id, localOrderDate, {
-              id: normalizedOrder.id,
-              retailer_id: normalizedOrder.retailer_id,
-              user_id: normalizedOrder.user_id,
-              total_amount: roundedTotalAmount,
-              order_date: localOrderDate,
-              status: normalizedOrder.status || 'confirmed',
-              visit_id: normalizedOrder.visit_id,
-            });
-          }
-        } catch (e) {
-          console.warn('[useOfflineOrderEntry] Could not persist online order locally (non-fatal):', e);
-        }
-
-        // Trigger data refresh for Today's Progress
-        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: localOrderDate } }));
-
-        return { success: true, offline: false, order };
-      } catch (onlineError: any) {
-        // FALLBACK: Online submission failed — queue for offline sync to prevent data loss
-        console.warn('[useOfflineOrderEntry] Online submission failed, falling back to offline queue:', onlineError.message);
-        
-        const orderId = crypto.randomUUID();
-        const offlineOrder = {
-          ...orderData,
-          id: orderId,
-          created_at: new Date().toISOString(),
-          order_date: localOrderDate,
-          status: orderData.status || 'confirmed',
-          total_amount: Math.round(Number(orderData.total_amount ?? 0)),
-        };
-
-        const offlineItems = orderItems.map(item => ({
-          ...item,
-          order_id: orderId
-        }));
-
-        await Promise.all([
-          offlineStorage.save(STORES.ORDERS, { ...offlineOrder, items: offlineItems }),
-          offlineStorage.addToSyncQueue('CREATE_ORDER', {
-            order: offlineOrder,
-            items: offlineItems
-          })
-        ]);
-
-        try {
-          if (offlineOrder.user_id) {
-            await addOrderToSnapshot(offlineOrder.user_id, localOrderDate, {
-              id: offlineOrder.id,
-              retailer_id: offlineOrder.retailer_id,
-              user_id: offlineOrder.user_id,
-              total_amount: offlineOrder.total_amount,
-              order_date: localOrderDate,
-              status: offlineOrder.status || 'confirmed',
-              visit_id: offlineOrder.visit_id,
-            });
-          }
-        } catch (e) {
-          console.warn('[useOfflineOrderEntry] Could not update snapshot (fallback):', e);
-        }
-
-        toast({
-          title: "Order Saved Locally",
-          description: "Network issue detected. Your order will sync automatically when connection is stable.",
-        });
-
-        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: localOrderDate } }));
-
-        return { success: true, offline: true, order: offlineOrder };
-      }
-    }
+    return submitOrderWithOfflineSupport(orderData, orderItems, {
+      connectivityStatus: isOnline ? 'online' : 'offline',
+      onOffline: () => {
+        console.log('[useOfflineOrderEntry] Order queued safely for background sync');
+      },
+      onOnline: () => {
+        console.log('[useOfflineOrderEntry] Order persisted via atomic sync flow');
+      },
+    });
   };
 
   return {
