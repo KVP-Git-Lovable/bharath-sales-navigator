@@ -34,7 +34,6 @@ export default defineConfig(({ mode }) => ({
           '**/lovable-uploads/**/*',
         ],
         maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
-        // Ensure service worker updates immediately
         dontCacheBustURLsMatching: /\.[0-9a-f]{8}\./,
       },
       manifest: {
@@ -69,18 +68,6 @@ export default defineConfig(({ mode }) => ({
       },
       includeAssets: ['icons/app-icon.png'],
       injectRegister: null,
-      injectManifest: {
-        globPatterns: [
-          '**/*.{html,js,mjs,css,woff,woff2,ttf,eot,ico,png,jpg,jpeg,svg,gif,webp,json,txt}',
-        ],
-        globIgnores: [
-          '**/node_modules/**/*',
-          '**/*.map',
-          '**/lovable-uploads/**/*',
-        ],
-        maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
-        dontCacheBustURLsMatching: /\.[0-9a-f]{8}\./,
-      }
     })
   ].filter(Boolean),
   resolve: {
