@@ -28,7 +28,7 @@ export function useMasterDataCache() {
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('*')
-        .eq('is_active', true);
+        .or('is_active.eq.true,is_active.is.null');
 
       if (productsError) throw productsError;
 
@@ -36,7 +36,7 @@ export function useMasterDataCache() {
       const { data: variants } = await supabase
         .from('product_variants')
         .select('*')
-        .eq('is_active', true);
+        .or('is_active.eq.true,is_active.is.null');
 
       // Only clear and update cache if all fetches succeeded
       if (products) {
