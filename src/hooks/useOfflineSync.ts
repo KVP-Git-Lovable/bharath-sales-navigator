@@ -8,6 +8,9 @@ import { visitStatusCache } from '@/lib/visitStatusCache';
 import { classifySyncError, isRetryableError, getBackoffDelay, SLOW_RETRY_THRESHOLD, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
 // Removed isSlowConnection import - sync should always attempt when online
 
+// Global lock shared across all hook instances to prevent duplicate queue runners
+let globalSyncInProgress = false;
+
 export function useOfflineSync() {
   const connectivityStatus = useConnectivity();
   
@@ -22,8 +25,8 @@ export function useOfflineSync() {
       return;
     }
     
-    // Prevent concurrent sync operations
-    if (isSyncingRef.current) {
+    // Prevent concurrent sync operations within this hook instance and across the app
+    if (isSyncingRef.current || globalSyncInProgress) {
       console.log('⏳ Sync already in progress, skipping...');
       return;
     }
@@ -32,6 +35,7 @@ export function useOfflineSync() {
     // The sync will happen in the background and won't block user actions
     
     isSyncingRef.current = true;
+    globalSyncInProgress = true;
 
     try {
       // Helper to check if an ID is a valid UUID (from database) vs temp offline ID
@@ -130,6 +134,69 @@ export function useOfflineSync() {
         }
       };
 
+      const verifyQueuedOrderAlreadySynced = async (item: any): Promise<boolean> => {
+        if (item.action !== 'CREATE_ORDER') return false;
+
+        const queuedOrder = item?.data?.order;
+        if (!queuedOrder?.id && !queuedOrder?.idempotency_key) return false;
+
+        try {
+          let matchedOrderId: string | null = null;
+
+          if (queuedOrder.id) {
+            const { data: orderById, error: orderByIdError } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('id', queuedOrder.id)
+              .maybeSingle();
+
+            if (orderByIdError) {
+              console.warn('⚠️ Could not verify synced order by id:', orderByIdError);
+            } else if (orderById?.id) {
+              matchedOrderId = orderById.id;
+            }
+          }
+
+          if (!matchedOrderId && queuedOrder.idempotency_key) {
+            const { data: orderByKey, error: orderByKeyError } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('idempotency_key', queuedOrder.idempotency_key)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (orderByKeyError) {
+              console.warn('⚠️ Could not verify synced order by idempotency key:', orderByKeyError);
+            } else if (orderByKey?.id) {
+              matchedOrderId = orderByKey.id;
+            }
+          }
+
+          if (!matchedOrderId) return false;
+
+          const { count: itemCount, error: itemsCountError } = await supabase
+            .from('order_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('order_id', matchedOrderId);
+
+          if (itemsCountError) {
+            console.warn('⚠️ Could not verify synced order items:', itemsCountError);
+            return false;
+          }
+
+          if ((itemCount || 0) > 0) {
+            console.log('✅ Queued order already exists in database with items, treating as synced:', matchedOrderId);
+            return true;
+          }
+
+          return false;
+        } catch (verificationError) {
+          console.warn('⚠️ Failed verifying queued order after sync error:', verificationError);
+          return false;
+        }
+      };
+
       let successCount = 0;
       let failCount = 0;
       const failedItems: any[] = [];
@@ -167,6 +234,15 @@ export function useOfflineSync() {
           const errorType = classifySyncError(error);
           const retryable = isRetryableError(errorType);
           const newRetryCount = (item.retryCount || 0) + 1;
+
+          const alreadySynced = await verifyQueuedOrderAlreadySynced(item);
+          if (alreadySynced) {
+            await logSyncAttempt(item, true);
+            await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            console.log(`✅ Recovered ${item.action} after post-sync verification`);
+            successCount++;
+            return;
+          }
           
           console.error(`❌ Failed to sync ${item.action}:`, {
             action: item.action,
@@ -237,6 +313,7 @@ export function useOfflineSync() {
     } finally {
       // Always release the lock
       isSyncingRef.current = false;
+      globalSyncInProgress = false;
     }
   }, [connectivityStatus]);
 
