@@ -34,7 +34,6 @@ export default defineConfig(({ mode }) => ({
           '**/lovable-uploads/**/*',
         ],
         maximumFileSizeToCacheInBytes: 20 * 1024 * 1024,
-        // Ensure service worker updates immediately
         dontCacheBustURLsMatching: /\.[0-9a-f]{8}\./,
       },
       manifest: {
@@ -63,10 +62,12 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       devOptions: {
-        enabled: true, // Enable PWA in dev mode for testing install prompt
+        enabled: false,
         type: 'module',
         navigateFallback: 'index.html'
-      }
+      },
+      includeAssets: ['icons/app-icon.png'],
+      injectRegister: null,
     })
   ].filter(Boolean),
   resolve: {

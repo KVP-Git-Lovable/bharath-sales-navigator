@@ -6,12 +6,54 @@ import App from './App.tsx';
 import './index.css';
 // Import i18n BEFORE app renders to ensure translations are available
 import './i18n/config';
+import { Capacitor } from '@capacitor/core';
 // Core modules - static imports (always in main bundle)
 import { offlineStorage } from './lib/offlineStorage';
 import { initCrashlytics } from './utils/crashlytics';
 import { initDownloadNotifications } from './utils/fileDownloader';
 
 console.log('🚀 App starting...');
+
+const isInIframe = (() => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+})();
+
+const isPreviewHost =
+  window.location.hostname.includes('id-preview--') ||
+  window.location.hostname.includes('lovableproject.com');
+
+const isStandaloneApp =
+  window.matchMedia?.('(display-mode: standalone)').matches ||
+  (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+const isNativeApp = Capacitor.isNativePlatform();
+const shouldDisableServiceWorker = isPreviewHost || isInIframe || isNativeApp || isStandaloneApp;
+
+const cleanupServiceWorkersAndCaches = async () => {
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+      console.log('🧹 Existing service workers unregistered');
+    }
+
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+      console.log('🧹 Existing caches cleared');
+    }
+  } catch (cleanupError) {
+    console.warn('⚠️ Failed to cleanup service workers/caches:', cleanupError);
+  }
+};
+
+if (shouldDisableServiceWorker) {
+  void cleanupServiceWorkersAndCaches();
+}
 
 // Recover from stale Vite optimized-dep references after a dev/preview restart.
 // When Vite re-bundles deps, its `?v=<hash>` URL changes; pages still holding the
@@ -74,8 +116,16 @@ console.log('✅ App rendered successfully');
 // Initialize background services after render
 (async () => {
   try {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
+    // Do not keep a PWA service worker in preview, iframe, installed app, or native wrapper contexts.
+    // Those contexts were the source of stale order-sync code on already-installed mobile apps.
+    if (shouldDisableServiceWorker) {
+      console.log('🛑 Skipping service worker registration for current runtime:', {
+        isPreviewHost,
+        isInIframe,
+        isNativeApp,
+        isStandaloneApp,
+      });
+    } else if ('serviceWorker' in navigator) {
       const { registerSW } = await import('virtual:pwa-register');
       const updateSW = registerSW({
         immediate: true,

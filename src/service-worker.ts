@@ -97,7 +97,7 @@ self.addEventListener('activate', (event) => {
 
 // App-shell style navigation handling (prevents white screen)
 registerRoute(
-  ({ request }) => request.mode === 'navigate',
+  ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/~oauth'),
   async (args) => {
     // Try network first with generous timeout
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -169,7 +169,7 @@ registerRoute(
 
 // Runtime caching: Supabase API - Use NetworkFirst with very short cache
 registerRoute(
-  ({ url }) => url.hostname.endsWith('.supabase.co'),
+  ({ url }) => url.hostname.endsWith('.supabase.co') && !url.pathname.startsWith('/auth/v1/'),
   new NetworkFirst({
     cacheName: `api-cache-${RUNTIME_CACHE_VERSION}`,
     networkTimeoutSeconds: 3,
