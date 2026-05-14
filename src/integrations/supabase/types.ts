@@ -11616,7 +11616,6 @@ export type Database = {
           description: string | null
           discount_amount: number | null
           discount_percentage: number | null
-          discount_unit: string | null
           discount_value_type: string | null
           end_date: string | null
           exclusion_group: string | null
@@ -11656,7 +11655,6 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
-          discount_unit?: string | null
           discount_value_type?: string | null
           end_date?: string | null
           exclusion_group?: string | null
@@ -11696,7 +11694,6 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
-          discount_unit?: string | null
           discount_value_type?: string | null
           end_date?: string | null
           exclusion_group?: string | null
@@ -11769,7 +11766,6 @@ export type Database = {
           is_active: boolean | null
           is_focused_product: boolean | null
           price: number
-          product_id: string
           qr_code: string | null
           sku: string
           stock_quantity: number
@@ -11792,7 +11788,6 @@ export type Database = {
           is_active?: boolean | null
           is_focused_product?: boolean | null
           price?: number
-          product_id: string
           qr_code?: string | null
           sku: string
           stock_quantity?: number
@@ -11815,22 +11810,13 @@ export type Database = {
           is_active?: boolean | null
           is_focused_product?: boolean | null
           price?: number
-          product_id?: string
           qr_code?: string | null
           sku?: string
           stock_quantity?: number
           updated_at?: string
           variant_name?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "product_variants_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       products: {
         Row: {
