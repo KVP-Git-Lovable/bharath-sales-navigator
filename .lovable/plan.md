@@ -1,68 +1,44 @@
+# Permanent fix: restore variant↔product link
+
 ## Root cause
+`product_variants` table is missing the `product_id` column. The frontend filters variants with `v.product_id === product.id` — since that field doesn't exist on any row, **zero variants attach to any product** for every user. RLS is fine; the schema is broken.
 
-When you deactivated **Manvith** and transferred his data to **Mokshith** from User Management, the system used the *Partial Ownership Transfer* flow. Looking at the database right now for Manvith's beats:
+This is a **pure database fix** — no app code changes, no rebuild, no APK redeploy. Once the column is added and backfilled, every existing user (web + installed app) will see all variants automatically on their next product cache refresh (~30s).
 
-| Field | Current value | Should be |
-|---|---|---|
-| `created_by` | Manvith | Manvith (keep — history) |
-| `user_id` (operational owner) | Mokshith ✅ | Mokshith |
-| `owner_id` | **Manvith ❌** | Mokshith |
-| `owner_name` | **"Manvith" ❌** | "Mokshith" |
+## Migration steps
 
-So the *operational* assignment moved (orders/visits will go to Mokshith), but the **displayed owner** on the beat card still shows Manvith. Two beats (`test`, `Testbeat`) didn't move at all because they were owned only by Manvith with no Mokshith retailers.
-
-Two bugs in `public.partial_ownership_transfer` RPC:
-1. Even when "Also transfer ownership" is ticked, the RPC only updates `owner_id` — never `owner_name`. So the name shown on the beat stays as the old user.
-2. For beats where retailers were transferred (not the beat row itself), the RPC computes a "consensus owner" but again only updates `owner_id`, never `owner_name`.
-
-## Fix
-
-### 1. Patch the RPC `partial_ownership_transfer`
-
-Resolve the new owner's display name from `profiles.full_name` once at the start, then include `owner_name = <resolved name>` in every `UPDATE public.beats SET owner_id = p_to ...` branch (both the retailer-driven consensus block and the explicit beat-list block) — only when `transfer_ownership` is true.
-
-Pseudo-change inside the function:
-```text
-v_to_name := SELECT full_name FROM profiles WHERE id = p_to;
-
-UPDATE beats
-   SET owner_id   = p_to,
-       owner_name = v_to_name,         -- NEW
-       user_id    = p_to
- WHERE ...                              -- existing predicates unchanged
+**1. Add the column + index**
+```sql
+ALTER TABLE public.product_variants
+  ADD COLUMN product_id uuid REFERENCES public.products(id) ON DELETE CASCADE;
+CREATE INDEX idx_product_variants_product_id ON public.product_variants(product_id);
 ```
 
-`created_by` is never touched — Manvith remains the historical creator.
+**2. Backfill all 20 orphan variants** by matching brand keyword in `variant_name` to the existing base products:
 
-### 2. One-time backfill for the already-broken Manvith beats
+| Variant names                                  | Linked to base product |
+|------------------------------------------------|------------------------|
+| ADUKU 100G / 250G / 500G                       | ADUKU 20G              |
+| BLUE 100G / 250G / 500G                        | BLUE 20G               |
+| GOLD 1KG / Gold 250G / GOLD 500G               | GOLD 40G               |
+| YELLOW 100G / 250G / 500G / Yellow 1Kg / Yellow 40G | YELLOW 20G        |
+| RL JAR 1KG / RL JAR 500G                       | RL JAR 250             |
+| DAKSHIN 250G                                   | DAKSHIN 30G            |
+| VAYU 250G                                      | VAYU 30G               |
+| ELACHI 250G                                    | ELAICHI 40G            |
+| ADARAK 250G                                    | ADRAK 40G              |
 
-Run a data update (via the *insert/update* tool, not a migration) to align the 17 beats that were half-transferred:
+(RL POUCH 250G and DAKSHIN GOLD HORECA stay base-only — they have no variants in the table.)
 
-```text
-UPDATE public.beats
-   SET owner_id   = '<Mokshith uuid>',
-       owner_name = 'Mokshith',
-       user_id    = '<Mokshith uuid>'
- WHERE created_by = '<Manvith uuid>'
-   AND (owner_id = '<Manvith uuid>' OR user_id = '<Manvith uuid>');
-
-UPDATE public.retailers
-   SET owner_id = '<Mokshith uuid>',
-       user_id  = '<Mokshith uuid>'
- WHERE user_id = '<Manvith uuid>' OR owner_id = '<Manvith uuid>';
+**3. Verify**
+```sql
+SELECT count(*) FROM product_variants WHERE product_id IS NULL;  -- expect 0
 ```
+Then reload Order Entry → each base product expands to show its full variant list.
 
-This sweeps the two stragglers (`test`, `Testbeat`) and fixes the displayed name on the other 15. `created_by` stays Manvith on every row.
+## Why no code/app change is needed
+- `useOfflineOrderEntry.ts` and `TableOrderForm.tsx` already read `product_id` from variants — they always did. The schema just needs the column back.
+- IndexedDB cache auto-refreshes from Supabase on next open (background sync within 30s). No reinstall, no rebuild.
+- All existing users — including those on the installed Android app — will pick up the fix on their next online product fetch.
 
-### 3. Verification
-
-After the changes:
-- Re-query a sample of beats — every row originally created by Manvith should show `user_id`, `owner_id`, `owner_name` = Mokshith and `created_by` = Manvith.
-- Open the Beats screen as Mokshith — all those beats should appear under his login and the owner chip should read "Mokshith".
-- Place a test order on one of those beats from Mokshith's account — it should save against Mokshith with no RLS errors.
-
-## Notes / scope
-
-- Frontend code (`UserDeleteDialog`, `BeatTransferDialog`) does not need changes — they already pass `transfer_ownership: true` when the user ticks the box; the bug is server-side in the RPC.
-- No schema changes; only the RPC body is updated and a one-time data correction is applied.
-- No edits to `created_by` anywhere — Manvith's authorship stays intact.
+Confirm and I'll run the migration.
