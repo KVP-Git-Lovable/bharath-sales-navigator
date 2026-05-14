@@ -5,8 +5,9 @@ const config: CapacitorConfig = {
   appName: 'SalesNavigator',
   webDir: 'dist',
   server: {
+    url: 'https://field-sales-navigator.lovable.app',
     androidScheme: 'https',
-    cleartext: true
+    cleartext: false
   },
   webView: {
     allowMixedContent: true
