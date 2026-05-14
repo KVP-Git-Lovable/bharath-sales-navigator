@@ -9127,7 +9127,6 @@ export type Database = {
           discount_amount: number | null
           hsn_code: string | null
           id: string
-          order_id: string
           original_rate: number | null
           product_id: string | null
           product_name: string
@@ -9145,7 +9144,6 @@ export type Database = {
           discount_amount?: number | null
           hsn_code?: string | null
           id?: string
-          order_id: string
           original_rate?: number | null
           product_id?: string | null
           product_name: string
@@ -9163,7 +9161,6 @@ export type Database = {
           discount_amount?: number | null
           hsn_code?: string | null
           id?: string
-          order_id?: string
           original_rate?: number | null
           product_id?: string | null
           product_name?: string
@@ -9175,13 +9172,6 @@ export type Database = {
           variant_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "order_items_product_id_fkey"
             columns: ["product_id"]
