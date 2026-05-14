@@ -9129,7 +9129,6 @@ export type Database = {
           id: string
           order_id: string
           original_rate: number | null
-          product_id: string
           product_name: string
           quantity: number
           rate: number
@@ -9146,7 +9145,6 @@ export type Database = {
           id?: string
           order_id: string
           original_rate?: number | null
-          product_id: string
           product_name: string
           quantity: number
           rate: number
@@ -9163,7 +9161,6 @@ export type Database = {
           id?: string
           order_id?: string
           original_rate?: number | null
-          product_id?: string
           product_name?: string
           quantity?: number
           rate?: number
