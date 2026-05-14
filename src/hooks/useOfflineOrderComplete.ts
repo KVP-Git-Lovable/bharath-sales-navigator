@@ -6,6 +6,7 @@ import { toast } from './use-toast';
 import { visitStatusCache } from '@/lib/visitStatusCache';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { markVisitDataChanged } from '@/lib/visitChangeMarker';
+import { submitOrderWithOfflineSupport } from '@/utils/offlineOrderUtils';
 
 /**
  * Comprehensive offline order entry hook
@@ -208,131 +209,37 @@ export function useOfflineOrderComplete() {
         );
       }
 
-      if (isOnline) {
-        // Online: Submit directly to Supabase
-        const { data: order, error: orderError } = await supabase
-          .from('orders')
-          .insert(orderData)
-          .select()
-          .single();
+      const result = await submitOrderWithOfflineSupport(orderData, orderItems, {
+        connectivityStatus,
+        onOffline: () => {
+          toast({
+            title: "Order Saved Offline",
+            description: "Your order will be submitted when you're back online.",
+            variant: "default",
+          });
+        },
+        onOnline: () => {
+          toast({
+            title: "Order Submitted",
+            description: "Your order has been submitted successfully.",
+          });
+        },
+      });
 
-        if (orderError) throw orderError;
-
-        const itemsWithOrderId = orderItems.map(item => ({
-          ...item,
-          order_id: order.id
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(itemsWithOrderId);
-
-        if (itemsError) throw itemsError;
-
-        // Database trigger automatically updates visit status to 'productive'
-        // when order is inserted - no manual update needed
-        console.log('✅ Order inserted, database trigger will auto-update visit status');
-
-        toast({
-          title: "Order Submitted",
-          description: "Your order has been submitted successfully.",
-        });
-
-        // Dispatch events AFTER database update completes
-        console.log('✅ Order submitted online, dispatching events with orderValue:', orderData.total_amount);
-        window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-          detail: { 
-            visitId: orderData.visit_id, 
-            status: 'productive', 
-            retailerId: orderData.retailer_id,
-            orderValue: orderData.total_amount  // Include order value for immediate UI update
-          }
-        }));
-        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
-        
-        // Mark data changed for cross-page state sync
-        markVisitDataChanged(orderDate);
-
-        // Add delay before returning to allow events to be processed
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        return { success: true, offline: false, order };
-      } else {
-        // Offline: Queue for sync
-        const orderId = crypto.randomUUID();
-        const offlineOrder = {
-          ...orderData,
-          id: orderId,
-          created_at: new Date().toISOString(),
-          order_date: new Date().toISOString().split('T')[0]
-        };
-
-        const offlineItems = orderItems.map(item => ({
-          ...item,
-          id: crypto.randomUUID(),
-          order_id: orderId
-        }));
-
-        // Save to offline storage
-        await offlineStorage.save(STORES.ORDERS, { 
-          ...offlineOrder, 
-          items: offlineItems 
-        });
-
-        // Update visit status in offline cache to 'productive'
-        if (orderData.visit_id) {
-          console.log('🔄 Updating visit in offline cache for visit:', orderData.visit_id);
-          const cachedVisits = await offlineStorage.getAll<any>(STORES.VISITS);
-          const visitToUpdate = cachedVisits.find((v: any) => v.id === orderData.visit_id);
-          
-          if (visitToUpdate) {
-            const updatedVisit = { 
-              ...visitToUpdate, 
-              status: 'productive',
-              check_out_time: new Date().toISOString()
-            };
-            await offlineStorage.save(STORES.VISITS, updatedVisit);
-            console.log('✅ Visit status updated in offline cache');
-          } else {
-            console.warn('⚠️ Visit not found in cache:', orderData.visit_id);
-          }
-        } else {
-          console.warn('⚠️ No visit_id in orderData for offline order');
+      console.log('✅ Order processed via shared atomic flow, dispatching refresh events');
+      window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+        detail: {
+          visitId: orderData.visit_id,
+          status: 'productive',
+          retailerId: orderData.retailer_id,
+          orderValue: orderData.total_amount
         }
+      }));
+      window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
+      markVisitDataChanged(orderDate);
 
-        // Queue for sync
-        await offlineStorage.addToSyncQueue('CREATE_ORDER', {
-          order: offlineOrder,
-          items: offlineItems,
-          visitId: orderData.visit_id // Include visitId for visit status update during sync
-        });
-
-        toast({
-          title: "Order Saved Offline",
-          description: "Your order will be submitted when you're back online.",
-          variant: "default",
-        });
-
-        // Dispatch events for immediate UI update
-        console.log('✅ Order saved offline, dispatching events with orderValue:', orderData.total_amount);
-        window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-          detail: { 
-            visitId: orderData.visit_id, 
-            status: 'productive', 
-            retailerId: orderData.retailer_id,
-            orderValue: orderData.total_amount  // Include order value for immediate UI update
-          }
-        }));
-        window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
-        
-        // Mark data changed for cross-page state sync
-        markVisitDataChanged(orderDate);
-
-        // Add delay before returning to allow events to be processed
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        return { success: true, offline: true, order: offlineOrder };
-      }
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return result;
     } catch (error: any) {
       console.error('Error submitting order:', error);
       toast({
