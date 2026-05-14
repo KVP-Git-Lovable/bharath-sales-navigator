@@ -474,6 +474,7 @@ export function useOfflineSync() {
           }));
           
           // SINGLE RPC CALL: Upsert order + items in one transaction (replaces 4-5 round-trips)
+          // Do not fall back to direct inserts here — that can create header-only orders if item insert fails.
           let actualOrderId = offlineOrderId;
           try {
             const { data: rpcResult, error: rpcError } = await supabase
@@ -490,75 +491,55 @@ export function useOfflineSync() {
             
             actualOrderId = rpcResult?.order_id || offlineOrderId;
             console.log('✅ Order + items synced via RPC:', rpcResult);
-          } catch (rpcFallbackError: any) {
-            // FALLBACK: Direct insert if RPC not available
-            console.log('🔄 Falling back to direct order+items insert...');
-            
-            // Check if order already exists
+          } catch (rpcSyncError: any) {
+            console.warn('⚠️ RPC sync_order_with_items failed; verifying whether the order was already persisted:', rpcSyncError?.message || rpcSyncError);
+
+            let matchedOrderId: string | null = null;
+
             if (offlineOrderId && isValidUUID(offlineOrderId)) {
-              const { data: existingById } = await supabase
+              const { data: existingById, error: existingByIdError } = await supabase
                 .from('orders')
                 .select('id')
                 .eq('id', offlineOrderId)
                 .maybeSingle();
-              
-              if (existingById) {
-                actualOrderId = offlineOrderId;
-                // Check if items exist
-                const { data: existingItemsCheck } = await supabase
-                  .from('order_items')
-                  .select('id')
-                  .eq('order_id', offlineOrderId)
-                  .limit(1);
-                
-                if (existingItemsCheck && existingItemsCheck.length > 0) {
-                  console.log('✅ Order and items both exist, skipping:', offlineOrderId);
-                  // Skip to post-sync cleanup below
-                } else {
-                  // Insert missing items
-                  const missingItems = cleanItems.map((item: any) => ({
-                    ...item,
-                    order_id: offlineOrderId
-                  }));
-                  await supabase.from('order_items').insert(missingItems);
-                }
+
+              if (existingByIdError) {
+                console.warn('⚠️ Could not verify order by offline id after RPC failure:', existingByIdError);
+              } else if (existingById?.id) {
+                matchedOrderId = existingById.id;
+              }
+            }
+
+            if (!matchedOrderId && data.order?.idempotency_key) {
+              const { data: existingByKey, error: existingByKeyError } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('idempotency_key', data.order.idempotency_key)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (existingByKeyError) {
+                console.warn('⚠️ Could not verify order by idempotency key after RPC failure:', existingByKeyError);
+              } else if (existingByKey?.id) {
+                matchedOrderId = existingByKey.id;
+              }
+            }
+
+            if (matchedOrderId) {
+              const { count: itemCount, error: itemCountError } = await supabase
+                .from('order_items')
+                .select('id', { count: 'exact', head: true })
+                .eq('order_id', matchedOrderId);
+
+              if (!itemCountError && (itemCount || 0) > 0) {
+                actualOrderId = matchedOrderId;
+                console.log('✅ Order already exists with items after RPC verification:', matchedOrderId);
               } else {
-                // Insert order
-                const { data: insertedOrder, error: orderError } = await supabase
-                  .from('orders')
-                  .insert(orderToInsert)
-                  .select()
-                  .single();
-                
-                if (orderError && orderError.code !== '23505') {
-                  throw orderError;
-                }
-                actualOrderId = insertedOrder?.id || offlineOrderId;
-                
-                // Insert items
-                const itemsWithOrderId = cleanItems.map((item: any) => ({
-                  ...item,
-                  order_id: actualOrderId
-                }));
-                const { error: itemsError } = await supabase.from('order_items').insert(itemsWithOrderId);
-                if (itemsError && itemsError.code !== '23505') throw itemsError;
+                throw rpcSyncError;
               }
             } else {
-              // No valid UUID - insert fresh
-              const { data: insertedOrder, error: orderError } = await supabase
-                .from('orders')
-                .insert(orderToInsert)
-                .select()
-                .single();
-              if (orderError) throw orderError;
-              actualOrderId = insertedOrder.id;
-              
-              const itemsWithOrderId = cleanItems.map((item: any) => ({
-                ...item,
-                order_id: actualOrderId
-              }));
-              const { error: itemsError } = await supabase.from('order_items').insert(itemsWithOrderId);
-              if (itemsError && itemsError.code !== '23505') throw itemsError;
+              throw rpcSyncError;
             }
           }
           
