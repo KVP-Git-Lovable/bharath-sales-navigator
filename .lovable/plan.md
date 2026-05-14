@@ -1,49 +1,68 @@
-# Why variants are missing for some users
+## Root cause
 
-## Diagnosis
+When you deactivated **Manvith** and transferred his data to **Mokshith** from User Management, the system used the *Partial Ownership Transfer* flow. Looking at the database right now for Manvith's beats:
 
-- Database is correct: 20 active variants exist, all with `is_active = true`.
-- RLS is correct: `product_variants` has `SELECT TO authenticated USING (true)` — every logged-in user can read them.
-- Code is correct: `useOfflineOrderEntry.ts` fetches variants with `is_active = true OR null` and merges them into the product list.
+| Field | Current value | Should be |
+|---|---|---|
+| `created_by` | Manvith | Manvith (keep — history) |
+| `user_id` (operational owner) | Mokshith ✅ | Mokshith |
+| `owner_id` | **Manvith ❌** | Mokshith |
+| `owner_name` | **"Manvith" ❌** | "Mokshith" |
 
-So why don't all users see them?
+So the *operational* assignment moved (orders/visits will go to Mokshith), but the **displayed owner** on the beat card still shows Manvith. Two beats (`test`, `Testbeat`) didn't move at all because they were owned only by Manvith with no Mokshith retailers.
 
-**Root cause = stale IndexedDB cache on user devices.**
-
-Before we added the SELECT policy on `product_variants`, the variant fetch silently returned `[]` for every non-admin user. That empty array got cached into IndexedDB (`STORES.VARIANTS`). The hook is **cache-first**:
-
-1. Loads products + variants from IndexedDB instantly and renders.
-2. Only **then** triggers a background re-sync — and only if `isOnline`, only via `requestIdleCallback`, and only once per session (`hasFetchedRef`).
-
-For users on slow/intermittent connections (typical for the Android field app), the background sync often never completes before they navigate away, so the empty variants cache persists across sessions. Result: products show, variants don't.
-
-There is no cache version mechanism, so we cannot detect that the cache was populated under the old broken RLS.
+Two bugs in `public.partial_ownership_transfer` RPC:
+1. Even when "Also transfer ownership" is ticked, the RPC only updates `owner_id` — never `owner_name`. So the name shown on the beat stays as the old user.
+2. For beats where retailers were transferred (not the beat row itself), the RPC computes a "consensus owner" but again only updates `owner_id`, never `owner_name`.
 
 ## Fix
 
-Add a one-time cache invalidation tied to a version constant. On app load, if the stored version is older than the current code version, wipe `PRODUCTS`, `VARIANTS`, `SCHEMES` from IndexedDB so the next fetch is forced to pull fresh data from the network (now that RLS allows it).
+### 1. Patch the RPC `partial_ownership_transfer`
 
-### Changes
+Resolve the new owner's display name from `profiles.full_name` once at the start, then include `owner_name = <resolved name>` in every `UPDATE public.beats SET owner_id = p_to ...` branch (both the retailer-driven consensus block and the explicit beat-list block) — only when `transfer_ownership` is true.
 
-1. **`src/hooks/useOfflineOrderEntry.ts`**
-   - Add `const PRODUCT_CACHE_VERSION = 2;`
-   - On mount (before first cache read), check `localStorage.getItem('product_cache_version')`. If missing or `< 2`, call `offlineStorage.clear(STORES.PRODUCTS / VARIANTS / SCHEMES)` and set the new version.
-   - After clearing, force a network sync immediately instead of returning the empty cache.
+Pseudo-change inside the function:
+```text
+v_to_name := SELECT full_name FROM profiles WHERE id = p_to;
 
-2. **`src/utils/offlineOrderUtils.ts`** (`loadProductsFromCache`)
-   - Same version check — if cache is stale, return `{ products: [], fromCache: true }` so the caller falls through to network fetch.
+UPDATE beats
+   SET owner_id   = p_to,
+       owner_name = v_to_name,         -- NEW
+       user_id    = p_to
+ WHERE ...                              -- existing predicates unchanged
+```
 
-3. **Make the background sync more reliable**
-   - In `useOfflineOrderEntry.ts`, when cache yields products but **zero variants total**, force an immediate (non-idle) network sync instead of the deferred one. This catches the affected users on their very next visit to Order Entry, even on slow connections.
+`created_by` is never touched — Manvith remains the historical creator.
 
-### Out of scope
+### 2. One-time backfill for the already-broken Manvith beats
 
-- No RLS changes (already correct).
-- No DB data changes (variants are already active).
-- No UI changes — variants render correctly once data is present.
+Run a data update (via the *insert/update* tool, not a migration) to align the 17 beats that were half-transferred:
 
-### Verification
+```text
+UPDATE public.beats
+   SET owner_id   = '<Mokshith uuid>',
+       owner_name = 'Mokshith',
+       user_id    = '<Mokshith uuid>'
+ WHERE created_by = '<Manvith uuid>'
+   AND (owner_id = '<Manvith uuid>' OR user_id = '<Manvith uuid>');
 
-- Log out / reopen the installed app as an affected user → IndexedDB version bumps → variants re-sync → variant rows appear in the Order Entry product dropdown.
-- Browser preview (which already shows variants) continues to work — cache version simply bumps once with no visible effect.
-- Newly added variants in Product Master continue to flow through the existing 30-second background sync.
+UPDATE public.retailers
+   SET owner_id = '<Mokshith uuid>',
+       user_id  = '<Mokshith uuid>'
+ WHERE user_id = '<Manvith uuid>' OR owner_id = '<Manvith uuid>';
+```
+
+This sweeps the two stragglers (`test`, `Testbeat`) and fixes the displayed name on the other 15. `created_by` stays Manvith on every row.
+
+### 3. Verification
+
+After the changes:
+- Re-query a sample of beats — every row originally created by Manvith should show `user_id`, `owner_id`, `owner_name` = Mokshith and `created_by` = Manvith.
+- Open the Beats screen as Mokshith — all those beats should appear under his login and the owner chip should read "Mokshith".
+- Place a test order on one of those beats from Mokshith's account — it should save against Mokshith with no RLS errors.
+
+## Notes / scope
+
+- Frontend code (`UserDeleteDialog`, `BeatTransferDialog`) does not need changes — they already pass `transfer_ownership: true` when the user ticks the box; the bug is server-side in the RPC.
+- No schema changes; only the RPC body is updated and a one-time data correction is applied.
+- No edits to `created_by` anywhere — Manvith's authorship stays intact.
