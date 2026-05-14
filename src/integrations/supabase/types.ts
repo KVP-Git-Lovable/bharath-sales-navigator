@@ -15048,32 +15048,21 @@ export type Database = {
           created_at: string
           id: string
           is_applicable: boolean
-          product_variant_id: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           is_applicable?: boolean
-          product_variant_id: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           is_applicable?: boolean
-          product_variant_id?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "tax_product_map_product_variant_id_fkey"
-            columns: ["product_variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       team_expense_config: {
         Row: {
