@@ -9127,7 +9127,7 @@ export type Database = {
           discount_amount: number | null
           hsn_code: string | null
           id: string
-          order_id: string | null
+          order_id: string
           original_rate: number | null
           product_id: string | null
           product_name: string
@@ -9145,7 +9145,7 @@ export type Database = {
           discount_amount?: number | null
           hsn_code?: string | null
           id?: string
-          order_id?: string | null
+          order_id: string
           original_rate?: number | null
           product_id?: string | null
           product_name: string
@@ -9163,7 +9163,7 @@ export type Database = {
           discount_amount?: number | null
           hsn_code?: string | null
           id?: string
-          order_id?: string | null
+          order_id?: string
           original_rate?: number | null
           product_id?: string | null
           product_name?: string
