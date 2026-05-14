@@ -1405,6 +1405,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1444,6 +1445,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1483,6 +1485,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
@@ -2314,6 +2317,7 @@ const Operations = () => {
                       <SelectItem value="today">Today</SelectItem>
                       <SelectItem value="week">This Week</SelectItem>
                       <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2380,6 +2384,7 @@ const Operations = () => {
                       <SelectItem value="today">Today</SelectItem>
                       <SelectItem value="week">This Week</SelectItem>
                       <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2527,6 +2532,7 @@ const Operations = () => {
                         <SelectItem value="today">Today</SelectItem>
                         <SelectItem value="week">This Week</SelectItem>
                         <SelectItem value="month">This Month</SelectItem>
+                      <SelectItem value="lastMonth">Last Month</SelectItem>
                         <SelectItem value="all">All Time</SelectItem>
                       </SelectContent>
                     </Select>
