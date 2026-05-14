@@ -588,7 +588,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     // Then check variants
     for (const product of products) {
       if (product.variants) {
-        const variant = product.variants.find(v => v.sku.toLowerCase() === code.toLowerCase() && v.is_active);
+        const variant = product.variants.find(v => v.sku.toLowerCase() === code.toLowerCase() && v.is_active !== false);
         if (variant) {
           return { product, variant };
         }
