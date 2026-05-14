@@ -17665,6 +17665,7 @@ export type Database = {
       }
     }
     Functions: {
+      _safe_uuid: { Args: { p: string }; Returns: string }
       apply_event_stock_for_order: {
         Args: {
           p_items: Json

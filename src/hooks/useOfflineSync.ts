@@ -385,10 +385,17 @@ export function useOfflineSync() {
             delete orderToInsert.visit_id;
           }
 
-          // Strip variant_id from items (column doesn't exist on order_items table)
+          // Sanitize items: keep variant_id (column now exists), drop only the local "id" field,
+          // and null out non-UUID product_id / variant_id values so the DB cast doesn't fail.
+          const isUUID = (v: any) =>
+            typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
           const cleanItems = data.items.map((item: any) => {
-            const { variant_id, id, ...rest } = item;
-            return rest;
+            const { id, ...rest } = item;
+            return {
+              ...rest,
+              product_id: isUUID(rest.product_id) ? rest.product_id : null,
+              variant_id: isUUID(rest.variant_id) ? rest.variant_id : null,
+            };
           });
           
           // SINGLE RPC CALL: Upsert order + items in one transaction (replaces 4-5 round-trips)

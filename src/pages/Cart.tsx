@@ -868,17 +868,23 @@ export const Cart = () => {
         const sgstAmount = itemTotal * 0.025;
         const cgstAmount = itemTotal * 0.025;
         
-        // FIX: For variants, use the VARIANT UUID as product_id so van stock sync matches correctly
-        // Cart item.id format: "baseProductId_variant_variantId" for variants
-        // Van stock items store variant UUIDs directly, so we need to store the variant UUID
-        let productId = item.id;
+        // Split composite cart id "baseProductId_variant_variantId" into proper FK fields.
+        // product_id MUST be the base product UUID (FK to products.id);
+        // variant_id holds the variant UUID separately (FK to product_variants.id).
+        let productId: string | null = item.id;
+        let variantId: string | null = null;
         if (item.id.includes('_variant_')) {
           const parts = item.id.split('_variant_');
-          productId = parts[1]; // Use VARIANT UUID for product_id (matches van_stock_items.product_id)
+          productId = parts[0] || null;
+          variantId = parts[1] || null;
         }
-        
+        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        if (!isUUID(productId)) productId = null;
+        if (!isUUID(variantId)) variantId = null;
+
         return {
           product_id: productId,
+          variant_id: variantId,
           product_name: item.name,
           category: item.category,
           rate: currentRate - discountPerItem, // Store discounted rate
@@ -897,7 +903,9 @@ export const Cart = () => {
       const freeOrderItems = orderCalculation.appliedSchemes
         .filter(s => s.free_items && s.free_items.length > 0)
         .flatMap(s => s.free_items!.map(freeItem => ({
-          product_id: freeItem.product_id || 'FREE_ITEM',
+          // Only set product_id if it's a real UUID; otherwise null so the DB cast doesn't fail
+          product_id: (typeof freeItem.product_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(freeItem.product_id)) ? freeItem.product_id : null,
+          variant_id: null,
           product_name: `${freeItem.product_name} (FREE)`,
           category: 'Free Item',
           rate: 0,
@@ -1601,14 +1609,20 @@ export const Cart = () => {
         const sgstAmount = itemTotal * 0.025;
         const cgstAmount = itemTotal * 0.025;
         
-        let productId = item.id;
+        let productId: string | null = item.id;
+        let variantId: string | null = null;
         if (item.id.includes('_variant_')) {
           const parts = item.id.split('_variant_');
-          productId = parts[1];
+          productId = parts[0] || null;
+          variantId = parts[1] || null;
         }
-        
+        const isUUID = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        if (!isUUID(productId)) productId = null;
+        if (!isUUID(variantId)) variantId = null;
+
         return {
           product_id: productId,
+          variant_id: variantId,
           product_name: item.name,
           category: item.category,
           rate: currentRate - discountPerItem,
@@ -1627,7 +1641,8 @@ export const Cart = () => {
       const freeOrderItems = orderCalculation.appliedSchemes
         .filter(s => s.free_items && s.free_items.length > 0)
         .flatMap(s => s.free_items!.map(freeItem => ({
-          product_id: freeItem.product_id || 'FREE_ITEM',
+          product_id: (typeof freeItem.product_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(freeItem.product_id)) ? freeItem.product_id : null,
+          variant_id: null,
           product_name: `${freeItem.product_name} (FREE)`,
           category: 'Free Item',
           rate: 0,
