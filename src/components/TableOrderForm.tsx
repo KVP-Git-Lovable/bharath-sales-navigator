@@ -633,10 +633,10 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         type: 'product',
       });
 
-      // Add active variants; display only variant name (no base name prefix)
+      // Add active variants; null/undefined is treated as active throughout order entry
       if (product.variants && product.variants.length > 0) {
         product.variants.forEach(variant => {
-          if (variant.is_active) {
+          if (variant.is_active !== false) {
             options.push({
               value: `${product.id}_variant_${variant.id}`,
               label: `${variant.variant_name} | ₹${variant.price}`,
