@@ -161,30 +161,50 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
                     {selectedItemIds.length} selected
                   </span>
                 </div>
-                <div className="max-h-44 overflow-y-auto space-y-1">
+                <div className="max-h-56 overflow-y-auto space-y-1">
                   {eligibleLines.map(line => {
                     const disabled = !!minQty && line.quantity < minQty;
                     const checked = selectedItemIds.includes(line.id);
+                    const lineVal = perItemValues[line.id] ?? '';
+                    const lineDiscount = checked ? lineDiscountFor(line) : 0;
                     return (
-                      <label
+                      <div
                         key={line.id}
-                        className={`flex items-center justify-between gap-3 p-2 rounded border text-xs cursor-pointer ${
+                        className={`flex items-center gap-2 p-2 rounded border text-xs ${
                           checked ? 'border-primary bg-primary/5' : 'border-border'
-                        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${disabled ? 'opacity-50' : ''}`}
                       >
-                        <div className="flex items-center gap-2 min-w-0">
+                        <label className={`flex items-center gap-2 min-w-0 flex-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                           <Checkbox
                             checked={checked}
                             disabled={disabled}
                             onCheckedChange={() => !disabled && toggleLine(line.id)}
                           />
-                          <span className="truncate font-medium">{line.name}</span>
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">{line.name}</div>
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {line.quantity} {line.unit} @ ₹{line.rate.toFixed(2)}
+                              {disabled ? ` · need ≥${minQty}` : ''}
+                              {checked && lineDiscount > 0 ? ` · −₹${lineDiscount.toFixed(2)}` : ''}
+                            </div>
+                          </div>
+                        </label>
+                        <div className="relative shrink-0 w-[88px]">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            min={0}
+                            max={cap}
+                            step="0.01"
+                            disabled={disabled || !checked}
+                            value={lineVal}
+                            onChange={(e) => setLineValue(line.id, e.target.value)}
+                            placeholder={`0–${cap}`}
+                            className="pr-6 h-7 text-xs"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{symbol}</span>
                         </div>
-                        <span className="shrink-0 text-muted-foreground">
-                          {line.quantity} {line.unit} @ ₹{line.rate.toFixed(2)}
-                          {disabled ? ` · need ≥${minQty}` : ''}
-                        </span>
-                      </label>
+                      </div>
                     );
                   })}
                 </div>
@@ -192,41 +212,16 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
             )}
           </div>
 
-          <div>
-            <Label className="text-xs font-medium">
-              Discount {valueType === 'percentage' ? `% per ${unit}` : `per ${unit}`}
-              <span className="text-muted-foreground font-normal"> · max {capLabel}</span>
-            </Label>
-            <div className="relative mt-1">
-              <Input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={cap}
-                step="0.01"
-                value={perUnit}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === '') return setPerUnit('');
-                  const n = Number(v);
-                  if (Number.isNaN(n)) return;
-                  setPerUnit(String(Math.max(0, Math.min(cap, n))));
-                }}
-                placeholder={`0 - ${cap}`}
-                className="pr-8 h-9 text-sm"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{symbol}</span>
-            </div>
-          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Enter a per-{unit} discount on each row · max {capLabel}
+          </p>
 
-          {selectedLines.length > 0 && enteredNum > 0 && (
+          {linesWithValue.length > 0 && (
             <div className="bg-muted/50 rounded p-2 text-xs space-y-0.5">
               <div className="font-medium">Preview</div>
               <div className="text-muted-foreground">
-                {valueType === 'percentage' ? `${enteredNum}% per ${unit}` : `₹${enteredNum} per ${unit}`}
-                {' · '}
-                {selectedLines.length} product{selectedLines.length > 1 ? 's' : ''}
-                {' = '}
+                {linesWithValue.length} product{linesWithValue.length > 1 ? 's' : ''}
+                {' · total '}
                 <span className="font-semibold text-foreground">₹{previewDiscount.toFixed(2)}</span> off
               </div>
             </div>
