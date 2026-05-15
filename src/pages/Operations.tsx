@@ -606,7 +606,7 @@ const Operations = () => {
           credit_paid_amount,
           payment_method,
           payment_status,
-          invoice_number
+          invoice_generated_at
         `)
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
@@ -657,7 +657,7 @@ const Operations = () => {
           ? supabase.from('counter_customers').select('id, phone').in('id', counterIds)
           : Promise.resolve({ data: [] as any[] }),
         orderIds.length
-          ? supabase.from('invoices').select('id, order_id').in('order_id', orderIds)
+          ? supabase.from('invoices').select('id, order_id, invoice_number').in('order_id', orderIds)
           : Promise.resolve({ data: [] as any[] }),
         orderIds.length
           ? supabase
@@ -697,7 +697,7 @@ const Operations = () => {
           credit_paid_amount: Number(order.credit_paid_amount || 0),
           payment_method: order.payment_method || null,
           payment_status: order.payment_status || null,
-          invoice_number: order.invoice_number || null,
+          invoice_number: (invoice as any)?.invoice_number || null,
           invoice_id: invoice?.id || null,
         };
       }) || [];
