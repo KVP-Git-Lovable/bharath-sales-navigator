@@ -101,6 +101,9 @@ export interface ManualSchemeSelection {
   perUnitDiscount: number; // amount entered, ≤ scheme.max_discount_per_unit
   // Optional: when 'percentage', perUnitDiscount represents a % off the line rate
   valueType?: 'amount' | 'percentage';
+  // Optional: multi-line selection. When present, the discount is applied to every
+  // listed cart line. `itemId` is kept for backward compatibility (mirrors itemIds[0]).
+  itemIds?: string[];
 }
 
 /**
@@ -294,18 +297,6 @@ function calculateSchemeDiscount(
       const cap = Number(scheme.max_discount_per_unit || 0);
       if (cap <= 0) break;
 
-      // The chosen item must still exist in the cart and be applicable to this scheme.
-      // Support older/manual IDs where variants were saved as plain variant ids.
-      const item = items.find(i => {
-        if (i.id === manualSelection.itemId) return true;
-        if (!i.variant_id) return false;
-        return i.variant_id === manualSelection.itemId;
-      });
-      if (!item) break;
-      if (!schemeAppliesToItem(scheme, item)) break;
-      // Optional min-quantity gate
-      if (!isQuantityConditionMet(scheme, item.quantity)) break;
-
       const valueType: 'amount' | 'percentage' =
         (scheme.discount_value_type as 'amount' | 'percentage') === 'percentage'
           ? 'percentage'
@@ -314,37 +305,59 @@ function calculateSchemeDiscount(
       const entered = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
       if (entered <= 0) break;
 
-      // For percentage: perUnit = rate * pct/100; line discount = perUnit * qty
-      const perUnit =
-        valueType === 'percentage'
-          ? (Number(item.rate) || 0) * (entered / 100)
-          : entered;
-      if (perUnit <= 0) break;
-
-      const itemDiscount = perUnit * item.quantity;
-      discount = itemDiscount;
-      itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+      // Resolve the list of selected cart lines (multi-select); fall back to single itemId for legacy.
+      const selectedIds = (manualSelection.itemIds && manualSelection.itemIds.length > 0)
+        ? manualSelection.itemIds
+        : (manualSelection.itemId ? [manualSelection.itemId] : []);
 
       const unit = scheme.discount_unit || 'unit';
-      if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
-      itemSchemeDetails[item.id].push({
-        schemeId: scheme.id,
-        schemeName: scheme.name,
-        schemeType: scheme.scheme_type,
-        discountAmount: itemDiscount,
-        perUnitDiscount: entered,
-        unit,
-        valueType,
-        ...(valueType === 'percentage' ? { discountPercentage: entered } : {}),
-      });
+      const matchedItems: SchemeItem[] = [];
 
-      manualMeta = {
-        perUnitDiscount: entered,
-        unit,
-        itemId: item.id,
-        productName: item.name || '',
-        valueType,
-      };
+      for (const sid of selectedIds) {
+        // Match by line id, or by variant_id for legacy stored selections.
+        const item = items.find(i => i.id === sid || (i.variant_id && i.variant_id === sid));
+        if (!item) continue;
+        if (!schemeAppliesToItem(scheme, item)) continue;
+        if (!isQuantityConditionMet(scheme, item.quantity)) continue;
+
+        // For percentage: perUnit = rate * pct/100; line discount = perUnit * qty
+        const perUnit =
+          valueType === 'percentage'
+            ? (Number(item.rate) || 0) * (entered / 100)
+            : entered;
+        if (perUnit <= 0) continue;
+
+        const itemDiscount = perUnit * item.quantity;
+        discount += itemDiscount;
+        itemDiscounts[item.id] = (itemDiscounts[item.id] || 0) + itemDiscount;
+
+        if (!itemSchemeDetails[item.id]) itemSchemeDetails[item.id] = [];
+        itemSchemeDetails[item.id].push({
+          schemeId: scheme.id,
+          schemeName: scheme.name,
+          schemeType: scheme.scheme_type,
+          discountAmount: itemDiscount,
+          perUnitDiscount: entered,
+          unit,
+          valueType,
+          ...(valueType === 'percentage' ? { discountPercentage: entered } : {}),
+        });
+
+        matchedItems.push(item);
+      }
+
+      if (matchedItems.length > 0) {
+        const firstItem = matchedItems[0];
+        manualMeta = {
+          perUnitDiscount: entered,
+          unit,
+          itemId: firstItem.id,
+          productName: matchedItems.length === 1
+            ? (firstItem.name || '')
+            : `${matchedItems.length} products`,
+          valueType,
+        };
+      }
       break;
     }
 
