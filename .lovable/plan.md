@@ -1,26 +1,35 @@
-# Fix: Order Creation Failing With "record new has no field invoice_number"
+## Goal
+Restore order sync to the earlier working behavior by removing the last invalid `invoice_number` write from the backend RPC that creates orders.
 
-## What's broken
-A trigger `set_order_invoice_number` was added to `public.orders` that tries to set `NEW.invoice_number`. The `orders` table does not have an `invoice_number` column (only `invoice_generated_at`). Every INSERT into `orders` now fails — including the queued offline orders shown in your Sync Progress screenshot.
+## What’s actually broken
+- The UI screenshot and console logs are showing the same backend failure:
+  `column "invoice_number" of relation "orders" does not exist`
+- I verified the live database function `public.sync_order_with_items(jsonb, jsonb)` still contains this insert:
+  - `previous_pending_cleared, invoice_number, idempotency_key, ...`
+  - with value `p_order->>'invoice_number'`
+- I also verified the `orders` table does not have an `invoice_number` column anymore.
+- So the trigger was removed earlier, but the RPC function was not fully cleaned up. That is why sync is still failing.
 
-This is why orders worked fine in the morning but stopped working: the trigger was added afterward.
+## Plan
+1. Create a Supabase migration to update `public.sync_order_with_items(jsonb, jsonb)`.
+   - Remove `invoice_number` from the `INSERT INTO public.orders (...)` column list.
+   - Remove `p_order->>'invoice_number'` from the matching values list.
+   - Keep the rest of the order insert behavior unchanged.
 
-## Why dropping it is safe
-- Invoice numbers belong to the `invoices` table, not `orders`.
-- The `invoices` table already has a working trigger `trigger_set_invoice_number` that calls `generate_invoice_number()` on insert.
-- Removing the orders-side trigger restores the original (working) behavior with no other side effects.
+2. Re-check the frontend order-sync path for anything else that depends on `orders.invoice_number`.
+   - Keep `Operations` using `invoices.invoice_number` only.
+   - Confirm offline sync still calls the same RPC with safe payload sanitization.
 
-## Change
+3. Validate the fix after the migration.
+   - Re-read the live function definition to confirm the invalid column is gone.
+   - Confirm the pending sync error path matches the fix.
 
-```sql
-DROP TRIGGER IF EXISTS set_order_invoice_number ON public.orders;
-DROP FUNCTION IF EXISTS public.set_order_invoice_number();
-```
+## Technical details
+- Database object to update: `public.sync_order_with_items(jsonb, jsonb)`
+- No new tables or policies are needed.
+- No auth or RLS change is required for this fix.
+- Expected result: queued `CREATE_ORDER` items stop failing with the `invoice_number` column error and retry successfully.
 
-No frontend code changes needed. Once the trigger is gone, the two retrying orders in the sync queue will succeed on the next retry automatically.
-
-## Verification
-1. Apply the migration.
-2. In the Sync Progress sheet, tap "Sync Now" — both pending orders should sync successfully.
-3. Create a new order from the order entry page — should save without the "invoice_number" error.
-4. Confirm invoice generation (Pay Now flow) still produces an invoice number — handled by the untouched `trigger_set_invoice_number` on `invoices`.
+## User impact
+- Orders should sync again exactly like before.
+- Invoice generation remains separate and should continue to use the `invoices` table.
