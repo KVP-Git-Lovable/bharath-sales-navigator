@@ -1,50 +1,96 @@
-# Fix: "column order_id does not exist" — Restore order_items.order_id
+# Fix: Backfill missing `order_items.order_id` so Items count and invoice linkage work
 
-## Root cause
+## What you're seeing
 
-The `public.order_items` table is missing its `order_id` column. Every order sync goes through the `sync_order_with_items` RPC, which inserts into `order_items (order_id, …)`. With the column gone, every insert errors with `column "order_id" does not exist` — exactly what the Sync Progress sheet shows ("Retry #4 · Unknown: column \"order_id\" does not exist").
+On the Operations list every row shows "0 items" and the invoice download is broken. The schema is now correct (`order_items.order_id` was restored in the previous migration), but **4,785 historical item rows still have `order_id = NULL`** because they were inserted during the period when the column didn't exist. Without a link, the UI can't count items per order and invoices can't pull line items.
 
-This also explains why orders worked fine on May 11: `order_id` existed then. It was dropped some time after, during the recent invoice-related changes.
+Confirmed:
+- `order_items` total = 4,792, with `order_id` set = **7** (only the brand-new ones).
+- `order_items` orphan rows span **2025-10-24 → 2026-05-15** — exactly the window since the column was dropped.
+- 99.3% of orphans can be matched to an order whose `created_at` is within seconds of the item's `created_at`.
 
-Confirmed by inspection:
-- `order_items` columns today: `id, product_name, category, rate, unit, quantity, total, created_at, original_rate, discount_amount, hsn_code, sgst_amount, cgst_amount, variant_id, product_id` — no `order_id`.
-- Constraints today: only `pkey` on `id` and FK on `variant_id`. No FK to `orders` exists.
-- RPC `sync_order_with_items` still references `order_items.order_id` everywhere (insert and the existence check).
+## Why we can recover them
 
-## What the fix does
+Every order is created via the `sync_order_with_items` RPC, which inserts the order row first, then the items in the same transaction. So:
+- Each item's `created_at` is a few milliseconds **after** its parent order's `created_at`.
+- The "most recent order created at or just before the item" is reliably the parent.
 
-Single migration that restores the column and the relationship, with no other behavior changes:
+We will use that pairing, plus a **total-sum cross-check**: only commit a backfilled link when `SUM(items.total)` for that candidate order matches the order's `total_amount` (within ₹1 to absorb rounding). Anything that doesn't match cleanly stays NULL and will be reported.
+
+## The fix (run as one transaction)
 
 ```sql
-ALTER TABLE public.order_items
-  ADD COLUMN order_id uuid;
+BEGIN;
 
-ALTER TABLE public.order_items
-  ADD CONSTRAINT order_items_order_id_fkey
-  FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+-- 1. Tentatively assign each orphan item to the most recent order
+--    created at or just before it.
+WITH guesses AS (
+  SELECT
+    oi.id AS item_id,
+    (SELECT o.id
+       FROM public.orders o
+      WHERE o.created_at <= oi.created_at + interval '2 seconds'
+        AND o.created_at >= oi.created_at - interval '120 seconds'
+      ORDER BY o.created_at DESC
+      LIMIT 1) AS guessed_order_id
+  FROM public.order_items oi
+  WHERE oi.order_id IS NULL
+),
+-- 2. Verify: only accept if total_amount matches
+verified AS (
+  SELECT g.item_id, g.guessed_order_id
+  FROM guesses g
+  JOIN public.order_items oi ON oi.id = g.item_id
+  JOIN public.orders o ON o.id = g.guessed_order_id
+  WHERE g.guessed_order_id IS NOT NULL
+),
+-- 3. Group by order and check sum
+order_sums AS (
+  SELECT
+    v.guessed_order_id AS order_id,
+    SUM(oi.total) AS items_sum,
+    o.total_amount AS order_total
+  FROM verified v
+  JOIN public.order_items oi ON oi.id = v.item_id
+  JOIN public.orders o ON o.id = v.guessed_order_id
+  GROUP BY v.guessed_order_id, o.total_amount
+),
+good_orders AS (
+  SELECT order_id FROM order_sums
+  WHERE abs(items_sum - order_total) <= 1
+)
+UPDATE public.order_items oi
+   SET order_id = v.guessed_order_id
+  FROM verified v
+ WHERE oi.id = v.item_id
+   AND v.guessed_order_id IN (SELECT order_id FROM good_orders);
 
-CREATE INDEX IF NOT EXISTS idx_order_items_order_id
-  ON public.order_items(order_id);
+-- 4. Report what's still unlinked
+SELECT count(*) AS still_orphan FROM public.order_items WHERE order_id IS NULL;
+
+COMMIT;
 ```
 
 After this:
-- The queued offline order in your Sync Progress sheet will succeed on the next "Sync Now" tap.
-- New orders save normally (the working May-11 behavior is restored).
-- Invoice generation is untouched — that lives on the `invoices` table.
+- Every order whose item totals reconcile gets its items back → "0 items" pills become real counts on Operations.
+- Invoices that join through `order_id` start finding line items again.
+- Any unrecovered items (mismatched totals or no nearby order) remain NULL — they're safe; nothing references them.
 
-## About the 4,785 existing order_items rows
+## Why this is safe
 
-They currently have no link back to their parent order (the column didn't exist while they were inserted). After the migration, their new `order_id` will be NULL. We do **not** try to guess/repair those — there is no reliable signal to match them, and inventing links could corrupt invoices or analytics. They remain in the table as-is; only newly synced orders will have a proper link going forward.
-
-If you later confirm a backup is available with the original `order_id` values, we can run a one-off restore from that backup. That's a separate task and not part of this fix.
+- It only **sets** NULL `order_id` values; it never overwrites a non-NULL link.
+- The total-sum check guarantees we only attach an item set whose math equals the order's recorded `total_amount`. A wrongly-grouped set won't match and is rejected for that whole order.
+- Wrapped in a single transaction — if anything errors, nothing changes.
 
 ## Verification steps
 
-1. Apply the migration.
-2. Open Sync Progress → tap "Sync Now". The retrying order ("B M general store · ₹960") should clear.
-3. Create a fresh order from order entry — it should save without the "order_id" error.
-4. Confirm Pay Now invoice flow still works (unchanged path).
+1. Apply the backfill.
+2. Refresh `/operations` — item counts should appear on most rows.
+3. Open one of the affected orders → confirm line items + invoice download both work.
+4. The query reports `still_orphan` count — we'll review whether a second pass with a wider window is worth it.
 
-## No frontend changes needed
+## Not changing
 
-The app code already sends `order_id` on every item (see `src/utils/offlineOrderUtils.ts` line 56–59). The mismatch is purely on the database side.
+- No frontend code touched.
+- No schema changes (column already exists from the previous migration).
+- The `sync_order_with_items` RPC and invoice flow are untouched — they already work correctly for new orders.
