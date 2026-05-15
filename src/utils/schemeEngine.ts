@@ -101,6 +101,9 @@ export interface ManualSchemeSelection {
   perUnitDiscount: number; // amount entered, ≤ scheme.max_discount_per_unit
   // Optional: when 'percentage', perUnitDiscount represents a % off the line rate
   valueType?: 'amount' | 'percentage';
+  // Optional: multi-line selection. When present, the discount is applied to every
+  // listed cart line. `itemId` is kept for backward compatibility (mirrors itemIds[0]).
+  itemIds?: string[];
 }
 
 /**
