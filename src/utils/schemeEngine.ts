@@ -305,8 +305,8 @@ function calculateSchemeDiscount(
           ? 'percentage'
           : 'amount';
 
-      const entered = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
-      if (entered <= 0) break;
+      const fallbackEntered = Math.max(0, Math.min(cap, Number(manualSelection.perUnitDiscount) || 0));
+      const perItem = manualSelection.perItemDiscounts || {};
 
       // Resolve the list of selected cart lines (multi-select); fall back to single itemId for legacy.
       const selectedIds = (manualSelection.itemIds && manualSelection.itemIds.length > 0)
@@ -323,11 +323,16 @@ function calculateSchemeDiscount(
         if (!schemeAppliesToItem(scheme, item)) continue;
         if (!isQuantityConditionMet(scheme, item.quantity)) continue;
 
+        // Per-line entered value, clamped to cap; falls back to legacy single value.
+        const rawForLine = perItem[sid] != null ? Number(perItem[sid]) : fallbackEntered;
+        const enteredForLine = Math.max(0, Math.min(cap, Number(rawForLine) || 0));
+        if (enteredForLine <= 0) continue;
+
         // For percentage: perUnit = rate * pct/100; line discount = perUnit * qty
         const perUnit =
           valueType === 'percentage'
-            ? (Number(item.rate) || 0) * (entered / 100)
-            : entered;
+            ? (Number(item.rate) || 0) * (enteredForLine / 100)
+            : enteredForLine;
         if (perUnit <= 0) continue;
 
         const itemDiscount = perUnit * item.quantity;
@@ -340,10 +345,10 @@ function calculateSchemeDiscount(
           schemeName: scheme.name,
           schemeType: scheme.scheme_type,
           discountAmount: itemDiscount,
-          perUnitDiscount: entered,
+          perUnitDiscount: enteredForLine,
           unit,
           valueType,
-          ...(valueType === 'percentage' ? { discountPercentage: entered } : {}),
+          ...(valueType === 'percentage' ? { discountPercentage: enteredForLine } : {}),
         });
 
         matchedItems.push(item);
@@ -351,8 +356,12 @@ function calculateSchemeDiscount(
 
       if (matchedItems.length > 0) {
         const firstItem = matchedItems[0];
+        const firstId = firstItem.id;
+        const firstEntered = perItem[firstId] != null
+          ? Math.max(0, Math.min(cap, Number(perItem[firstId]) || 0))
+          : fallbackEntered;
         manualMeta = {
-          perUnitDiscount: entered,
+          perUnitDiscount: firstEntered,
           unit,
           itemId: firstItem.id,
           productName: matchedItems.length === 1
