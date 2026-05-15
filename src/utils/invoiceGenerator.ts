@@ -616,6 +616,23 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   const appliedOrderDiscount = orderDiscount || 0;
   const subtotal = Math.max(0, itemSubtotal - appliedOrderDiscount);
 
+  // Pre-discount subtotal (rate × qty, before per-unit & order-level discounts)
+  // Mirrors what the cart shows as "Subtotal".
+  const originalSubtotal = normalizedItems.reduce((sum, item) => {
+    const qty = Number(item._displayQty) || 0;
+    const origRate = Number(item._displayOriginalRate) || Number(item._displayRate) || 0;
+    const lineOriginal = qty * origRate;
+    // Fallback to taxable_amount/_storedTotal if original_rate is missing
+    if (lineOriginal > 0) return sum + lineOriginal;
+    if (item.taxable_amount != null) return sum + Number(item.taxable_amount);
+    return sum + (item._storedTotal || 0);
+  }, 0);
+
+  // Per-unit savings already baked into taxable_amount/_storedTotal
+  const perUnitSavings = Math.max(0, originalSubtotal - itemSubtotal);
+  // Combined discount = per-unit savings + order-level discount (single line)
+  const combinedDiscount = perUnitSavings + appliedOrderDiscount;
+
   // Calculate GST on discounted subtotal
   const sgst = hasStoredTotals
     ? cartItems.reduce((sum, item) => sum + (Number(item.sgst_amount) || 0), 0)
@@ -649,7 +666,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   const valueOffset = totalsBoxWidth - 3;
   
   // Compact row heights - add extra row for discount if applicable
-  const hasOrderLevelDiscount = appliedOrderDiscount > 0;
+  const hasOrderLevelDiscount = combinedDiscount > 0;
   const rowHeight = 5;
   const totalRowHeight = 7;
   // Rows: SUB-TOTAL, (DISCOUNT if any), SGST, CGST, then TOTAL bar
@@ -669,7 +686,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   
   // SUB-TOTAL (sum of item totals, before order-level discount)
   doc.text("SUB-TOTAL", totalsBoxX + labelOffset, innerY);
-  doc.text(`Rs.${formatExact(itemSubtotal)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+  doc.text(`Rs.${formatExact(originalSubtotal)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
   
   // Show order-level discount if applicable
   if (hasOrderLevelDiscount) {
@@ -677,7 +694,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     doc.setTextColor(22, 163, 74);
     doc.setFont("helvetica", "bold");
     doc.text("DISCOUNT", totalsBoxX + labelOffset, innerY);
-    doc.text(`-Rs.${formatExact(appliedOrderDiscount)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+    doc.text(`-Rs.${formatExact(combinedDiscount)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
   }
