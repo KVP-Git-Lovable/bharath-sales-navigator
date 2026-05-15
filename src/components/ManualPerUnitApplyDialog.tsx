@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tag } from "lucide-react";
 import { ProductScheme } from "@/hooks/useOfflineSchemes";
 import type { ManualSchemeSelection } from "@/utils/schemeEngine";
@@ -47,33 +47,41 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
     });
   }, [scheme, cartLines]);
 
-  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [perUnit, setPerUnit] = useState<string>('');
 
   useEffect(() => {
     if (!isOpen) return;
-    const seedId = initialSelection?.itemId && eligibleLines.find(l => l.id === initialSelection.itemId)
-      ? initialSelection.itemId
-      : eligibleLines[0]?.id || '';
-    setSelectedItemId(seedId);
+    // Seed selection: prefer prior selection (itemIds or legacy itemId), else select all eligible lines.
+    const eligibleIds = eligibleLines.filter(l => !minQty || l.quantity >= minQty).map(l => l.id);
+    const prior = (initialSelection?.itemIds && initialSelection.itemIds.length > 0)
+      ? initialSelection.itemIds
+      : (initialSelection?.itemId ? [initialSelection.itemId] : []);
+    const valid = prior.filter(id => eligibleIds.includes(id));
+    setSelectedItemIds(valid.length > 0 ? valid : eligibleIds);
     setPerUnit(initialSelection?.perUnitDiscount ? String(initialSelection.perUnitDiscount) : '');
   }, [isOpen, scheme?.id]);
 
-  const selectedLine = eligibleLines.find(l => l.id === selectedItemId);
+  const toggleLine = (id: string) => {
+    setSelectedItemIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const selectedLines = eligibleLines.filter(l => selectedItemIds.includes(l.id));
   const enteredNum = Math.max(0, Math.min(cap, Number(perUnit) || 0));
-  const computedPerUnit = selectedLine
-    ? (valueType === 'percentage' ? selectedLine.rate * (enteredNum / 100) : enteredNum)
-    : 0;
-  const previewDiscount = selectedLine ? computedPerUnit * selectedLine.quantity : 0;
+  const previewDiscount = selectedLines.reduce((sum, line) => {
+    const perUnitAmt = valueType === 'percentage' ? line.rate * (enteredNum / 100) : enteredNum;
+    return sum + perUnitAmt * line.quantity;
+  }, 0);
 
   const symbol = valueType === 'percentage' ? '%' : '₹';
   const capLabel = valueType === 'percentage' ? `${cap}%` : `₹${cap}`;
 
-  const canConfirm = !!selectedLine && enteredNum > 0 && (!minQty || (selectedLine.quantity >= minQty));
+  const canConfirm = selectedLines.length > 0 && enteredNum > 0;
 
   const handleConfirm = () => {
-    if (!canConfirm || !selectedLine) return;
-    onConfirm({ itemId: selectedLine.id, perUnitDiscount: enteredNum, valueType });
+    if (!canConfirm) return;
+    const ids = selectedLines.map(l => l.id);
+    onConfirm({ itemId: ids[0], itemIds: ids, perUnitDiscount: enteredNum, valueType });
     onClose();
   };
 
@@ -95,38 +103,58 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
 
         <div className="space-y-3">
           <div>
-            <Label className="text-xs font-medium">Pick one product from your cart</Label>
+            <Label className="text-xs font-medium">Pick products from your cart</Label>
             {eligibleLines.length === 0 ? (
               <p className="text-xs text-muted-foreground mt-2 p-3 bg-muted/40 rounded">
                 No eligible product in cart for this offer. Add one first.
               </p>
             ) : (
-              <RadioGroup
-                value={selectedItemId}
-                onValueChange={setSelectedItemId}
-                className="mt-2 max-h-44 overflow-y-auto space-y-1"
-              >
-                {eligibleLines.map(line => {
-                  const disabled = !!minQty && line.quantity < minQty;
-                  return (
-                    <label
-                      key={line.id}
-                      className={`flex items-center justify-between gap-3 p-2 rounded border text-xs cursor-pointer ${
-                        selectedItemId === line.id ? 'border-primary bg-primary/5' : 'border-border'
-                      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <RadioGroupItem value={line.id} disabled={disabled} />
-                        <span className="truncate font-medium">{line.name}</span>
-                      </div>
-                      <span className="shrink-0 text-muted-foreground">
-                        {line.quantity} {line.unit} @ ₹{line.rate.toFixed(2)}
-                        {disabled ? ` · need ≥${minQty}` : ''}
-                      </span>
-                    </label>
-                  );
-                })}
-              </RadioGroup>
+              <>
+                <div className="flex items-center justify-between mt-2 mb-1">
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={() => {
+                      const all = eligibleLines.filter(l => !minQty || l.quantity >= minQty).map(l => l.id);
+                      setSelectedItemIds(selectedItemIds.length === all.length ? [] : all);
+                    }}
+                  >
+                    {selectedItemIds.length === eligibleLines.filter(l => !minQty || l.quantity >= minQty).length
+                      ? 'Clear all'
+                      : 'Select all'}
+                  </button>
+                  <span className="text-[11px] text-muted-foreground">
+                    {selectedItemIds.length} selected
+                  </span>
+                </div>
+                <div className="max-h-44 overflow-y-auto space-y-1">
+                  {eligibleLines.map(line => {
+                    const disabled = !!minQty && line.quantity < minQty;
+                    const checked = selectedItemIds.includes(line.id);
+                    return (
+                      <label
+                        key={line.id}
+                        className={`flex items-center justify-between gap-3 p-2 rounded border text-xs cursor-pointer ${
+                          checked ? 'border-primary bg-primary/5' : 'border-border'
+                        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Checkbox
+                            checked={checked}
+                            disabled={disabled}
+                            onCheckedChange={() => !disabled && toggleLine(line.id)}
+                          />
+                          <span className="truncate font-medium">{line.name}</span>
+                        </div>
+                        <span className="shrink-0 text-muted-foreground">
+                          {line.quantity} {line.unit} @ ₹{line.rate.toFixed(2)}
+                          {disabled ? ` · need ≥${minQty}` : ''}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
 
@@ -157,15 +185,15 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
             </div>
           </div>
 
-          {selectedLine && enteredNum > 0 && (
-            <div className="bg-muted/50 rounded p-2 text-xs">
-              <div className="font-medium mb-0.5">Preview</div>
+          {selectedLines.length > 0 && enteredNum > 0 && (
+            <div className="bg-muted/50 rounded p-2 text-xs space-y-0.5">
+              <div className="font-medium">Preview</div>
               <div className="text-muted-foreground">
-                {selectedLine.name} · {selectedLine.quantity} {selectedLine.unit} ×{' '}
-                {valueType === 'percentage'
-                  ? `${enteredNum}% (₹${computedPerUnit.toFixed(2)}/${unit})`
-                  : `₹${enteredNum}/${unit}`}{' '}
-                = <span className="font-semibold text-foreground">₹{previewDiscount.toFixed(2)}</span> off
+                {valueType === 'percentage' ? `${enteredNum}% per ${unit}` : `₹${enteredNum} per ${unit}`}
+                {' · '}
+                {selectedLines.length} product{selectedLines.length > 1 ? 's' : ''}
+                {' = '}
+                <span className="font-semibold text-foreground">₹{previewDiscount.toFixed(2)}</span> off
               </div>
             </div>
           )}
