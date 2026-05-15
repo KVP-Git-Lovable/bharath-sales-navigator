@@ -6318,30 +6318,54 @@ export type Database = {
       }
       gamification_points: {
         Row: {
+          action_id: string | null
           earned_at: string
+          game_id: string | null
           id: string
           metadata: Json | null
+          points: number | null
           reference_id: string | null
           reference_type: string | null
           user_id: string
         }
         Insert: {
+          action_id?: string | null
           earned_at?: string
+          game_id?: string | null
           id?: string
           metadata?: Json | null
+          points?: number | null
           reference_id?: string | null
           reference_type?: string | null
           user_id: string
         }
         Update: {
+          action_id?: string | null
           earned_at?: string
+          game_id?: string | null
           id?: string
           metadata?: Json | null
+          points?: number | null
           reference_id?: string | null
           reference_type?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "gamification_points_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "gamification_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gamification_points_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "gamification_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gamification_redemptions: {
         Row: {
