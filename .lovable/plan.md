@@ -1,96 +1,70 @@
-# Fix: Backfill missing `order_items.order_id` so Items count and invoice linkage work
+## Why some orders still show "0 items"
 
-## What you're seeing
+After the previous backfill, **150 items remained orphaned**. Looking at the orders in your screenshot:
 
-On the Operations list every row shows "0 items" and the invoice download is broken. The schema is now correct (`order_items.order_id` was restored in the previous migration), but **4,785 historical item rows still have `order_id = NULL`** because they were inserted during the period when the column didn't exist. Without a link, the UI can't count items per order and invoices can't pull line items.
+- **Ansar - Mulky (S)** — ₹36,230, created `07:17:55` — its items were inserted at `07:21:29` (3m 34s **after** the order). Sum of those orphan items = ₹36,230 (matches `subtotal` exactly).
+- **Amazon Orders** — ₹396, created `07:08:59` — its item was inserted at `07:11:28` (2m 29s **after** the order). Item total = ₹396 (matches).
 
-Confirmed:
-- `order_items` total = 4,792, with `order_id` set = **7** (only the brand-new ones).
-- `order_items` orphan rows span **2025-10-24 → 2026-05-15** — exactly the window since the column was dropped.
-- 99.3% of orphans can be matched to an order whose `created_at` is within seconds of the item's `created_at`.
+The previous backfill matched each orphan item to the most recent order created **within 120 seconds before** the item. That works when items are inserted right after their order (online flow). But when the device is **offline**, the order row syncs first, then the items get pushed minutes later — so items end up with a `created_at` that is **after** the order, not before. The earlier query never considered that direction, so these stayed orphaned.
 
-## Why we can recover them
+The other "Office" orders that are showing items correctly (Punith Rai, Suresh Kudrolli, Sunny General) had their items synced quickly enough to fall inside the original window, which is why the same user's other orders look fine.
 
-Every order is created via the `sync_order_with_items` RPC, which inserts the order row first, then the items in the same transaction. So:
-- Each item's `created_at` is a few milliseconds **after** its parent order's `created_at`.
-- The "most recent order created at or just before the item" is reliably the parent.
+## Fix — second backfill pass (data-only, no app code changes)
 
-We will use that pairing, plus a **total-sum cross-check**: only commit a backfilled link when `SUM(items.total)` for that candidate order matches the order's `total_amount` (within ₹1 to absorb rounding). Anything that doesn't match cleanly stays NULL and will be reported.
+Run one more migration that:
 
-## The fix (run as one transaction)
+1. For each remaining `order_items` row where `order_id IS NULL`, pick the candidate order whose `created_at` is closest to the item's `created_at` within a **±15-minute window** (covers offline sync delays without being reckless).
+2. Group those tentative assignments and verify `SUM(items.total)` for the group equals the candidate order's `subtotal` within ±₹1 (same reconciliation rule as before).
+3. Only commit `order_id` for groups that pass the subtotal check. Skip groups that don't reconcile (leave them orphaned for manual review).
+4. Wrap in a single transaction. Report `relinked_items`, `relinked_orders`, and `still_orphan` counts.
 
-```sql
-BEGIN;
+### Safety guarantees
 
--- 1. Tentatively assign each orphan item to the most recent order
---    created at or just before it.
-WITH guesses AS (
-  SELECT
-    oi.id AS item_id,
-    (SELECT o.id
-       FROM public.orders o
-      WHERE o.created_at <= oi.created_at + interval '2 seconds'
-        AND o.created_at >= oi.created_at - interval '120 seconds'
-      ORDER BY o.created_at DESC
-      LIMIT 1) AS guessed_order_id
-  FROM public.order_items oi
+- Touches only rows where `order_id IS NULL`. No existing link is ever overwritten.
+- Subtotal-equality check guarantees mathematically correct grouping (same rule that worked for the 4,645 items already relinked).
+- Frontend code (`Operations.tsx`, `sync_order_with_items` RPC, invoice flow) is **not modified** — the bug is purely missing historical links, not logic.
+
+### Expected outcome
+
+- Ansar Mulky and Amazon Orders entries in the screenshot will show their real item counts and amounts.
+- The remaining ~150 orphan items should drop to a much smaller number (only items whose order was deleted or whose totals genuinely don't reconcile).
+- New orders going forward already work — they have `order_id` set at insert time via the RPC.
+
+## Technical details
+
+```text
+WITH candidates AS (
+  SELECT oi.id AS item_id,
+         o.id  AS order_id,
+         o.subtotal,
+         oi.total,
+         ABS(EXTRACT(EPOCH FROM (oi.created_at - o.created_at))) AS gap_sec
+  FROM order_items oi
+  JOIN LATERAL (
+    SELECT id, subtotal, created_at
+    FROM orders o2
+    WHERE ABS(EXTRACT(EPOCH FROM (o2.created_at - oi.created_at))) <= 900  -- ±15 min
+    ORDER BY ABS(EXTRACT(EPOCH FROM (o2.created_at - oi.created_at)))
+    LIMIT 1
+  ) o ON true
   WHERE oi.order_id IS NULL
 ),
--- 2. Verify: only accept if total_amount matches
-verified AS (
-  SELECT g.item_id, g.guessed_order_id
-  FROM guesses g
-  JOIN public.order_items oi ON oi.id = g.item_id
-  JOIN public.orders o ON o.id = g.guessed_order_id
-  WHERE g.guessed_order_id IS NOT NULL
+groups AS (
+  SELECT order_id, SUM(total) AS items_sum, MAX(subtotal) AS order_subtotal
+  FROM candidates
+  GROUP BY order_id
 ),
--- 3. Group by order and check sum
-order_sums AS (
-  SELECT
-    v.guessed_order_id AS order_id,
-    SUM(oi.total) AS items_sum,
-    o.total_amount AS order_total
-  FROM verified v
-  JOIN public.order_items oi ON oi.id = v.item_id
-  JOIN public.orders o ON o.id = v.guessed_order_id
-  GROUP BY v.guessed_order_id, o.total_amount
-),
-good_orders AS (
-  SELECT order_id FROM order_sums
-  WHERE abs(items_sum - order_total) <= 1
+valid AS (
+  SELECT order_id FROM groups WHERE ABS(items_sum - order_subtotal) <= 1
 )
-UPDATE public.order_items oi
-   SET order_id = v.guessed_order_id
-  FROM verified v
- WHERE oi.id = v.item_id
-   AND v.guessed_order_id IN (SELECT order_id FROM good_orders);
-
--- 4. Report what's still unlinked
-SELECT count(*) AS still_orphan FROM public.order_items WHERE order_id IS NULL;
-
-COMMIT;
+UPDATE order_items oi
+SET order_id = c.order_id
+FROM candidates c
+WHERE oi.id = c.item_id
+  AND c.order_id IN (SELECT order_id FROM valid)
+  AND oi.order_id IS NULL;
 ```
 
-After this:
-- Every order whose item totals reconcile gets its items back → "0 items" pills become real counts on Operations.
-- Invoices that join through `order_id` start finding line items again.
-- Any unrecovered items (mismatched totals or no nearby order) remain NULL — they're safe; nothing references them.
+Migration file would be created under `supabase/migrations/` with this query plus a final `SELECT COUNT(*) FILTER (WHERE order_id IS NULL)` for verification logging.
 
-## Why this is safe
-
-- It only **sets** NULL `order_id` values; it never overwrites a non-NULL link.
-- The total-sum check guarantees we only attach an item set whose math equals the order's recorded `total_amount`. A wrongly-grouped set won't match and is rejected for that whole order.
-- Wrapped in a single transaction — if anything errors, nothing changes.
-
-## Verification steps
-
-1. Apply the backfill.
-2. Refresh `/operations` — item counts should appear on most rows.
-3. Open one of the affected orders → confirm line items + invoice download both work.
-4. The query reports `still_orphan` count — we'll review whether a second pass with a wider window is worth it.
-
-## Not changing
-
-- No frontend code touched.
-- No schema changes (column already exists from the previous migration).
-- The `sync_order_with_items` RPC and invoice flow are untouched — they already work correctly for new orders.
+No frontend or RPC changes.
