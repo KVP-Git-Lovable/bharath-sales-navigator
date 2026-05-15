@@ -1,94 +1,51 @@
-## Root cause
+## Goal
 
-The `public.gamification_points` table is **missing the `points`, `game_id`, and `action_id` columns**.
+In the "Apply: Per Unit discount" dialog, let the user enter a **different discount value for each selected product** inline (next to that product row), instead of one shared "Discount per unit" field that applies the same amount to all selected lines.
 
-Current live schema:
-```text
-id, user_id, reference_type, reference_id, earned_at, metadata
-```
+Each product row in the cart list will have its own small numeric input (capped at the scheme's max) so the user can give, e.g. ₹40 off ADUKU, ₹25 off ADARAK, ₹10 off BLUE — all in one Apply.
 
-Original migration (`20251109112756`) created it with:
-```text
-id, game_id, user_id, action_id, points, reference_type, reference_id, earned_at, metadata
-```
+## UX changes (`ManualPerUnitApplyDialog.tsx`)
 
-Those three columns were dropped at some point (no migration in the repo did it — likely a manual change in the Supabase dashboard).
+1. Remove the single shared "Discount per unit · max ₹40" input at the bottom.
+2. For each eligible cart line:
+   - Keep the checkbox + product name + qty/rate.
+   - Add a compact inline input on the right (width ~80px, h-7, text-xs) with `₹` / `%` suffix, placeholder `0–40`, capped at `scheme.max_discount_per_unit`.
+   - Input is enabled only when the row is checked; disabled + greyed when unchecked.
+   - Auto-clamps to `[0, cap]` on change.
+3. Preview block recalculates as: `Σ (perUnitForLine × qty)` across selected lines, listing each line's contribution briefly (e.g. "ADUKU 8×₹40 = ₹320").
+4. Apply button enabled when at least one selected line has a discount > 0.
+5. "Select all / Clear all" preserved. When a line is unchecked, its entered value is kept in local state but ignored in the calculation (re-checking restores it).
 
-### Effect
+## Data shape changes (`schemeEngine.ts`)
 
-Every read in the app does something like:
+Extend `ManualSchemeSelection`:
+
 ```ts
-supabase.from("gamification_points").select("user_id, points, earned_at")
+export interface ManualSchemeSelection {
+  itemId: string;                 // legacy, = first id
+  itemIds?: string[];             // selected line ids
+  perUnitDiscount: number;        // legacy single value (= max of perItem, for back-compat reads)
+  perItemDiscounts?: Record<string, number>; // NEW: line id -> per-unit discount
+  valueType: 'amount' | 'percentage';
+}
 ```
 
-PostgREST returns **400 / column does not exist**, so:
-- `Leaderboard.tsx` → `toast.error("Failed to load leaderboard")`, list stays empty
-- `LeaderboardSection.tsx` (Analytics)
-- `usePeriodStats.ts`
-- `useHomeDashboard.ts`
-- `ProfilePointsBadge.tsx`
-- `PointsDetailsModal.tsx`
-- `useVisitsDataOptimized.ts`, `TodaySummary.tsx`, etc.
+In the `manual_per_unit_discount` case:
+- For each id in `selectedIds`, read `perItemDiscounts[id]` (fallback to legacy `perUnitDiscount` if absent — keeps already-saved selections working).
+- Skip lines where the per-unit value is 0.
+- Apply each line's own per-unit value (clamped to cap) × quantity.
+- `manualMeta` summary becomes: "3 products, ₹375 total off" (sum across lines).
 
-…all silently fail or return 0.
+## Caller (`OrderEntrySchemesModal.tsx`)
 
-The awarder (`gamificationPointsAwarder.ts`) also tries to insert `game_id`, `action_id`, `points` — those inserts now also fail (the 3,386 historical rows in the table were written before the columns were dropped, with `metadata` only).
+No interface break: it already forwards the `ManualSchemeSelection` object. Toast continues to show "Applied to N products". No other changes.
 
-## Fix
+## Files touched
 
-### 1. Restore the missing columns on `gamification_points`
+- `src/components/ManualPerUnitApplyDialog.tsx` — UI rework (per-row input, removed shared input, updated preview).
+- `src/utils/schemeEngine.ts` — extend `ManualSchemeSelection`, use per-line values in the manual loop.
+- `src/components/OrderEntrySchemesModal.tsx` — only if toast/summary text needs updating to reflect per-line totals (minor).
 
-New migration that re-adds them as **nullable** (so it doesn't break the existing 3,386 rows):
+## Untouched
 
-```sql
-ALTER TABLE public.gamification_points
-  ADD COLUMN IF NOT EXISTS points NUMERIC,
-  ADD COLUMN IF NOT EXISTS game_id UUID REFERENCES public.gamification_games(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS action_id UUID REFERENCES public.gamification_actions(id);
-
-CREATE INDEX IF NOT EXISTS idx_gp_user_earned
-  ON public.gamification_points (user_id, earned_at DESC);
-CREATE INDEX IF NOT EXISTS idx_gp_action ON public.gamification_points (action_id);
-CREATE INDEX IF NOT EXISTS idx_gp_game   ON public.gamification_points (game_id);
-```
-
-(Indexes restore lookup performance the original migration had.)
-
-### 2. Backfill historical rows
-
-The 3,386 existing rows have no `points` value and no `action_id`. Best-effort backfill so the leaderboard doesn't show zeros for active users:
-
-- Most existing rows are `reference_type = 'order'` from the `awardPointsForOrder` flow. The only enabled action that fires per order today is the same single action_type used in those flows.
-- Backfill plan:
-  - Set `action_id` = the currently enabled "order"-type action (single match in `gamification_actions`).
-  - Set `game_id` = that action's `game_id`.
-  - Set `points` = that action's `points`.
-- Rows with `reference_type = 'visit'` get the visit action equivalent.
-- Rows we cannot map are left at `points = 0` (still visible in count, just zero contribution).
-
-I will confirm the action mapping with a quick check before running the UPDATE; **if the mapping is ambiguous I will pause and ask** rather than guess.
-
-### 3. No code changes needed
-
-`gamificationPointsAwarder.ts` and all read sites are already written against the original (`points / game_id / action_id`) schema, so once the columns exist again everything starts working.
-
-### 4. Verify
-
-After migration + backfill:
-- Run `SELECT user_id, sum(points) FROM gamification_points GROUP BY 1` — should return non-zero for active users.
-- Reload the **Leaderboard** page → top performers populate.
-- Reload **Analytics → Leaderboard** section → same data.
-- New orders/visits → confirm `awardPointsForOrder` writes a row with `points`, `game_id`, `action_id` populated (check the latest row in the table after submitting an order).
-
-## Files / surfaces
-
-- New migration under `supabase/migrations/` (DDL + backfill UPDATE).
-- No `.ts` / `.tsx` changes.
-- No RLS changes (existing policies already permit "Authenticated users can view all gamification points").
-
-## Out of scope (not changing)
-
-- The leaderboard banner / scheduled announcement system.
-- Notification rules.
-- Any UI styling.
-- The gamification actions/games master data.
+- DB schema, scheme master, other scheme types (percentage/flat/bundle/tiered/BOGO), cap enforcement, eligibility filtering, min-qty rule.

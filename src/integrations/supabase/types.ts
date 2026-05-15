@@ -6318,54 +6318,30 @@ export type Database = {
       }
       gamification_points: {
         Row: {
-          action_id: string | null
           earned_at: string
-          game_id: string | null
           id: string
           metadata: Json | null
-          points: number | null
           reference_id: string | null
           reference_type: string | null
           user_id: string
         }
         Insert: {
-          action_id?: string | null
           earned_at?: string
-          game_id?: string | null
           id?: string
           metadata?: Json | null
-          points?: number | null
           reference_id?: string | null
           reference_type?: string | null
           user_id: string
         }
         Update: {
-          action_id?: string | null
           earned_at?: string
-          game_id?: string | null
           id?: string
           metadata?: Json | null
-          points?: number | null
           reference_id?: string | null
           reference_type?: string | null
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "gamification_points_action_id_fkey"
-            columns: ["action_id"]
-            isOneToOne: false
-            referencedRelation: "gamification_actions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "gamification_points_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: false
-            referencedRelation: "gamification_games"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       gamification_redemptions: {
         Row: {
@@ -9217,6 +9193,7 @@ export type Database = {
           id: string
           idempotency_key: string | null
           invoice_generated_at: string | null
+          invoice_number: string | null
           is_credit_order: boolean | null
           order_date: string | null
           owner_id_snapshot: string | null
@@ -9263,6 +9240,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           invoice_generated_at?: string | null
+          invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
           owner_id_snapshot?: string | null
@@ -9309,6 +9287,7 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           invoice_generated_at?: string | null
+          invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
           owner_id_snapshot?: string | null
