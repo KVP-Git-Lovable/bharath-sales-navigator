@@ -673,7 +673,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         }
         toast({
           title: 'Offer Applied',
-          description: `${pickerScheme.name} added to selected line`,
+          description: `${pickerScheme.name} applied to ${selection.itemIds?.length || 1} product${(selection.itemIds?.length || 1) > 1 ? 's' : ''}`,
         });
       }}
     />
