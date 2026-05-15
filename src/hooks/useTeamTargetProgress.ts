@@ -42,12 +42,14 @@ interface UseTeamTargetProgressParams {
   enabledParameters?: EnabledParameters | null;
 }
 
-// Helper to get current FY year (April to March)
+// Helper to get current FY start year (April to March).
+// Convention matches user_business_plans.year and fy_target_config.fy_year:
+// fy_year = 2026 means FY 2026-27 (April 2026 – March 2027).
 const getCurrentFYYear = (date: Date): number => {
   const month = date.getMonth();
   const year = date.getFullYear();
-  // If we're in Jan-March, FY is current year, else FY is next year
-  return month < 3 ? year : year + 1;
+  // April–Dec → current year; Jan–March → previous year (still in last FY)
+  return month >= 3 ? year : year - 1;
 };
 
 // Get FY month number (1-12 starting from April)

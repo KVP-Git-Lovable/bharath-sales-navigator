@@ -1,31 +1,45 @@
-# Plan
+# Fix: Target Summary showing 0 KG for all users
 
-## What I found
-- The Sardar order for **Virdvinyak stores** on **May 15, 12:18 PM** is present in `orders`.
-- Order ID: `80f0b50c-ba57-4641-b878-4c98d0c44abc`
-- It currently has **0 linked `order_items`**.
-- There are **2 orphan `order_items`** created **2 seconds later** with totals:
-  - `DAKSHIN 250G` → ₹628.56
-  - `ELACHI 250G` → ₹628.58
-- Their combined total is **₹1,257.14**, which matches the order `subtotal` exactly.
-- So this is a **backfill/linking issue**, not a frontend analytics bug.
+## Root cause
 
-## Proposed implementation
-1. Add a **targeted migration** that links only these 2 orphan `order_items` to order `80f0b50c-ba57-4641-b878-4c98d0c44abc`.
-2. Keep the update safe by touching only rows where:
-   - `order_id IS NULL`
-   - `created_at = 2026-05-15 06:48:13.341327+00`
-   - item total matches the known orphan bucket for this order
-3. Re-check the database after migration to confirm:
-   - the order now has **2 linked items**
-   - item total still matches the order subtotal
-   - this order should then stop showing `0 items` in Analytics / VisitCard.
+The Analytics → Target Summary card pulls targets from `user_business_plans` filtered by FY year. The convention used everywhere else in the app (table `fy_target_config`, `useFYTargetPlans`, the FY label "FY 2026-27") is **start-year**: `fy_year = 2026` means April 2026 – March 2027.
 
-## Technical details
-- The UI path already reads `orders` with nested `order_items(*)` in `VisitCard.tsx`, so no frontend code change is needed.
-- This is the same class of issue as the earlier orphan-row cases, but this one is even cleaner because the orphan bucket is only 2 seconds away and subtotal matches exactly.
-- I will use a migration instead of ad-hoc editing so the change is tracked and repeatable.
+But `useTeamTargetProgress.ts` uses the opposite convention:
 
-## Expected result
-- Sardar’s Virdvinyak order should show **2 items** instead of **0 items**.
-- Invoice linkage based on order items should also behave normally for this order.
+```ts
+// src/hooks/useTeamTargetProgress.ts (line 46-50)
+const getCurrentFYYear = (date: Date): number => {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  return month < 3 ? year : year + 1;   // ← returns end-year
+};
+```
+
+For today (May 15, 2026) this returns **2027**, so the query
+`user_business_plans.year = 2027` matches only 1 unrelated row.
+
+DB confirms: 15 plans exist with `year = 2026` (the actual current FY), only 1 with `year = 2027`. That is exactly why every user shows `Target 0.00 KG` while `Actual` is correct.
+
+## Fix
+
+Change `getCurrentFYYear` in `src/hooks/useTeamTargetProgress.ts` to use the start-year convention:
+
+```ts
+const getCurrentFYYear = (date: Date): number => {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  // April–Dec → current year; Jan–March → previous year (still in last FY)
+  return month >= 3 ? year : year - 1;
+};
+```
+
+That single change makes the analytics target query hit `year = 2026` and the 15 existing plans will populate Target columns immediately. No DB changes, no UI changes — purely the FY computation.
+
+## Verification after fix
+
+- Abhishek Pai, Girish, Harshith and members should show their saved KG/revenue targets instead of 0.
+- Achievement % and status badges (Not Started → In Progress / Achieved) will recompute automatically since they derive from `target` and `actual`.
+
+## Out of scope
+
+No changes to RLS, schema, or the FY month-breakdown logic (`getFYMonthNumber` is already correct).
