@@ -9193,7 +9193,6 @@ export type Database = {
           id: string
           idempotency_key: string | null
           invoice_generated_at: string | null
-          invoice_number: string | null
           is_credit_order: boolean | null
           order_date: string | null
           owner_id_snapshot: string | null
@@ -9240,7 +9239,6 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           invoice_generated_at?: string | null
-          invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
           owner_id_snapshot?: string | null
@@ -9287,7 +9285,6 @@ export type Database = {
           id?: string
           idempotency_key?: string | null
           invoice_generated_at?: string | null
-          invoice_number?: string | null
           is_credit_order?: boolean | null
           order_date?: string | null
           owner_id_snapshot?: string | null
