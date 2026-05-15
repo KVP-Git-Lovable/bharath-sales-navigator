@@ -104,6 +104,9 @@ export interface ManualSchemeSelection {
   // Optional: multi-line selection. When present, the discount is applied to every
   // listed cart line. `itemId` is kept for backward compatibility (mirrors itemIds[0]).
   itemIds?: string[];
+  // Optional: per-line discount values. Keyed by cart line id. When present, each
+  // selected line uses its own value (clamped to cap); falls back to perUnitDiscount.
+  perItemDiscounts?: Record<string, number>;
 }
 
 /**
