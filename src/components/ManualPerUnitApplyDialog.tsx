@@ -48,7 +48,7 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
   }, [scheme, cartLines]);
 
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [perUnit, setPerUnit] = useState<string>('');
+  const [perItemValues, setPerItemValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -59,29 +59,63 @@ export const ManualPerUnitApplyDialog: React.FC<Props> = ({
       : (initialSelection?.itemId ? [initialSelection.itemId] : []);
     const valid = prior.filter(id => eligibleIds.includes(id));
     setSelectedItemIds(valid.length > 0 ? valid : eligibleIds);
-    setPerUnit(initialSelection?.perUnitDiscount ? String(initialSelection.perUnitDiscount) : '');
+    // Seed per-line values from prior selection if present, else from legacy single value.
+    const seed: Record<string, string> = {};
+    const legacy = initialSelection?.perUnitDiscount ? String(initialSelection.perUnitDiscount) : '';
+    const priorPerItem = initialSelection?.perItemDiscounts || {};
+    eligibleIds.forEach(id => {
+      if (priorPerItem[id] != null) seed[id] = String(priorPerItem[id]);
+      else if (legacy) seed[id] = legacy;
+    });
+    setPerItemValues(seed);
   }, [isOpen, scheme?.id]);
 
   const toggleLine = (id: string) => {
     setSelectedItemIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
+  const setLineValue = (id: string, raw: string) => {
+    if (raw === '') {
+      setPerItemValues(prev => ({ ...prev, [id]: '' }));
+      return;
+    }
+    const n = Number(raw);
+    if (Number.isNaN(n)) return;
+    setPerItemValues(prev => ({ ...prev, [id]: String(Math.max(0, Math.min(cap, n))) }));
+  };
+
   const selectedLines = eligibleLines.filter(l => selectedItemIds.includes(l.id));
-  const enteredNum = Math.max(0, Math.min(cap, Number(perUnit) || 0));
-  const previewDiscount = selectedLines.reduce((sum, line) => {
-    const perUnitAmt = valueType === 'percentage' ? line.rate * (enteredNum / 100) : enteredNum;
-    return sum + perUnitAmt * line.quantity;
-  }, 0);
+  const lineDiscountFor = (line: CartLine) => {
+    const v = Math.max(0, Math.min(cap, Number(perItemValues[line.id]) || 0));
+    if (v <= 0) return 0;
+    const perUnitAmt = valueType === 'percentage' ? line.rate * (v / 100) : v;
+    return perUnitAmt * line.quantity;
+  };
+  const previewDiscount = selectedLines.reduce((sum, l) => sum + lineDiscountFor(l), 0);
+  const linesWithValue = selectedLines.filter(l => (Number(perItemValues[l.id]) || 0) > 0);
 
   const symbol = valueType === 'percentage' ? '%' : '₹';
   const capLabel = valueType === 'percentage' ? `${cap}%` : `₹${cap}`;
 
-  const canConfirm = selectedLines.length > 0 && enteredNum > 0;
+  const canConfirm = linesWithValue.length > 0;
 
   const handleConfirm = () => {
     if (!canConfirm) return;
-    const ids = selectedLines.map(l => l.id);
-    onConfirm({ itemId: ids[0], itemIds: ids, perUnitDiscount: enteredNum, valueType });
+    const ids = linesWithValue.map(l => l.id);
+    const perItemDiscounts: Record<string, number> = {};
+    let firstVal = 0;
+    ids.forEach((id, i) => {
+      const v = Math.max(0, Math.min(cap, Number(perItemValues[id]) || 0));
+      perItemDiscounts[id] = v;
+      if (i === 0) firstVal = v;
+    });
+    onConfirm({
+      itemId: ids[0],
+      itemIds: ids,
+      perUnitDiscount: firstVal, // legacy/back-compat
+      perItemDiscounts,
+      valueType,
+    });
     onClose();
   };
 
