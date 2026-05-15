@@ -2428,10 +2428,15 @@ export const VisitCard = ({
         });
         
         // If still no items, try fetching from DB directly (fallback)
-        if (allItems.length === 0 && dbOrders.length > 0 && navigator.onLine) {
+        if (allItems.length === 0 && mergedOrders.length > 0 && navigator.onLine) {
           try {
-            const dbOrderIds_arr = dbOrders.map(o => o.id);
-            const { data: items } = await supabase.from('order_items').select('product_name, quantity, rate, original_rate, total, order_id, unit').in('order_id', dbOrderIds_arr);
+            // Use ALL merged order ids (covers cases where the nested embed returned empty
+            // due to RLS/PostgREST quirks, or where orders came from offline cache)
+            const allOrderIds = mergedOrders.map((o: any) => o.id).filter(Boolean);
+            const { data: items } = await supabase
+              .from('order_items')
+              .select('product_name, quantity, rate, original_rate, total, order_id, unit')
+              .in('order_id', allOrderIds);
             if (items && items.length > 0) {
               allItems = items;
             }
