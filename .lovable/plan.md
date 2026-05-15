@@ -1,51 +1,74 @@
-## Goal
+## Problem
 
-In the "Apply: Per Unit discount" dialog, let the user enter a **different discount value for each selected product** inline (next to that product row), instead of one shared "Discount per unit" field that applies the same amount to all selected lines.
+In the cart (Order Entry):
+- **Subtotal**: ₹10,190.50 (sum of `original_rate × qty` — before any discount)
+- **Discount**: -₹200.00 (sum of per-unit savings + any order-level discount)
+- **Total**: ₹10,490 (after discount + GST)
 
-Each product row in the cart list will have its own small numeric input (capped at the scheme's max) so the user can give, e.g. ₹40 off ADUKU, ₹25 off ADARAK, ₹10 off BLUE — all in one Apply.
+In the generated **Invoice PDF**:
+- **SUB-TOTAL**: Rs.9,790.50 (already net of per-unit AND order-level discount)
+- **DISCOUNT**: -Rs.200.00 (shown again)
+- **Total**: Rs.10,490 (correct, because `orderTotal` is used directly)
 
-## UX changes (`ManualPerUnitApplyDialog.tsx`)
+So the **subtotal is being computed post-discount** while the discount line is still printed below it — the values don't reconcile with the cart, even though the final total matches.
 
-1. Remove the single shared "Discount per unit · max ₹40" input at the bottom.
-2. For each eligible cart line:
-   - Keep the checkbox + product name + qty/rate.
-   - Add a compact inline input on the right (width ~80px, h-7, text-xs) with `₹` / `%` suffix, placeholder `0–40`, capped at `scheme.max_discount_per_unit`.
-   - Input is enabled only when the row is checked; disabled + greyed when unchecked.
-   - Auto-clamps to `[0, cap]` on change.
-3. Preview block recalculates as: `Σ (perUnitForLine × qty)` across selected lines, listing each line's contribution briefly (e.g. "ADUKU 8×₹40 = ₹320").
-4. Apply button enabled when at least one selected line has a discount > 0.
-5. "Select all / Clear all" preserved. When a line is unchecked, its entered value is kept in local state but ignored in the calculation (re-checking restores it).
+The user wants the invoice to mirror the cart exactly:
 
-## Data shape changes (`schemeEngine.ts`)
-
-Extend `ManualSchemeSelection`:
-
-```ts
-export interface ManualSchemeSelection {
-  itemId: string;                 // legacy, = first id
-  itemIds?: string[];             // selected line ids
-  perUnitDiscount: number;        // legacy single value (= max of perItem, for back-compat reads)
-  perItemDiscounts?: Record<string, number>; // NEW: line id -> per-unit discount
-  valueType: 'amount' | 'percentage';
-}
+```text
+SUB-TOTAL    Rs.10,190.50   ← before any discount (rate × qty)
+DISCOUNT     -Rs.200.00     ← single combined discount line
+SGST (2.5%)  Rs.249.76
+CGST (2.5%)  Rs.249.76
+TOTAL        Rs.10,490
 ```
 
-In the `manual_per_unit_discount` case:
-- For each id in `selectedIds`, read `perItemDiscounts[id]` (fallback to legacy `perUnitDiscount` if absent — keeps already-saved selections working).
-- Skip lines where the per-unit value is 0.
-- Apply each line's own per-unit value (clamped to cap) × quantity.
-- `manualMeta` summary becomes: "3 products, ₹375 total off" (sum across lines).
+## Root cause
 
-## Caller (`OrderEntrySchemesModal.tsx`)
+In `src/utils/invoiceGenerator.ts` (`generateTemplate4Invoice`, ~lines 600–680):
 
-No interface break: it already forwards the `ManualSchemeSelection` object. Toast continues to show "Applied to N products". No other changes.
+- `itemSubtotal` is summed from each item's stored `taxable_amount` (or `_storedTotal`), which already has the per-unit / item-level discount baked in.
+- The `SUB-TOTAL` row prints `itemSubtotal` (post-discount).
+- The `DISCOUNT` row only prints the order-level `orderDiscount`, ignoring per-unit savings that were already absorbed into `taxable_amount`.
 
-## Files touched
+Net effect: subtotal looks "too low" and the printed discount looks "too small" to bridge it back to the cart's numbers.
 
-- `src/components/ManualPerUnitApplyDialog.tsx` — UI rework (per-row input, removed shared input, updated preview).
-- `src/utils/schemeEngine.ts` — extend `ManualSchemeSelection`, use per-line values in the manual loop.
-- `src/components/OrderEntrySchemesModal.tsx` — only if toast/summary text needs updating to reflect per-line totals (minor).
+## Fix (presentation-only, in `src/utils/invoiceGenerator.ts`)
 
-## Untouched
+1. **Compute a true pre-discount subtotal** from the line items:
+   - `originalSubtotal = Σ ( (item.original_rate ?? item.rate) × displayQty )`
+   - Use the same display-qty conversion already done in `normalizeItemForDisplay` so grams→KG conversions stay consistent with the printed line rows.
+   - Falls back to current `itemSubtotal` if `original_rate` is missing.
 
-- DB schema, scheme master, other scheme types (percentage/flat/bundle/tiered/BOGO), cap enforcement, eligibility filtering, min-qty rule.
+2. **Compute combined discount**:
+   - `perUnitSavings = max(0, originalSubtotal − itemSubtotal)` (the part baked into line `taxable_amount`)
+   - `combinedDiscount = perUnitSavings + appliedOrderDiscount`
+   - Show the DISCOUNT row only if `combinedDiscount > 0`.
+
+3. **Update the totals box rendering** (~lines 651–691):
+   - `SUB-TOTAL` value → `originalSubtotal`
+   - `DISCOUNT` value → `-combinedDiscount`
+   - `SGST` / `CGST` → unchanged (still computed off the discounted taxable base, so GST math stays correct)
+   - `TOTAL` bar → unchanged (still uses `orderTotal` when present)
+
+4. **Update "Amount in Words"** → unchanged, still derived from final `total`.
+
+5. Sanity-check the same logic is not duplicated elsewhere; `InvoiceTemplate1/2/3.tsx` are not used by the live PDF flow (`InvoicePDFGenerator` and `fetchAndGenerateInvoice` both go through `generateTemplate4Invoice`), so they don't need changes for this fix.
+
+## Files to touch
+
+- `src/utils/invoiceGenerator.ts` — only the totals computation + totals-box rendering inside `generateTemplate4Invoice`.
+
+## Not changed
+
+- `cartItems` / `order_items` schema — no DB migration.
+- GST calculation base — still the discounted taxable amount, so tax compliance stays intact.
+- `orderTotal` source-of-truth for the final total bar.
+- Cart UI, scheme engine, other invoice templates.
+
+## Verification
+
+After the change, regenerate the same order's invoice and confirm:
+- `SUB-TOTAL` matches cart `Subtotal` (₹10,190.50 in the screenshot)
+- `DISCOUNT` equals cart `Discount` (-₹200.00)
+- `Total: Rs.10,490` unchanged
+- An order with **no** discounts hides the DISCOUNT row and shows `SUB-TOTAL` = sum of line totals (no regression).
