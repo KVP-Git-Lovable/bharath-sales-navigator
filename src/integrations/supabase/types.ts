@@ -9231,6 +9231,7 @@ export type Database = {
           sales_channel: string
           short_items: Json | null
           status: string
+          subtotal: number
           total_amount: number
           updated_at: string
           upi_last_four_code: string | null
@@ -9276,6 +9277,7 @@ export type Database = {
           sales_channel?: string
           short_items?: Json | null
           status?: string
+          subtotal?: number
           total_amount: number
           updated_at?: string
           upi_last_four_code?: string | null
@@ -9321,6 +9323,7 @@ export type Database = {
           sales_channel?: string
           short_items?: Json | null
           status?: string
+          subtotal?: number
           total_amount?: number
           updated_at?: string
           upi_last_four_code?: string | null
