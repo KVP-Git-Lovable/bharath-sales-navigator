@@ -11858,7 +11858,6 @@ export type Database = {
           name: string
           product_number: string | null
           qr_code: string | null
-          rate: number
           sku: string
           sku_image_url: string | null
           updated_at: string
@@ -11884,7 +11883,6 @@ export type Database = {
           name: string
           product_number?: string | null
           qr_code?: string | null
-          rate?: number
           sku: string
           sku_image_url?: string | null
           updated_at?: string
@@ -11910,7 +11908,6 @@ export type Database = {
           name?: string
           product_number?: string | null
           qr_code?: string | null
-          rate?: number
           sku?: string
           sku_image_url?: string | null
           updated_at?: string
