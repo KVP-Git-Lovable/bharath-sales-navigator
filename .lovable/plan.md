@@ -1,72 +1,67 @@
-## Root Cause — Verified
+## Goal
+Restore Sardar's beat → retailer → order linkage as close to the pre-incident state as safely possible, without overwriting any newer correct data and without losing order history.
 
-This is **not** an "auto-trigger" issue. There is **no trigger** on the `orders` table (verified via `information_schema.triggers`). The breakage came from a **schema/code mismatch** that surfaced this morning.
+## What the data shows (verified, not assumed)
 
-### Timeline
+Active Sardar: `user_id = 6220fc85-ae7f-4c22-9694-db6c47fe8fb0`
+- Role: `user` in `user_roles`. Security profile re-assigned in `user_profiles` at 2026-05-21 05:48 UTC.
+- Beats created by Sardar: **21** (all still present, `created_by = Sardar`).
+- Retailers currently owned by Sardar (`retailers.user_id = Sardar`): **1** ("Mauail treders", created today 2026-05-21).
+- Retailers on Sardar's 21 beats: **1** (same record).
+- Orders by Sardar (`orders.user_id = Sardar`): **488** — all preserved, none deleted.
+- Orders with `retailer_id IS NULL`: **487** out of 488. Only the order created today (after re-assigning the role) has a valid `retailer_id`.
+- `distributor_beat_mappings` for Sardar's beats: 0.
+- `beat_audit_log` for Sardar: 0 entries (no recorded transfers).
+- `recycle_bin` for Sardar's user_id: only 2 unrelated retailer records (THIRTY BRAND PRODUCTS, Durga store) from Feb 2026 — no mass archive of Sardar's retailers/orders.
 
-| When (UTC) | What happened |
-|---|---|
-| **May 14, 10:29** | Migration `20260514102926…` rewrote the `sync_order_with_items` RPC. The INSERT lists `subtotal, discount_amount` in the orders columns. |
-| **May 14, 11:10** | Migration `20260514111005…` rewrote it again — **also includes `subtotal`** in the INSERT (line 77 of the migration). |
-| **Mon → Sat → today 04:58** | Orders were syncing fine through this same RPC. Today's 4 successful orders (BB Office Canteen, Kalla ji ×2, Basheer) all landed between 04:50 and 04:58 UTC. |
-| **~06:57 UTC today** | Postgres starts logging `column "subtotal" of relation "orders" does not exist` — dozens of failures from this point on. |
-| **Now** | `information_schema.columns` confirms the `orders` table has **no `subtotal` column** (verified column list: id, user_id, visit_id, retailer_name, discount_amount, total_amount, status, …). |
+### What this means
+- Beats are intact.
+- Order rows are intact (no deletion), but their `retailer_id` foreign key was cleared.
+- Retailer rows that previously belonged to Sardar are *not in recycle_bin*, which means they were not deleted via the in-app delete flow. The most likely cause is a bulk UPDATE that set `retailers.user_id` / `beat_id` to NULL or to another user. Without the original retailer rows, an exact 1:1 retailer restore is not possible from current DB state alone.
+- However, the orders carry `retailer_name` and `order_date`. We can use those plus Sardar's beats to safely relink most orders to existing retailer records when a unique name match exists.
 
-### What actually happened
+The role change in itself does not delete or null any beat/retailer/order columns (verified in `EditUserDialog.tsx` and `UserProfileAssignment.tsx`). So the linkage break is from a separate destructive action (e.g. the admin "Delete User Data" flow run earlier, or a bulk update). That flow archives to recycle_bin — and we see only 2 retailer rows there for Sardar — so it likely wasn't run for all retailers either. We'll proceed with what we can safely rebuild and clearly report what cannot be restored without a backup.
 
-The RPC body has **always referenced `subtotal`** since May 14. The only way the morning's 4 orders succeeded is that **the `subtotal` column existed in the `orders` table this morning and was dropped between 04:58 and ~07:00 UTC today**.
+## Plan (safe, reversible, no UI changes)
 
-There is **no migration file** that creates or drops `orders.subtotal` (grep across `supabase/migrations/` returns zero `ALTER TABLE … subtotal` statements). That means the column was added and later dropped **manually via the Supabase dashboard SQL editor**, outside the migration system — not by us, not by Lovable, not by an automatic process.
+### Step 1 — Snapshot current state (read-only)
+Export to `/mnt/documents/`:
+- Sardar's 21 beats
+- All 488 orders with `id, retailer_id, retailer_name, beat-related metadata, order_date, total_amount`
+- All retailers currently referencing any of Sardar's 21 beat_ids
+- recycle_bin rows where `record_data` references Sardar
+This snapshot lets us roll back any change.
 
-So the "auto-change" is actually: someone (or a manual dashboard action) ran `ALTER TABLE public.orders DROP COLUMN subtotal` today around 05:00–07:00 UTC. From that moment, every new order routed through `sync_order_with_items` fails with `42703: column "subtotal" does not exist`, and the offline queue piles up retries (which is exactly what the Sync Progress modal shows for Ajay Prabhu).
+### Step 2 — Try to relink existing retailers to Sardar (no overwrites of newer ownership)
+SQL-only, idempotent:
+- For each retailer where `beat_id IN (Sardar's 21 beat_ids)` AND `user_id IS NULL`: set `user_id = Sardar`, `owner_id = Sardar`, `owner_name = 'Sardar'`.
+- Do NOT touch retailers whose `user_id` is already non-null and belongs to another user (avoids hijacking).
 
-The "subtotal calculations" the user mentions were never being **calculated** — `subtotal` was just stored as the post-discount line-items total. The math still runs client-side; only the storage column vanished.
+### Step 3 — Relink orders to existing retailers by exact name + Sardar ownership
+- Build a map: `(lower(trim(retailer_name)) → retailers.id)` restricted to retailers where `user_id = Sardar` OR `beat_id IN Sardar's 21 beat_ids`.
+- For each of Sardar's 487 orders with `retailer_id IS NULL`, if `lower(trim(retailer_name))` matches exactly one retailer in the map, set `orders.retailer_id` to that id.
+- Skip ambiguous matches (multiple retailers with same name) and unmatched orders — log them.
 
-## Fix
+### Step 4 — Recreate missing retailer rows from order history (only on explicit confirmation)
+For orders whose `retailer_name` has no matching retailer row, the original retailer record is gone. Two options to choose from after Step 3:
+- (a) Leave those orders with `retailer_id = NULL` and just keep `retailer_name` (no data invented).
+- (b) Create new retailer stubs (`name = retailer_name`, `user_id = Sardar`, `beat_id = NULL`, `status = 'active'`) and link the orders. Stubs are clearly marked with `notes = 'Auto-recreated 2026-05-21 from order history'` so they can be deleted/merged later. This restores the data shape for reporting but the stubs will lack address/phone/GPS until the user re-edits them.
+This step is only run after you confirm the count of unmatched orders.
 
-Restore the column so the RPC and the May 15 backfill migrations (`20260515101415`, `20260515103734`, `20260515103824` — all reference `o.subtotal`) work again. Safest, minimal-risk path:
+### Step 5 — Verify and report
+- Re-run the diagnostic counts (beats / retailers / orders linked).
+- Output `/mnt/documents/sardar-restore-report.csv` with: before counts, after counts, list of relinked orders, list of skipped/ambiguous orders, list of newly created stubs (if Step 4b chosen).
 
-### 1. New migration — add `subtotal` back
+### What this plan deliberately does NOT do
+- Does not modify `user_roles` or `user_profiles` (current role/profile assignment is fine).
+- Does not delete any data.
+- Does not overwrite newer retailers that already belong to other users.
+- Does not invent retailer details (GPS, address, phone) — only restores name + ownership for stubs if approved.
+- Does not change any UI/component code; this is a data-only repair.
 
-```sql
-ALTER TABLE public.orders
-  ADD COLUMN IF NOT EXISTS subtotal numeric NOT NULL DEFAULT 0;
+## Technical execution
+All steps run via `supabase--migration` (data UPDATEs are run as one-shot data migrations) so they are version-controlled in `supabase/migrations/`. Each step is a separate migration so we can roll back independently. No code changes, no edge function changes, no client changes.
 
--- Backfill historical rows where subtotal is missing:
--- subtotal = total_amount + discount_amount (pre-discount line sum)
-UPDATE public.orders
-SET subtotal = COALESCE(total_amount, 0) + COALESCE(discount_amount, 0)
-WHERE subtotal = 0;
-```
-
-This:
-- Restores the column the RPC expects.
-- Backfills a sensible value for the orders inserted today after the column was dropped (their `subtotal` is null/0 in any cached payload, so we reconstruct from `total_amount + discount_amount`).
-- Uses `IF NOT EXISTS` so it's safe to re-run.
-
-### 2. No code change needed
-
-`sync_order_with_items` already writes `subtotal` correctly, and `Cart.tsx` already sends it in `orderData`. Once the column is back, the queued Ajay Prabhu order (and any others stuck on retry) will sync on the next attempt.
-
-### 3. After deploy — verify
-
-```sql
--- Should return 1 row
-SELECT column_name FROM information_schema.columns
-WHERE table_schema='public' AND table_name='orders' AND column_name='subtotal';
-
--- Watch the queue drain (counts should drop)
-SELECT count(*) FROM orders WHERE order_date='2026-05-18';
-```
-
-And in the device's Sync Progress modal, Ajay Prabhu should flip from "Retry #N" to synced within a minute.
-
-## Recommendation — prevent recurrence
-
-The real lesson: **never run `ALTER TABLE` via the Supabase dashboard SQL editor** on this project. Every schema change must go through a Lovable migration so the codebase and DB stay in sync. If you want, I can also add a tiny CI-style check (a dev-only DB function) that asserts `orders.subtotal` exists at startup, so this kind of out-of-band drop is caught immediately instead of after orders start failing.
-
-## Technical Details (for reference)
-
-- Active RPC: `public.sync_order_with_items(jsonb, jsonb)` — single definition, references `subtotal` in both the new-order INSERT (line ~61 of the function body) and not in the existing-order branch.
-- Failing path in client: `src/utils/offlineOrderUtils.ts → syncOrder()` calls the RPC; on `42703`, the catch block re-queues to `SYNC_QUEUE` — that's why the modal shows endless retries instead of a user-visible error.
-- May 15 backfill migrations (`…101415`, `…103734`, `…103824`) all `SELECT o.subtotal` — they would have errored too if run after the drop, but they ran on May 15 when the column still existed.
+## What you need to decide before I implement
+1. Confirm you want Steps 1–3 run now (snapshot + relink existing retailers + relink orders by name).
+2. For Step 4, choose (a) leave unmatched orders unlinked, or (b) auto-create retailer stubs for them. I will surface the unmatched count from Step 3 before doing this so you can choose with full information.
