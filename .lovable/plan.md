@@ -1,82 +1,79 @@
+# Restore Sardar's Orders from May 19 Snapshot
 
-# Sardar Data Restore — From May 19 Snapshot
+## What the CSV proves
 
-**Source of truth:** the two uploaded CSVs (371 retailers + 378 beat↔retailer mappings) captured on May 19 while Sardar's account was healthy.
+The uploaded file is the `orders` table filtered by `user_id = 6220fc85-...` (Sardar) — captured before the deletion. Verified:
 
-**Confirmed:** No prior changes in this thread touched Sagar's user, beats, retailers, or orders. Only the products price-restore migration ran.
+- **479 orders**, all with `user_id = 6220fc85` (Sardar)
+- Date range: **2026-01-28 → 2026-05-19**
+- **227 distinct retailer_ids** referenced
+- **Zero ID overlap** with Sagar's current 536 orders — confirms Sagar's orders are his own, and Sardar's 479 are genuinely missing
+- All 479 IDs are absent from the current `orders` table (sample checks returned 0)
+- All 44 CSV columns match the live `orders` schema exactly
+
+So Sardar's orders were **hard-deleted**. We re-insert them verbatim.
+
+## Step 1 — Stage the CSV
+
+`COPY` the file into a temp staging table `_restore_sardar_orders` with all 44 columns matching `orders`.
+
+## Step 2 — Pre-flight diff (read-only)
+
+For each of the 479 rows:
+- Is `id` already in `orders`? (expect 0 — abort if any collide)
+- Is `retailer_id` present in `retailers`? Bucket missing ones.
+- Is `visit_id` present in `visits`? Bucket missing ones (nullify if missing — visits aren't required).
+- Is `assigned_agent_id` / `cancelled_by` / `counter_customer_id` / `packing_list_id` / `event_id` / `distributor_id` valid? Nullify any dangling FKs.
+
+Write report to `/mnt/documents/sardar_orders_restore_diff.csv`. Pause for review only if `id` collisions exist or >5% retailer_ids missing.
+
+## Step 3 — Insert the orders
+
+```
+INSERT INTO orders (<all 44 columns>)
+SELECT <columns, with dangling FKs nulled per Step 2>
+FROM _restore_sardar_orders
+ON CONFLICT (id) DO NOTHING;
+```
+
+Force `user_id = '6220fc85-...'` and `owner_id_snapshot = '6220fc85-...'` to be safe (CSV already has them).
+
+## Step 4 — Verify
+
+```
+SELECT COUNT(*), SUM(total_amount), MIN(order_date), MAX(order_date)
+FROM orders WHERE user_id='6220fc85-...';
+-- expect 479, total ≈ sum from CSV, dates 2026-01-28 → 2026-05-19
+```
+
+Cross-check against `_restore_sardar_orders` (counts and sum match).
+
+## Step 5 — Report
+
+Export final summary → `/mnt/documents/sardar_orders_restore_report.csv` with: rows inserted, rows skipped (and why), retailer/visit FKs nulled.
 
 ---
 
-## Step 1 — Stage the snapshot
+## ⚠️ Known limitation — order_items NOT in this snapshot
 
-Load both CSVs into temporary tables in Postgres:
-- `_restore_sardar_retailers` (371 rows, full retailer columns)
-- `_restore_sardar_beats_map` (378 rows: beat_id, beat_name, retailer_id)
+The CSV is **only the `orders` header rows**. It does not contain `order_items` (line items: product, qty, price per order). After Step 3:
 
-Done via `COPY ... FROM STDIN` using the uploaded files. No production tables touched yet.
+- `orders.total_amount` will be correct (header value preserved).
+- But **line-item detail will be empty** — invoices/PDFs that re-render from `order_items` will show "no items" for these 479 orders.
 
-## Step 2 — Diagnostic diff (read-only report)
+**Options:**
+1. Accept header-only restore now (totals + retailer + date + payment status all correct; invoices that reference saved PDFs or `total_amount` work fine).
+2. Also upload an `order_items` snapshot filtered by these 479 order_ids — I'll restore both together.
 
-For every retailer_id in the snapshot, classify current DB state:
+I'll proceed with **option 1 (header-only)** unless you upload items. The orders will show up in the dashboard with correct totals immediately.
 
-| Bucket | Meaning | Action |
-|---|---|---|
-| A | Exists, `user_id = Sardar` | Skip — already correct |
-| B | Exists, `user_id IS NULL` | Restore from snapshot |
-| C | Exists, `user_id = Sagar` or other | **STOP — list to user** |
-| D | Missing entirely | Re-insert from snapshot |
+## Safety
 
-Same diff for the 21 beat_ids referenced. Output a CSV report to `/mnt/documents/sardar_restore_diff.csv` and pause.
+- No change to Sagar's data, retailers, beats, profiles, or auth.
+- `ON CONFLICT DO NOTHING` makes re-runs safe.
+- Dangling FKs nulled, not force-inserted — no constraint violations.
+- Pre/post counts logged.
 
-## Step 3 — Conflict gate
+## What you approve next
 
-If bucket C is non-empty, halt and surface the list (retailer id, name, current owner). No writes until you decide per-row. This honors your "Stop and list them" choice.
-
-## Step 4 — Restore beats
-
-For each beat_id in the snapshot:
-- If missing → INSERT (id, name, created_by=Sardar, user_id=Sardar)
-- If exists but unowned → UPDATE created_by/user_id to Sardar
-- If owned by someone else → skip + list
-
-## Step 5 — Restore retailers
-
-For buckets B and D only:
-- B: UPDATE retailers SET user_id, owner_id, owner_name, beat_id, created_by, address, phone, latitude, longitude, gst_number, category, retail_type, photo_url, … ← snapshot values, WHERE id = snapshot.id AND (user_id IS NULL OR user_id = Sardar).
-- D: INSERT full row from snapshot, preserving original `id` so order FKs reattach automatically.
-
-`updated_at = now()`, leave `created_at` from snapshot.
-
-## Step 6 — Relink orphan orders
-
-After retailers are back:
-```
-UPDATE orders o
-SET retailer_id = r.id
-FROM retailers r
-WHERE o.user_id = '<Sardar>'
-  AND o.retailer_id IS NULL
-  AND r.user_id = '<Sardar>'
-  AND lower(trim(o.retailer_name)) = lower(trim(r.name));
-```
-Ambiguous (multi-match) names skipped and reported.
-
-## Step 7 — Verify & snapshot
-
-- Pre/post row counts: retailers owned by Sardar, beats owned by Sardar, orders with non-null retailer_id.
-- Export final report → `/mnt/documents/sardar_restore_report.csv`.
-- Backup of pre-change state → `/mnt/documents/sardar_pre_restore_snapshot/`.
-
----
-
-## Safety guarantees
-
-- No changes to `user_roles`, `user_profiles`, `auth.users`.
-- No changes to any record currently owned by Sagar (gated at Step 3).
-- All writes idempotent — re-running is safe.
-- No application code changes; SQL only.
-- Original `id`s preserved so existing FKs (orders, visits, invoices) reconnect without further work.
-
-## What you'll approve next
-
-After you click "Implement plan", I'll run Steps 1–3 first and show you the diff report. Steps 4–7 only execute after you review the Step 3 conflict list (if any).
+Click **Implement plan** and I'll run Steps 1–2 (stage + diff) and show you the report before any insert.
