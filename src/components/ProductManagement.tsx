@@ -1432,7 +1432,7 @@ const [productForm, setProductForm] = useState({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>₹{variant.price.toFixed(2)}</TableCell>
+                      <TableCell>₹{Number(variant.price ?? 0).toFixed(2)}</TableCell>
                       <TableCell>{variant.stock_quantity}</TableCell>
                       <TableCell>
                         {variant.discount_percentage > 0 && (
