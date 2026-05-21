@@ -13911,6 +13911,71 @@ export type Database = {
           },
         ]
       }
+      sardar_restore_audit_runs: {
+        Row: {
+          id: string
+          mode: string
+          run_at: string
+          run_by: string | null
+          summary: Json
+        }
+        Insert: {
+          id?: string
+          mode: string
+          run_at?: string
+          run_by?: string | null
+          summary?: Json
+        }
+        Update: {
+          id?: string
+          mode?: string
+          run_at?: string
+          run_by?: string | null
+          summary?: Json
+        }
+        Relationships: []
+      }
+      sardar_restore_log: {
+        Row: {
+          action: string
+          actor: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          id: string
+          retailer_id: string | null
+          run_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          retailer_id?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          retailer_id?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sardar_restore_log_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sardar_restore_audit_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_reports: {
         Row: {
           conversation_id: string | null

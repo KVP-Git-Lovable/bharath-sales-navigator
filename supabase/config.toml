@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.restore-sardar-orders]
 verify_jwt = false
+
+[functions.sardar-restore-audit]
+verify_jwt = false

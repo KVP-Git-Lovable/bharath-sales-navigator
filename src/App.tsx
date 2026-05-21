@@ -126,6 +126,7 @@ import PriceBookAdmin from "./pages/admin/PriceBookAdmin";
 import PriceBookDetail from "./pages/admin/PriceBookDetail";
 import RecycleBin from "./pages/RecycleBin";
 import RecycleBinAdmin from "./pages/admin/RecycleBinAdmin";
+import SardarRestoreAudit from "./pages/admin/SardarRestoreAudit";
 import DistributorPortalAdmin from "./pages/admin/DistributorPortalAdmin";
 import TargetVsActual from "./pages/admin/TargetVsActual";
 import PincodeMasterPage from "./pages/admin/PincodeMasterPage";
@@ -462,6 +463,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/employee-360" element={<ProtectedRoute><Employee360 /></ProtectedRoute>} />
         <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
         <Route path="/admin/recycle-bin" element={<ProtectedRoute><RecycleBinAdmin /></ProtectedRoute>} />
+        <Route path="/admin/sardar-restore-audit" element={<ProtectedRoute><SardarRestoreAudit /></ProtectedRoute>} />
         <Route path="/admin/distributor-portal" element={<ProtectedRoute><DistributorPortalAdmin /></ProtectedRoute>} />
         <Route path="/admin/pincode-master" element={<ProtectedRoute><PincodeMasterPage /></ProtectedRoute>} />
         <Route path="/admin/tax-master" element={<ProtectedRoute><TaxMaster /></ProtectedRoute>} />
