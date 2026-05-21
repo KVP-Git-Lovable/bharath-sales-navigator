@@ -44,7 +44,7 @@ const BUCKET_LABELS: Record<Bucket, { label: string; tone: "default" | "secondar
 
 const SardarRestoreAudit = () => {
   const navigate = useNavigate();
-  const { isAdmin, isLoading: adminLoading } = useAdminAccess();
+  const { hasAdminAccess: isAdmin, loading: adminLoading } = useAdminAccess();
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<AuditResponse | null>(null);
 
