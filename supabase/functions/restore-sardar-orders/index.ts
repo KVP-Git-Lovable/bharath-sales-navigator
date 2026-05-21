@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
     const validRetailers = new Set<string>();
     for (let i=0; i<retailerIds.length; i+=100) {
-      const chunk = retailerIds.slice(i, i+500);
+      const chunk = retailerIds.slice(i, i+100);
       const { data, error } = await supabase.from("retailers").select("id").in("id", chunk);
       if (error) throw error;
       data?.forEach((r:any)=>validRetailers.add(r.id));
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     const orderIds = ORDERS.map((o:any)=>o.id);
     const existing = new Set<string>();
     for (let i=0; i<orderIds.length; i+=100) {
-      const chunk = orderIds.slice(i, i+500);
+      const chunk = orderIds.slice(i, i+100);
       const { data, error } = await supabase.from("orders").select("id").in("id", chunk);
       if (error) throw error;
       data?.forEach((r:any)=>existing.add(r.id));
