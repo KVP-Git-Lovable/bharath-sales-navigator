@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.sardar-restore-audit]
 verify_jwt = false
+
+[functions.restore-sardar-beats]
+verify_jwt = false
