@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.set-distributor-portal-password]
 verify_jwt = false
+
+[functions._restore_sardar]
+verify_jwt = false
