@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     const cancelledByIds = [...new Set(ORDERS.map((o:any)=>o.cancelled_by).filter(Boolean))];
 
     const validRetailers = new Set<string>();
-    for (let i=0; i<retailerIds.length; i+=500) {
+    for (let i=0; i<retailerIds.length; i+=100) {
       const chunk = retailerIds.slice(i, i+500);
       const { data, error } = await supabase.from("retailers").select("id").in("id", chunk);
       if (error) throw error;
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     // Existing order ids (collision check)
     const orderIds = ORDERS.map((o:any)=>o.id);
     const existing = new Set<string>();
-    for (let i=0; i<orderIds.length; i+=500) {
+    for (let i=0; i<orderIds.length; i+=100) {
       const chunk = orderIds.slice(i, i+500);
       const { data, error } = await supabase.from("orders").select("id").in("id", chunk);
       if (error) throw error;
