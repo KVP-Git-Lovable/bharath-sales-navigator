@@ -932,13 +932,13 @@ const [productForm, setProductForm] = useState({
                         <TableCell>{product.category?.name}</TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium">₹{(product.rate * (product.conversion_factor || 1)).toFixed(2)}</div>
+                            <div className="font-medium">₹{(Number(product.rate ?? 0) * (product.conversion_factor || 1)).toFixed(2)}</div>
                             <div className="text-xs text-muted-foreground">per {product.unit}</div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div className="font-medium">₹{product.rate.toFixed(2)}</div>
+                            <div className="font-medium">₹{Number(product.rate ?? 0).toFixed(2)}</div>
                             <div className="text-xs text-muted-foreground">per {product.base_unit || 'kg'}</div>
                           </div>
                         </TableCell>
