@@ -1,79 +1,74 @@
-# Restore Sardar's Orders from May 19 Snapshot
+## Goal
+Audit the May 20–21 orders shown in the screenshots, identify which records belong to Sardar but are now missing/mislinked in the database, and restore only those order-to-retailer/user links without touching other users’ data.
 
-## What the CSV proves
+## What I found so far
+- The current `orders` table does **not** contain May 20–21 rows with `user_id` or `retailer_id` set to `NULL`.
+- The DB currently shows:
+  - **May 20:** 66 orders total, **0** currently owned by Sardar
+  - **May 21:** 54 orders total, **2** currently owned by Sardar
+- The screenshots clearly show more Sardar retailers on both days than the DB now reflects, so this looks like a **mis-assignment/disconnection issue**, not simply a `NULL` field issue.
+- The visits screen can also read from cached snapshot/offline sources, so I need to separate **historical UI evidence** from **current DB truth** before restoring.
 
-The uploaded file is the `orders` table filtered by `user_id = 6220fc85-...` (Sardar) — captured before the deletion. Verified:
+## Plan
+### 1) Build a forensic audit for May 20–21
+Create a read-only audit that compares:
+- `orders` on May 20–21
+- Sardar’s current retailers and beat mappings
+- retailer names visible in the screenshots
+- ownership signals such as `user_id`, `owner_id_snapshot`, `retailer.user_id`, `retailer.created_by`, `beat_id`, `visit_id`, and timestamp proximity
 
-- **479 orders**, all with `user_id = 6220fc85` (Sardar)
-- Date range: **2026-01-28 → 2026-05-19**
-- **227 distinct retailer_ids** referenced
-- **Zero ID overlap** with Sagar's current 536 orders — confirms Sagar's orders are his own, and Sardar's 479 are genuinely missing
-- All 479 IDs are absent from the current `orders` table (sample checks returned 0)
-- All 44 CSV columns match the live `orders` schema exactly
+Output:
+- a candidate list of all orders on May 20–21 that could belong to Sardar
+- a confidence classification for each row: exact match / strong match / ambiguous / exclude
 
-So Sardar's orders were **hard-deleted**. We re-insert them verbatim.
+### 2) Produce a dry-run restore report before changing data
+Generate a report listing for each candidate:
+- current order id
+- current user/retailer linkage
+- proposed Sardar retailer id
+- evidence used for the match
+- whether the change is safe or ambiguous
 
-## Step 1 — Stage the CSV
+This will let us verify the exact rows to remap before any write happens.
 
-`COPY` the file into a temp staging table `_restore_sardar_orders` with all 44 columns matching `orders`.
+### 3) Implement a narrowly scoped remap path
+Add a backend-safe restore/remap path that only updates rows from the approved candidate set and only for May 20–21.
 
-## Step 2 — Pre-flight diff (read-only)
+Safety rules:
+- only orders positively matched to Sardar are touched
+- no inserts for unrelated users
+- no broad updates by name alone
+- every update logged with before/after values
+- support dry-run mode first, apply mode second
 
-For each of the 479 rows:
-- Is `id` already in `orders`? (expect 0 — abort if any collide)
-- Is `retailer_id` present in `retailers`? Bucket missing ones.
-- Is `visit_id` present in `visits`? Bucket missing ones (nullify if missing — visits aren't required).
-- Is `assigned_agent_id` / `cancelled_by` / `counter_customer_id` / `packing_list_id` / `event_id` / `distributor_id` valid? Nullify any dangling FKs.
+### 4) Remap ownership and retailer linkage
+For approved rows, update only the minimum fields needed so the orders belong to the correct Sardar retailer again, prioritizing:
+- `user_id`
+- `owner_id_snapshot`
+- `retailer_id`
+- `retailer_name` only if it needs normalization to match the linked retailer
+- `visit_id` only if a valid same-day Sardar visit match exists
 
-Write report to `/mnt/documents/sardar_orders_restore_diff.csv`. Pause for review only if `id` collisions exist or >5% retailer_ids missing.
+### 5) Verify the fix against both DB and app logic
+After remapping, verify:
+- Sardar’s May 20 and May 21 counts/value totals
+- retailer-level linkage correctness
+- no other users’ May 20–21 totals changed unexpectedly
+- summary/visits calculations now include the restored orders correctly
 
-## Step 3 — Insert the orders
+## Technical details
+- I’ll reuse the existing Supabase restore pattern already present in the project, but convert this into a **targeted audit + remap workflow** rather than another bulk blind restore.
+- I’ll query and classify candidates using normalized retailer-name matching plus live retailer/beat ownership checks.
+- If needed, I’ll implement this as a small Edge Function with:
+  - `dryRun=true` for the audit report
+  - `apply=true` for the actual remap
+- Any DB write will be restricted to:
+  - date range `2026-05-20` to `2026-05-21`
+  - candidate order ids only
+  - Sardar’s verified retailer mappings only
 
-```
-INSERT INTO orders (<all 44 columns>)
-SELECT <columns, with dangling FKs nulled per Step 2>
-FROM _restore_sardar_orders
-ON CONFLICT (id) DO NOTHING;
-```
-
-Force `user_id = '6220fc85-...'` and `owner_id_snapshot = '6220fc85-...'` to be safe (CSV already has them).
-
-## Step 4 — Verify
-
-```
-SELECT COUNT(*), SUM(total_amount), MIN(order_date), MAX(order_date)
-FROM orders WHERE user_id='6220fc85-...';
--- expect 479, total ≈ sum from CSV, dates 2026-01-28 → 2026-05-19
-```
-
-Cross-check against `_restore_sardar_orders` (counts and sum match).
-
-## Step 5 — Report
-
-Export final summary → `/mnt/documents/sardar_orders_restore_report.csv` with: rows inserted, rows skipped (and why), retailer/visit FKs nulled.
-
----
-
-## ⚠️ Known limitation — order_items NOT in this snapshot
-
-The CSV is **only the `orders` header rows**. It does not contain `order_items` (line items: product, qty, price per order). After Step 3:
-
-- `orders.total_amount` will be correct (header value preserved).
-- But **line-item detail will be empty** — invoices/PDFs that re-render from `order_items` will show "no items" for these 479 orders.
-
-**Options:**
-1. Accept header-only restore now (totals + retailer + date + payment status all correct; invoices that reference saved PDFs or `total_amount` work fine).
-2. Also upload an `order_items` snapshot filtered by these 479 order_ids — I'll restore both together.
-
-I'll proceed with **option 1 (header-only)** unless you upload items. The orders will show up in the dashboard with correct totals immediately.
-
-## Safety
-
-- No change to Sagar's data, retailers, beats, profiles, or auth.
-- `ON CONFLICT DO NOTHING` makes re-runs safe.
-- Dangling FKs nulled, not force-inserted — no constraint violations.
-- Pre/post counts logged.
-
-## What you approve next
-
-Click **Implement plan** and I'll run Steps 1–2 (stage + diff) and show you the report before any insert.
+## Expected deliverables
+- full audit of May 20–21 candidate orders
+- dry-run report of which orders belong to Sardar
+- safe remap implementation
+- final verification summary of restored order linkage
