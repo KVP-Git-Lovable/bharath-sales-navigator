@@ -115,7 +115,7 @@ export function useMasterDataCache() {
         .from('beats')
         .select('*')
         .eq('is_active', true)
-        .eq('created_by', user.id);
+        .or(`user_id.eq.${user.id},owner_id.eq.${user.id},created_by.eq.${user.id}`);
 
       if (error) throw error;
 
@@ -415,7 +415,11 @@ export function useMasterDataCache() {
 
       // Beats
       onProgress('beats', 'loading');
-      const { data: beats } = await supabase.from('beats').select('*').eq('is_active', true).eq('user_id', user.id);
+      const { data: beats } = await supabase
+        .from('beats')
+        .select('*')
+        .eq('is_active', true)
+        .or(`user_id.eq.${user.id},owner_id.eq.${user.id},created_by.eq.${user.id}`);
       if (beats) {
         await offlineStorage.clear(STORES.BEATS);
         for (const b of beats) await offlineStorage.save(STORES.BEATS, b);
