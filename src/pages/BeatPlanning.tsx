@@ -101,7 +101,11 @@ export const BeatPlanning = () => {
 
       const userBeats = cachedBeats.filter((b: any) =>
         b.is_active !== false &&
-        (b.user_id === effectiveUserId || b.owner_id === effectiveUserId)
+        (
+          b.user_id === effectiveUserId ||
+          b.owner_id === effectiveUserId ||
+          b.created_by === effectiveUserId
+        )
       );
 
       const userRetailers = cachedRetailers.filter((r: any) => r.user_id === effectiveUserId);
@@ -148,7 +152,7 @@ export const BeatPlanning = () => {
         .from('beats')
         .select('*')
         .eq('is_active', true)
-        .or(`user_id.eq.${effectiveUserId},owner_id.eq.${effectiveUserId}`)
+        .or(`user_id.eq.${effectiveUserId},owner_id.eq.${effectiveUserId},created_by.eq.${effectiveUserId}`)
         .order('created_at', { ascending: true });
 
       if (beatsError) throw beatsError;
