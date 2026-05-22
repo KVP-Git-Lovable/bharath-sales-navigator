@@ -1,59 +1,68 @@
+# Verification & Fix: Mokshith's Restored Beats Visibility
 
-# Resync Mokshith's beats and retailers from snapshot CSVs
+## Current DB state (Mokshith = `73044cad-2c19-4a47-89f1-6a755adc3362`)
 
-## What the CSVs contain
-- `beat.csv` → **25 beats** (24 of them referenced by the retailer CSV)
-  - 19 rows: `user_id` / `owner_id` = Mokshith (`73044cad…`), `owner_name` = "Mokshith"
-  - 6 rows: `user_id` / `owner_id` / `owner_name` are **NULL** in the snapshot (Elinje, Bajagoli-kuduremukha, Karkala 18, Hejamadi, Kodyadka, Moodabidre city, Kaikamba-Mullarpatna — all `created_by` = Mokshith)
-- `retailer_650.csv` → **650 retailers**, all `user_id` = Mokshith, covering 24 of the 25 beats
+Active beats matched by column:
+- `user_id` = Mokshith → **26**
+- `owner_id` = Mokshith → **26**
+- `created_by` = Mokshith → **9** (only his originally-created ones)
+- `user_id IS NULL` → 35 (legacy/unrestored — unrelated)
 
-## Current DB state (verified)
-| Check | Result |
-|---|---|
-| Beats from CSV already in DB | **6** (exactly the 6 NULL-user rows — currently NULL in DB too) |
-| Beats from CSV missing in DB | **19** (the Mokshith-owned ones — all hard-deleted) |
-| Retailers from CSV already in DB | **0 of 650** |
-| Mokshith's current retailers (4 in Padubidri) | Not in CSV — untouched |
+Retailers:
+- `user_id` = Mokshith → **654**
+- `created_by` = Mokshith → 634
 
-## Plan
+## Will the restore show correctly?
 
-### Step 1 — Beats (idempotent UPSERT, no hardcoded values)
-For each row in `beat.csv` we write **exactly what the CSV says** (no overrides):
-- `INSERT … ON CONFLICT (beat_id) DO UPDATE` with every column from the CSV.
-- The 19 missing rows get inserted with `user_id`/`owner_id` = Mokshith + `owner_name` = "Mokshith".
-- The 6 NULL-user rows get their other columns refreshed but `user_id`/`owner_id` stay NULL (matching the snapshot).
-- **Question 1 below** asks whether to override those 6 to Mokshith as well.
+| Screen | Filter column | Will show | Status |
+|---|---|---|---|
+| My Beat (`MyBeats.tsx` L283-284, 326) | `user_id` (cache also accepts `created_by`) | **26 beats** | ✓ Correct |
+| My Visit → All Beats (`BeatPlanning.tsx` L102, L148) | `created_by` only | **9 beats** | ✗ Misses 17 restored beats |
+| Retailers (any screen filtering `retailers.user_id`) | `user_id` | 654 | ✓ Correct |
 
-### Step 2 — Retailers (idempotent UPSERT, all 650 rows)
-- `INSERT … ON CONFLICT (id) DO UPDATE` for each of the 650 rows, using **only** the columns present in the CSV (`id, retailer_name → name, user_id, beat_id, beat_name, owner_name, created_by, phone, address, created_at`).
-- Required-but-missing columns (`entity_type`, `verified`) get their schema defaults on insert; existing rows aren't touched for those.
-- Re-using the original UUIDs auto-relinks all FK-bearing rows in `visits`, `orders`, `retailer_visit_logs`, `credit_*`, `retailer_loyalty_*`, etc. — **nothing else needs to be touched on those tables to restore the link**.
+So the restore data is fine — the bug is purely the `BeatPlanning.tsx` filter mismatch you already identified.
 
-### Step 3 — Historical user_id on `visits` and `orders` (needs your call — Question 2)
-Right now those rows still hold `user_id` = Manvith (`d6d364d5…`). The retailer master will say Mokshith, but the visit/order history still says Manvith. Options below.
+## Fix (single file, frontend-only)
 
-### Step 4 — Verification queries (after the writes)
-- Count beats with `user_id` = Mokshith → expect 19 (or 25 if Q1=override).
-- Count retailers with `user_id` = Mokshith → expect 650 + the 4 already-there = 654.
-- Count `visits`/`orders` with `retailer_id` now linking to a real retailer row → should jump from ~0 back to 1,992 / 470.
+**`src/pages/BeatPlanning.tsx`**
 
-## Open decisions
+1. **Cache filter (line ~102)** — switch from `created_by` to ownership:
+```ts
+const userBeats = cachedBeats.filter((b: any) =>
+  b.is_active !== false &&
+  (b.user_id === effectiveUserId || b.owner_id === effectiveUserId)
+);
+```
 
-**Q1 — The 6 NULL-user beats in the snapshot (Elinje, Bajagoli-kuduremukha, Hejamadi, Kodyadka, Moodabidre city, Kaikamba-Mullarpatna, Karkala 18)**
-The snapshot itself has them as NULL, but their retailers (in `retailer_650.csv`) are owned by Mokshith. Do you want me to:
-- **A.** Keep them NULL exactly as the CSV says (snapshot-faithful), OR
-- **B.** Also set their `user_id`/`owner_id`/`owner_name` to Mokshith so beats and retailers stay consistent.
+2. **Network query (line ~144-149)** — replace `.eq('created_by', …)` with ownership OR:
+```ts
+.from('beats').select('*').eq('is_active', true)
+  .or(`user_id.eq.${effectiveUserId},owner_id.eq.${effectiveUserId}`)
+```
 
-**Q2 — Historical `visits` / `orders` `user_id` (currently Manvith)**
-For every visit/order whose `retailer_id` is in this 650-row set:
-- **A.** Leave `user_id` = Manvith (history stays factual), OR
-- **B.** Rewrite `user_id` to Mokshith so Mokshith's analytics show the full history.
-- (1,992 visits + 470 orders affected.)
+No DB migration, no changes to MyBeats, no changes to BeatTransferDialog.
 
-## Technical notes
-- All writes go through the migration/insert tool; no client-side or hardcoded UUID lists beyond what the CSVs literally contain.
-- CSV → SQL conversion is done with `duckdb` so the data, not the AI, is the source of truth.
-- Beats use `ON CONFLICT (beat_id)`, retailers use `ON CONFLICT (id)`, so re-running is safe.
-- `beat_audit_log` will get one transfer entry per beat for traceability.
+## Deploying without a new APK
 
-Reply with **Q1: A/B** and **Q2: A/B** and I'll execute.
+The Android app already loads the web UI remotely from Lovable (`capacitor.config.ts` → `server.url: 'https://field-sales-navigator.lovable.app'`). This matches the project's **Live Update Architecture** memory — JS/TS changes go live via OTA the moment they're published.
+
+**Steps for Mokshith (no APK rebuild needed):**
+1. Apply the BeatPlanning.tsx patch above.
+2. Publish the project (Lovable → Publish) — this updates `field-sales-navigator.lovable.app`.
+3. On Mokshith's device:
+   - Pull to refresh, or fully close & reopen the app (service worker fetches new bundle).
+   - One-time cache clear may be needed: the BeatPlanning cache-load path filters the *local IndexedDB* (`STORES.BEATS`) which still contains the old beats. Two ways to refresh:
+     - **Easiest:** open My Beat first — its network sync (`MyBeats.tsx` L322-336) overwrites `STORES.BEATS` cache with all 26 beats. Then open Journey Plan.
+     - Or just be online when opening Journey Plan — the patched network load will repopulate cache.
+4. Confirm Journey Plan shows 26 beats matching My Beat.
+
+## Verification checklist
+
+- Mokshith → My Beat: 26 beats, 654 retailers (already working).
+- Mokshith → My Visit → All Beats: 26 beats after patch + publish.
+- Manvith → My Visit → All Beats: transferred beats no longer appear (expected).
+- Offline mode after one online sync: cache holds 26 beats, Journey Plan still shows 26.
+
+## Optional follow-up (not part of this patch)
+
+`BeatTransferDialog.tsx` leaves `created_by` pointing to the original creator. That's historically correct but means any other code still filtering by `created_by` will miss transferred beats. If you want, a future sweep can audit other `created_by` filters across the codebase and align them with ownership.
