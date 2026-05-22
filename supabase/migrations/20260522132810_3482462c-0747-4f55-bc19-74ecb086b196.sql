@@ -1,0 +1,58 @@
+DO $$
+DECLARE
+  before_count int;
+  after_count int;
+BEGIN
+  SELECT count(*) INTO before_count FROM public.beats
+   WHERE user_id  = '73044cad-2c19-4a47-89f1-6a755adc3362'
+      OR owner_id = '73044cad-2c19-4a47-89f1-6a755adc3362'
+      OR created_by = '73044cad-2c19-4a47-89f1-6a755adc3362';
+
+  INSERT INTO public.beats
+    (id, beat_id, beat_name, category, travel_allowance, average_km,
+     average_time_minutes, is_active, created_by, created_at, updated_at,
+     territory_id, distributor_id, owner_id, owner_name, user_id) VALUES
+('f94dcd18-3795-4e8a-81c5-80defb83348b','beat_1778907304500_qqbudgbzj','Elinje','General',200,0,0,TRUE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-16 04:55:04.5+00','2026-05-16 04:55:05.002477+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('0cedfb75-371d-4a63-947b-c455d286566c','beat_1778826480667_qtycw84uq','Bajagoli-kuduremukha','General',0,0,0,TRUE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-15 06:28:00.667+00','2026-05-15 06:28:01.37423+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('610af348-3a6c-4226-a864-54700300ec08','beat_1778739728942_z0ppawb4t','Karkala 18','General',200,0,0,FALSE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-14 06:22:08.942+00','2026-05-14 06:22:26.681516+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('29a18954-baab-4ce0-99b6-cb301b927413','beat_1778736209112_eufj4jy5q','Hejamadi','General',200,0,0,TRUE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-14 05:23:29.112+00','2026-05-14 05:23:29.614275+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('4d75cbcc-9508-4846-9398-b8c09787c1a9','beat_1778643943663_kjcj9runn','Kodyadka','General',200,100,5,TRUE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-13 03:45:43.663+00','2026-05-13 03:45:44.729957+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('32e78bef-99bc-4486-8edb-2fd4112f828c','beat_1778562313509_kwlkfb142','Moodabidre city','General',200,0,0,TRUE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-12 05:05:13.509+00','2026-05-12 05:05:14.129995+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('8e1842a4-8e44-406a-860d-5e4eb2258a90','beat_1778481549460_z0txl9vhz','Kaikamba-Mullarpatna','General',200,0,0,TRUE,'73044cad-2c19-4a47-89f1-6a755adc3362','2026-05-11 06:39:09.46+00','2026-05-11 06:39:09.612874+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('6c832a73-300b-4f10-9f62-d599c214832e','beat_1771654981244_s7b7flr4e','Mudipu','General',65646,4646,85,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2026-02-21 06:23:01.244+00','2026-05-13 11:32:33.165143+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('fdcc352c-8011-4d74-9781-373cc253d490','beat_1769497270960_kwzih4wfh','Surathkal city','General',0,0,0,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2026-01-27 07:01:10.96+00','2026-05-13 11:32:33.165143+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('a2edc96e-f23d-4c1c-b702-34a10c5eef2e','beat_1768026506053_km02telad','BANGALORE 1','General',500,500,5000,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2026-01-10 06:28:26.053+00','2026-05-13 11:32:33.165143+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('5b79095b-d0c8-4e61-83e9-66b1d3f6d539','beat_1766203004977_6a1na7k5n','Karkala 10','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-20 03:56:44.977+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('5825b2a4-6f14-4f61-977b-d1a65f4e8ebe','beat_1766117124659_gvngz9e1z','Karkala 9','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-19 04:05:24.659+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('1762fd9d-2eb6-4b4c-9e65-ebdbef289b2c','beat_1766025930638_hpyfjfcd6','Karkala 8','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-18 02:45:30.639+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('b0092ac7-1819-4b86-a54c-f8ae8d79ac07','beat_1765939234271_fxb16yk9v','Karkala 6','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-17 02:40:34.271+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('05bd83c2-bfc1-41d1-a13a-5a65784da983','beat_1765853097390_b4j49ocy1','Karkala 7','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-16 02:44:57.39+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('85e94d1e-8c18-4723-8c09-1cd4f015f711','beat_1765533585067_xfixqancw','test','General',0,0,0,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-12 09:59:45.068+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('d37f34c5-17f0-4624-b8a7-75cb7e768e43','beat_1765506172360_rg7fd9fsy','Karkala 5','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-12 02:22:52.36+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('e77253b6-8f55-4e00-a605-765797d2c097','beat_1765420760205_uwsrjmx4g','Karkala4','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-11 02:39:20.205+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('b82504d4-2613-4e2c-aeea-3aca45218fa6','beat_1765248798413_md470lrtl','Karkala3','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-09 02:53:18.413+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('3de952b9-67bf-4d81-9876-e440c5e87e7d','beat_1765248776015_eu5r3jewe','Karkala2','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-09 02:52:56.015+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('7830e427-3536-4b0a-83c6-2d03401227a9','beat_1765167092097_d46zfr3ie','Karkala 1','General',80,100,200,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-12-08 04:11:32.097+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('83f51019-1eb7-4d9c-8fef-9fef5ce922d9','beat_1762746584462_sis6elsoy','Kaikamba','General',0,0,0,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-11-10 03:49:46.444503+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('3c05f3d5-953b-4a9d-b89b-5cc3e60b338a','beat_1761368897317_9wo4ua0ra','Moorje','General',0,0,0,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-10-25 05:08:17.881878+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('304bb14d-dbf4-45f3-a0cc-c5f72c9fa781','beat_1761281421257_2u5rli464','Halegetu','General',0,0,0,TRUE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-10-24 04:50:22.984297+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362'),
+('890324f3-3644-4f90-b2f6-e17b48817a76','beat_1761221118299_esqwetbi8','Testbeat','General',0,0,0,FALSE,'d6d364d5-6f19-4da9-bb48-67b04a8065fa','2025-10-23 12:05:18.554657+00','2026-05-13 11:31:56.139764+00',NULL,NULL,'73044cad-2c19-4a47-89f1-6a755adc3362','Mokshith','73044cad-2c19-4a47-89f1-6a755adc3362')
+  ON CONFLICT (beat_id) DO UPDATE SET
+    beat_name      = EXCLUDED.beat_name,
+    category       = EXCLUDED.category,
+    is_active      = EXCLUDED.is_active,
+    owner_id       = EXCLUDED.owner_id,
+    owner_name     = EXCLUDED.owner_name,
+    user_id        = EXCLUDED.user_id,
+    updated_at     = now();
+
+  SELECT count(*) INTO after_count FROM public.beats
+   WHERE user_id  = '73044cad-2c19-4a47-89f1-6a755adc3362'
+      OR owner_id = '73044cad-2c19-4a47-89f1-6a755adc3362'
+      OR created_by = '73044cad-2c19-4a47-89f1-6a755adc3362';
+
+  RAISE NOTICE 'Mokshith beats before=%, after=%', before_count, after_count;
+  IF after_count < 25 THEN
+    RAISE EXCEPTION 'Beat restore landed only % rows -- aborting', after_count;
+  END IF;
+END $$;
