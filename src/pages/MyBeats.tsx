@@ -281,7 +281,9 @@ export const MyBeats = () => {
       
       // Filter cached beats by selected users
       const userCachedBeats = cachedBeats.filter((b: any) => 
-        effectiveUserIds.includes(b.user_id ?? b.created_by)
+        effectiveUserIds.includes(b.user_id) ||
+        effectiveUserIds.includes(b.owner_id) ||
+        effectiveUserIds.includes(b.created_by)
       );
       
       if (userCachedBeats.length > 0) {
@@ -319,11 +321,15 @@ export const MyBeats = () => {
       // STEP 2: If online, fetch fresh data in BACKGROUND and update cache
       if (navigator.onLine) {
         try {
+          const ownershipFilter = effectiveUserIds
+            .flatMap((id) => [`user_id.eq.${id}`, `owner_id.eq.${id}`, `created_by.eq.${id}`])
+            .join(',');
+
           const { data: onlineBeats, error: beatsError } = await supabase
             .from('beats')
             .select('*')
             .eq('is_active', true)
-            .in('user_id', effectiveUserIds)
+            .or(ownershipFilter)
             .order('created_at', { ascending: true });
 
           if (!beatsError && onlineBeats) {
