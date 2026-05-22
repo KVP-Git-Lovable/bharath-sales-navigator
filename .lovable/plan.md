@@ -1,74 +1,86 @@
-# Sardar Restore — Phase 1: Audit & Dry-Run (READ-ONLY)
+# Sardar Order Items — DB Verification & Backfill Plan
 
-This phase ships **only** a read-only audit. No DB writes. No reassignments. No inserts. No updates. No calls to existing `restore-sardar` / `restore-sardar-orders` functions.
+## What I checked
 
-Approving "Implement" builds Phase 1 only. Phases 2–4 require a separate, explicit approval with the specific row ids to act on.
+**CSV file** (`Supabase_Snippet_Per-User_Order_Summary.csv`, 632 rows):
+- 480 distinct `order_id` values, all under user `6220fc85…fb0` (Sardar)
+- 620 rows carry product details, 12 rows have `product=null / kg=null` (i.e. 12 orders are header-only even in the CSV)
+- 21 distinct product names, total qty ≈ **1,323,613 g (≈ 1,323.6 kg)**, total item value ≈ **₹406,220**
 
-## What gets built
+**DB current state for Sardar (user `6220fc85…fb0`)**:
+- `orders` rows: **481** (478 confirmed + 3 cancelled)
+- `orders` with `order_items` rows: **1**  →  **480 orders have zero line items**
+- Spot-checked 10 random CSV order_ids → **all 10 exist in `orders` as Sardar's orders, all 10 have 0 items**
 
-### 1. New edge function: `sardar-restore-audit`
+So the CSV is the missing line-item source for 480 historic orders.
 
-Path: `supabase/functions/sardar-restore-audit/index.ts`
+## Mismatches found
 
-- Verifies JWT, requires the caller to be a system admin (`public.is_system_admin(auth.uid())`). Non-admins get 403.
-- Accepts `{ mode: "audit" }` only in this phase. Any other mode returns 400 ("apply mode not enabled in phase 1").
-- Reads the 371-row snapshot already hardcoded in the existing `restore-sardar` function (imported as a JSON constant, not executed).
-- For each snapshot row, looks up the live `public.retailers` row by `id` and classifies it into one of:
-  1. `OK_PRESENT_OWNED_BY_SARDAR` — id present, `user_id = SARDAR_ID`, no field drift
-  2. `MISSING` — id not present in DB
-  3. `OWNED_BY_OTHER_USER` — id present, `user_id ≠ SARDAR_ID` (CONFLICT, never auto-fixable)
-  4. `FIELDS_DRIFTED` — id present, owned by Sardar, but one or more snapshot fields differ (name, phone, beat_id, address, lat/lng, gst, etc.)
-  5. `DUPLICATE_BY_PHONE_OR_NAME` — id missing but another retailer with same phone or normalized name exists (CONFLICT, skip)
-- Second pass: for the May 20 / May 21 window, joins `orders` and `visits` against snapshot retailer ids and reports counts per bucket so we can see how many orphan orders/visits would be reconnected by a future restore.
-- Returns a JSON summary (counts per bucket) **and** writes a per-row CSV to `/mnt/documents/sardar_restore_audit_<timestamp>.csv` via the function response (the function returns the CSV body; the caller in step 3 below saves it).
+1. **`orders.total_amount` ≠ Σ `item_total` in CSV** (e.g. order `ae60e434` total=₹3,180 vs CSV sum ₹3,028.56; `3c3ab2fa` total=₹880 vs CSV ₹838.08). The header totals are rounded/different. Plan: **do NOT overwrite `orders.total_amount`** — only insert items. We'll flag the gap but leave the header totals untouched (they're what the user has been seeing in Analytics for ₹).
 
-### 2. Audit log table (no data writes from the function itself)
+2. **CSV product names don't match the `products` master directly** — they map cleanly to **`product_variants`** instead:
 
-Migration adds:
+   | CSV product | Maps to | variant/product id |
+   |---|---|---|
+   | DAKSHIN 250G | variant of DAKSHIN 30G | `9465d743-…` |
+   | ADUKU 250G | variant of ADUKU 20G | `0bc4a82f-…` |
+   | VAYU 250G / VAYU 250 | variant of VAYU 30G ("VAYU 250") | `53b8017d-…` |
+   | ELACHI 250G | variant of ELAICHI 40G | `214f989c-…` |
+   | ELACHI 40G | base product ELAICHI 40G | `b7fbd116-…` |
+   | ELAICHI 40G | base product ELAICHI 40G | `b7fbd116-…` |
+   | ADUKU 20G | base product ADUKU 20G | `7f9e8802-…` |
+   | RL POUCH 250G | base product RL POUCH 250G | `6dbf027a-…` |
+   | DAKSHIN 30G | base product DAKSHIN 30G | `b26b2c73-…` |
+   | Gold 250G | variant of GOLD 40G | `43d7fd45-…` |
+   | GOLD 1KG | variant of GOLD 40G | `5ab5a8e1-…` |
+   | DAKSHIN GOLD (HORECA) | base product | `73fa608c-…` |
+   | DAKSHIN SPL 250 | variant of DAKSHIN 30G | `d9154444-…` |
+   | BLUE 100G | variant of BLUE 20G | `6db0d8e3-…` |
+   | BLUE 250G | variant of BLUE 20G | `43cbda3e-…` |
+   | RL JAR / RL JAR 250G | base product RL JAR 250 | `7b9cf8c9-…` |
+   | ADARAK 250G | variant of ADRAK 40G | `722594f5-…` |
+   | ADARAK 40G | base product ADRAK 40G | `f69e969b-…` |
+   | Yellow 1Kg | variant of YELLOW 20G | `3b0f2ca9-…` |
 
-- `public.sardar_restore_audit_runs` — one row per audit invocation: `id`, `run_at`, `run_by`, `mode`, `summary jsonb`. RLS: only system admins can select/insert.
-- `public.sardar_restore_log` — empty table prepared for Phase 3. Columns: `id`, `run_id`, `retailer_id`, `action` (`insert` | `update_fields` | `skip_conflict` | `noop`), `before jsonb`, `after jsonb`, `actor`, `created_at`. RLS: admin-only. No triggers, no writes in Phase 1.
+   All 21 CSV product names resolve. ✓ Zero unmapped products.
 
-Creating the log table now keeps Phase 3 a pure code change with no schema surprises.
+## Proposed backfill
 
-### 3. Caller script + admin UI entry point
+Insert **620 rows** into `order_items` from the 620 CSV rows that have a product. Field mapping per row:
 
-- Script: `scripts/run-sardar-audit.ts` (invokable via `bun`) — calls the edge function with the current admin session and writes the CSV to `/mnt/documents/sardar_restore_audit_<timestamp>.csv`. Used for the first run so we can hand the CSV back to the user.
-- UI: add a single "Run Sardar restore audit" button on the existing system-admin diagnostics page (no new route). Button:
-  - Calls `sardar-restore-audit` with `mode: "audit"`
-  - Shows the bucket counts in a card
-  - Offers a "Download CSV" link of the per-row report
-  - Explicitly labels: "Read-only. No data is modified."
+| order_items column | Value |
+|---|---|
+| `order_id` | CSV `order_id` |
+| `product_name` | CSV `product_name` (kept as-is for display) |
+| `product_id` | base product id (from mapping above) |
+| `variant_id` | variant id when row is a variant, else NULL |
+| `quantity` | CSV `kg` value (already integer **grams** — matches the one existing Sardar order which also stored grams as integer) |
+| `unit` | `'grams'` |
+| `rate` | `item_total / (kg/1000)` (per-kg price, matches existing convention) |
+| `original_rate` | same as `rate` |
+| `total` | CSV `item_total` |
+| `category` | `''` (column NOT NULL but no category info in CSV — empty string, same as existing legacy rows) |
+| `hsn_code` | `'90230'` (constant across all current products) |
+| `sgst_amount`, `cgst_amount`, `discount_amount` | `0` |
 
-No other UI is added. No "Apply" / "Restore" button anywhere in this phase.
+The 12 CSV rows with `product=null` are skipped (those 12 orders remain header-only — no source data exists for their items).
 
-## Guardrails baked into Phase 1
+After backfill, expected DB state for Sardar:
+- 481 orders, **468 with items** (480 in CSV − 12 null), 13 still header-only (12 from CSV + the 1 pre-existing was already itemised — net 13 header-only).
+- Analytics "Total KG" for Sardar will jump from 5 kg → ~1,323 kg.
 
-- The function **rejects** any `mode` other than `"audit"`.
-- The function does not import or call `restore-sardar` or `restore-sardar-orders`.
-- The function uses the service role only for reads; the only writes it performs are a single row into `sardar_restore_audit_runs` recording that an audit ran.
-- The hardcoded 371-row snapshot is treated as input data, not as a target to upsert.
-- `OWNED_BY_OTHER_USER` and `DUPLICATE_BY_PHONE_OR_NAME` rows are flagged and counted, never written.
+## Safety
 
-## Deliverable to the user after Phase 1 runs
+- All `orders.total_amount` values stay untouched.
+- All `orders` header rows stay untouched (no UPDATE/DELETE on `orders`).
+- Pure INSERT into `order_items` for orders that currently have **zero** items (we'll add a `NOT EXISTS` guard so re-running is idempotent).
+- The 1 pre-existing itemised order is automatically skipped.
 
-1. JSON summary with counts per bucket (snapshot 371 → buckets 1–5) and orphan order/visit counts for May 20–21.
-2. CSV at `/mnt/documents/sardar_restore_audit_<timestamp>.csv` with one row per snapshot retailer: `retailer_id, snapshot_name, snapshot_phone, snapshot_beat_id, current_user_id, current_name, current_phone, bucket, drift_fields, conflict_reason`.
-3. Orphan orders CSV: `/mnt/documents/sardar_orphan_orders_<timestamp>.csv` listing May 20–21 orders whose retailer falls into bucket 2/3/5.
+## Confirm before I execute
 
-The user reviews these two CSVs and, in a separate message, lists the exact retailer ids they authorize for Phase 3.
+Reply **"proceed"** and I'll run the migration that:
+1. Creates a temporary staging table from the CSV (uploaded as VALUES inside the migration).
+2. Inserts 620 `order_items` rows with the mapping above, guarded by `WHERE NOT EXISTS (SELECT 1 FROM order_items WHERE order_id = staging.order_id)`.
+3. Drops the staging table.
 
-## Out of scope for Phase 1 (require separate approval)
-
-- Phase 2: human review of the CSV (no code).
-- Phase 3: `mode=apply` with `allowedIds` / `forceReassignIds`, per-row writes, `sardar_restore_log` population, transactions of 50.
-- Phase 4: post-apply re-audit.
-
-## Technical notes
-
-- Snapshot source: extract the existing 371-row array from `supabase/functions/restore-sardar/index.ts` into `supabase/functions/_shared/sardar-snapshot.ts` so both functions read from one place. The existing `restore-sardar` function keeps working but is not invoked.
-- `SARDAR_ID = 6220fc85-ae7f-4c22-9694-db6c47fe8fb0` (confirmed earlier in this thread).
-- Field-drift comparison ignores `created_at`, `updated_at`, and any column not present in the snapshot.
-- Normalized name match for duplicate detection: lowercased, whitespace-collapsed, punctuation stripped.
-- Phone match: last 10 digits only.
-- Edge function is admin-only and rate-limited to 1 audit per minute per admin to avoid accidental spam.
+Or tell me to change anything (e.g. update `orders.total_amount` to match CSV sums, treat `kg` as kg instead of grams, skip certain products).
