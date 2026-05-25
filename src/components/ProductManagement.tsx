@@ -415,7 +415,25 @@ const [productForm, setProductForm] = useState({
   };
 
   const handleDeleteVariant = async (id: string) => {
-    setDeleteConfirm({ open: true, type: 'variant', id, name: 'this variant' });
+    const variantData = variants.find(v => v.id === id);
+    const variantName = variantData?.variant_name || 'this variant';
+    // Count historical order_items referencing this variant by id OR by name
+    let usageCount = 0;
+    try {
+      const { count: byId } = await supabase
+        .from('order_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('variant_id', id);
+      const { count: byName } = await supabase
+        .from('order_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_name', variantName);
+      usageCount = (byId || 0) + (byName || 0);
+    } catch (e) {
+      console.warn('Variant usage check failed; proceeding with confirmation', e);
+    }
+    setDeleteConfirmText('');
+    setDeleteConfirm({ open: true, type: 'variant', id, name: variantName, usageCount });
   };
 
   const executeDeleteVariant = async (id: string) => {
