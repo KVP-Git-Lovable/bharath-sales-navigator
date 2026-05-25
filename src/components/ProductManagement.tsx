@@ -97,7 +97,9 @@ const ProductManagement = () => {
     type: 'product' | 'category' | 'variant' | 'all-products' | null;
     id: string;
     name: string;
-  }>({ open: false, type: null, id: '', name: '' });
+    usageCount?: number;
+  }>({ open: false, type: null, id: '', name: '', usageCount: 0 });
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ id: '', name: '', description: '' });
@@ -413,7 +415,25 @@ const [productForm, setProductForm] = useState({
   };
 
   const handleDeleteVariant = async (id: string) => {
-    setDeleteConfirm({ open: true, type: 'variant', id, name: 'this variant' });
+    const variantData = variants.find(v => v.id === id);
+    const variantName = variantData?.variant_name || 'this variant';
+    // Count historical order_items referencing this variant by id OR by name
+    let usageCount = 0;
+    try {
+      const { count: byId } = await supabase
+        .from('order_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('variant_id', id);
+      const { count: byName } = await supabase
+        .from('order_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_name', variantName);
+      usageCount = (byId || 0) + (byName || 0);
+    } catch (e) {
+      console.warn('Variant usage check failed; proceeding with confirmation', e);
+    }
+    setDeleteConfirmText('');
+    setDeleteConfirm({ open: true, type: 'variant', id, name: variantName, usageCount });
   };
 
   const executeDeleteVariant = async (id: string) => {
@@ -1507,20 +1527,41 @@ const [productForm, setProductForm] = useState({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ open: false, type: null, id: '', name: '' })}>
+      <AlertDialog open={deleteConfirm.open} onOpenChange={(open) => { if (!open) { setDeleteConfirm({ open: false, type: null, id: '', name: '', usageCount: 0 }); setDeleteConfirmText(''); } }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete <strong>{deleteConfirm.name}</strong>
               {deleteConfirm.type === 'all-products' && ' including all related data (van inventory, schemes, variants)'}.
+              {deleteConfirm.type === 'variant' && (deleteConfirm.usageCount ?? 0) > 0 && (
+                <span className="mt-3 block rounded-md bg-destructive/10 p-3 text-destructive">
+                  This variant is referenced by <strong>{deleteConfirm.usageCount}</strong> historical order line item(s).
+                  Deleting it will not remove the orders, but reports and invoice product links for those orders will be broken.
+                  Type <strong>DELETE</strong> below to confirm.
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteConfirm.type === 'variant' && (deleteConfirm.usageCount ?? 0) > 0 && (
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder='Type DELETE to confirm'
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              autoFocus
+            />
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteConfirm({ open: false, type: null, id: '', name: '' })}>
+            <AlertDialogCancel onClick={() => { setDeleteConfirm({ open: false, type: null, id: '', name: '', usageCount: 0 }); setDeleteConfirmText(''); }}>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleConfirmAction}
+              disabled={deleteConfirm.type === 'variant' && (deleteConfirm.usageCount ?? 0) > 0 && deleteConfirmText !== 'DELETE'}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
