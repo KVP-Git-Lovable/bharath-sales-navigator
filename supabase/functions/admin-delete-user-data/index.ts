@@ -95,9 +95,9 @@ interface TableDef {
 
 const MODULE_TABLES: Record<string, TableDef[]> = {
   orders: [
-    { table: 'orders', column: 'user_id', category: 'Orders' },
-    { table: 'invoices', column: 'created_by', category: 'Orders' },
-    { table: 'packing_lists', column: 'created_by', category: 'Orders' },
+    // HARD DELETE DISABLED for orders/invoices/packing_lists.
+    // These are financial records — must never be wiped by admin cleanup.
+    // Use explicit cancellation/void flows instead.
   ],
   retailers: [
     { table: 'retailers', column: 'user_id', category: 'Retailers' },
@@ -105,7 +105,8 @@ const MODULE_TABLES: Record<string, TableDef[]> = {
     { table: 'retailer_feedback', column: 'user_id', category: 'Retailers' },
   ],
   beats: [
-    { table: 'beats', column: 'created_by', category: 'Beats' },
+    // HARD DELETE DISABLED for beats. Beats are shared business data
+    // referenced by retailers/visits/orders. Use soft-delete + recycle_bin.
     { table: 'beat_plans', column: 'user_id', category: 'Beats' },
     { table: 'beat_allowances', column: 'user_id', category: 'Beats' },
   ],
