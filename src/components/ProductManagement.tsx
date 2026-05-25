@@ -97,7 +97,9 @@ const ProductManagement = () => {
     type: 'product' | 'category' | 'variant' | 'all-products' | null;
     id: string;
     name: string;
-  }>({ open: false, type: null, id: '', name: '' });
+    usageCount?: number;
+  }>({ open: false, type: null, id: '', name: '', usageCount: 0 });
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // Form states
   const [categoryForm, setCategoryForm] = useState({ id: '', name: '', description: '' });
