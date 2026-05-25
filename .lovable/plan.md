@@ -1,61 +1,61 @@
-# Restore Mokshith's Orders + Order Items from Backup CSVs
+# Restore Missing Product Variants
 
-Two CSVs uploaded:
-- **CSV #3** — 23 order headers (id, retailer, beat, date, totals)
-- **CSV #4** — 29 line items across the same 23 orders, with product_name, category, unit, quantity, rate, discounts, CGST/SGST, item_total
+## Root cause (verified)
 
-This is enough to restore both `orders` and `order_items` (header + line items). One order (`88f27316...` Meharaj Mini Market, 2026-05-14) has all-null line fields = a zero-value "visit-only" order → restore header only, no item.
+- Backup CSV has **31** variants; DB has **26**. Exactly **5** rows are missing.
+- The 5 missing variants match 1-to-1 with the 5 "missing product" names reported by the Mokshith order restore (`DAKSHIN 250G`, `ADUKU 250G`, `ELACHI 250G`, `VAYU 250G`, `BLUE 100G`).
+- No backend/cron/trigger/edge-function deletes variants. Only three code paths can delete from `product_variants`:
+  1. `executeDeleteVariant(id)` — single-row delete from Product Management UI
+  2. `executeDeleteAllProducts()` — nukes everything (would have removed all 26)
+  3. `migrateProducts()` in `productMigration.ts` — same, nukes everything
+- Since only 5 rows are gone (not 26 or 0), this was **manual per-row deletion via the UI**, likely while pruning what looked like duplicates against the base products (`ADUKU 20G`, `DAKSHIN 30G`, `VAYU 30G`, `BLUE 20G`, `ELAICHI 40G`). No automatic deletion happened.
 
-## What can be restored
+## Step 1 — Restore the 5 missing variants (idempotent INSERT)
 
-| Table | Field | Source |
-|---|---|---|
-| `orders.id` | order_id | CSV |
-| `orders.user_id` | Mokshith | CSV |
-| `orders.retailer_id` | lookup by `name` + `user_id=Mokshith` | DB join |
-| `orders.retailer_name` | retailer_name | CSV |
-| `orders.total_amount` / `subtotal` | sum of item_total per order | CSV #4 (matches CSV #3 totals) |
-| `orders.order_date` / `created_at` / `updated_at` | order_date | CSV |
-| `orders.status` | `'confirmed'` | fixed |
-| `orders.sales_channel` | `'field'` | fixed |
-| `order_items.order_id` | order_id | CSV #4 |
-| `order_items.product_name`, `category`, `unit`, `quantity`, `rate`, `discount_amount`, `cgst_amount`, `sgst_amount`, `total` | from CSV #4 | direct |
-| `order_items.product_id` / `variant_id` | resolved by name match on `products.name` / `product_variants` if findable; else NULL | best-effort lookup |
+Insert (via the database insert tool) only the rows whose `id` does not already exist in `product_variants`, using the exact values from the backup CSV so all existing references (orders, order_items.variant_id if any, schemes) remain intact:
 
-## What is NOT in the backup (will be left default/NULL)
+```text
+0bc4a82f-4ef1-4ae6-b8af-a413470a3fdf  ADUKU 250G   Adu250   342.86  product_id 7f9e8802…  hsn 90230
+214f989c-3f6c-4f4e-9576-575d746834b0  ELACHI 250G  Ela250   314.29  product_id b7fbd116…  hsn 90230
+9465d743-501a-4871-9d41-6cc248cfe211  DAKSHIN 250G Dak250   209.52  product_id b26b2c73…  hsn 90230
+53b8017d-955d-4bb9-899b-01b045baaffb  VAYU 250     vay250   209.52  product_id 2f5fc10b…  hsn (none)
+6db0d8e3-dce3-4fca-88a4-cae6236ded09  BLUE 100G    Blue100  333.33  product_id 44aec890…  hsn 90230
+```
 
-- payment method, payment proof, credit details
-- invoices, packing lists, delivery info (`delivery_status` stays `'pending'`)
-- HSN code, original_rate
-- visit_id (orders won't be linked to a visit record)
+Use `INSERT ... ON CONFLICT (id) DO NOTHING` so re-running is safe. `is_active=true`, `stock_quantity=0`, discounts/focused fields default as in the CSV.
 
-## Execution Plan
+## Step 2 — Backfill `order_items.product_id` for the restored orders
 
-### Step 1 — Stage CSVs
-Copy both CSVs into `supabase/functions/restore-mokshith-orders/` as JSON (`orders.json`, `items.json`).
+The restore of Mokshith's orders left `product_id = NULL` for line items where these 5 names didn't resolve. After Step 1, update those rows:
 
-### Step 2 — Edge function: `restore-mokshith-orders`
-Service-role function that:
-1. Loads JSON payloads.
-2. Builds a `retailer_name → retailer_id` map by querying `retailers` for Mokshith.
-3. Builds a `product_name → {product_id, hsn_code}` map by querying `products` (case-insensitive).
-4. Inserts orders with `upsert({onConflict: 'id'})` — idempotent, safe to re-run.
-5. Inserts order_items with `upsert({onConflict: 'id'})` using deterministic UUIDs derived from `order_id + product_name + idx` so re-runs don't duplicate.
-6. Returns a JSON report: counts inserted, retailer/product names not matched, per-order totals reconciled vs CSV #3.
+```sql
+UPDATE order_items oi
+SET product_id = pv.product_id, hsn_code = COALESCE(oi.hsn_code, '90230')
+FROM product_variants pv
+WHERE oi.product_id IS NULL
+  AND lower(trim(oi.product_name)) = lower(trim(pv.variant_name))
+  AND oi.order_id IN ( /* the 23 restored Mokshith order ids */ );
+```
 
-### Step 3 — Invoke once and verify
-- Run function.
-- Read back: `SELECT COUNT(*) FROM orders WHERE user_id = Mokshith` (expect 23) and `SELECT COUNT(*) FROM order_items WHERE order_id IN (...)` (expect 29).
-- Spot-check 2–3 orders end-to-end in UI (`/visits/retailers` → order detail).
+This keeps the historical line items pointing at real catalog rows.
 
-### Step 4 — Audit
-Insert a `destructive_audit_log` entry (table already exists from prior hardening) recording: source = "user-uploaded backup CSVs #3 + #4", 23 orders + 29 items restored, actor = Mokshith profile, timestamp.
+## Step 3 — Guard against silent variant deletion
 
-### Step 5 — Tell user about gaps
-Surface clearly:
-- Payment / invoice / delivery info is gone (not in backup).
-- Any product names that didn't match `products` table → `product_id` left NULL (item still shows correctly in reports because product_name/rate/qty/total are stored on the row).
+Update `src/components/ProductManagement.tsx` so the per-variant Delete button routes through `useDeleteConfirm` (already used elsewhere in the project) with:
+- A typed confirmation ("DELETE") for variants that have any historical `order_items` referencing them
+- An impact line: "This variant is used in N past orders. Deleting it will not remove the orders but will break catalog linkage."
+- Keep the "Delete All Products" button gated behind the same typed confirmation it already uses.
 
-## Open question
+No schema change — only a UI-level confirmation tightening. This is the smallest, safest change that prevents a repeat without removing admin capability.
 
-Confirm and I'll switch to build mode to implement Steps 1–4.
+## Step 4 — Verify
+
+- `SELECT count(*) FROM product_variants` → expect **31**
+- `SELECT count(*) FROM order_items WHERE product_id IS NULL AND order_id IN (…23 ids…)` → expect **0**
+- Open Product Management page → 5 variants reappear under their parent products
+- Open one of Mokshith's restored orders → line items show product link, not just text
+
+## Out of scope
+
+- No edge function changes, no migrations, no RLS changes (none are needed — there is no automated deleter).
+- The unrelated `productMigration.ts` "wipe everything" utility is left alone; only the per-variant UI delete is hardened.
