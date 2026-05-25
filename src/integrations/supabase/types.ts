@@ -3017,6 +3017,42 @@ export type Database = {
         }
         Relationships: []
       }
+      destructive_audit_log: {
+        Row: {
+          app_user: string | null
+          application_name: string | null
+          db_user: string
+          id: string
+          occurred_at: string
+          row_data: Json
+          row_pk: string
+          table_name: string
+          txid: number
+        }
+        Insert: {
+          app_user?: string | null
+          application_name?: string | null
+          db_user?: string
+          id?: string
+          occurred_at?: string
+          row_data: Json
+          row_pk: string
+          table_name: string
+          txid?: number
+        }
+        Update: {
+          app_user?: string | null
+          application_name?: string | null
+          db_user?: string
+          id?: string
+          occurred_at?: string
+          row_data?: Json
+          row_pk?: string
+          table_name?: string
+          txid?: number
+        }
+        Relationships: []
+      }
       device_battery_logs: {
         Row: {
           battery_level: number | null
