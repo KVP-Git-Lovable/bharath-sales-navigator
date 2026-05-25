@@ -1,113 +1,92 @@
+## Forensic verification — what the DB actually says
 
-## Diagnosis (verified against live DB)
+Confirmed via direct DB inspection for Mokshith (`73044cad-2c19-4a47-89f1-6a755adc3362`):
 
-The app is **rendering correctly**. The problem is data, not code.
+| Check | Result | Implication |
+|---|---|---|
+| `recycle_bin` rows for Mokshith | **1 beat only** (2026-05-14) | Mass archive via admin flow did **not** happen |
+| `permanent_deletion_log` rows for Mokshith | **0** | No bin-clear event |
+| `beats.owner_id → profiles.id` FK | **ON DELETE CASCADE — CONFIRMED** | Profile delete silently wipes ALL his beats |
+| Other tables CASCADE from `profiles` | Only `beats`, `hierarchy_target_allocations`, `hierarchy_targets`, `petty_cash_*`, `pm_*`. **NOT** `retailers`, `visits`, `orders` | Profile cascade explains beats, but not orders |
+| Mokshith profile row | Present. `created_at = 2026-05-02`, `updated_at = 2026-05-22 06:36:54` | Profile was touched/recreated on May 22 |
+| Retailers for Mokshith | **654 active**, `last_update = 2026-05-22 06:55` | Admin-delete-user-data did **not** run (it would wipe retailers too) |
+| Visits | **1991** intact | Same — confirms no admin user wipe |
+| `beat_audit_log` rows for Mokshith | **0** | Audit unusable: `beat_id` column is `UUID`, app uses string IDs → silent insert failures |
 
-Live `beats` table, filtered by Mokshith's id (`73044cad-2c19-4a47-89f1-6a755adc3362`) on `user_id` / `owner_id` / `created_by`:
+## Conclusion — two separate root causes, not one
 
-```
-total rows: 1
-- beat_id: beat_1761221118299_esqwetbi8  name: Testbeat  is_active: FALSE
-```
+### Cause A — Beats wipe = profile CASCADE
+- Profile was deleted and recreated around `2026-05-22 06:36`.
+- `beats.owner_id ON DELETE CASCADE` silently removed all 25 beats with zero audit trail and zero recycle_bin entry.
+- Retailers, visits, and other Mokshith data survived because they don't cascade from `profiles`.
+- This is the proven path.
 
-Yet `retailers` for Mokshith = **654 rows**, referencing **25 distinct beat_ids** (e.g. `beat_1765167092097_d46zfr3ie` = 68 retailers, `beat_1765248776015_eu5r3jewe` = 57, …). Those 25 parent beat rows are **missing from `public.beats`**.
+### Cause B — Orders wipe = different mechanism (not admin-delete-user-data)
+- Admin-delete-user-data is ruled out: retailers and visits would also be gone, they aren't.
+- Orders have no CASCADE from profiles, so profile recreation didn't do it.
+- Remaining suspects, in priority order:
+  1. RLS `DELETE` policy `Users can delete own data` on `orders` (user_id = auth.uid()) — a client call or script could have triggered it.
+  2. `src/utils/orderCleanup.ts` cleanup flow.
+  3. A manual SQL/dashboard delete.
+- This needs a targeted log review before any restore.
 
-The earlier migration `supabase/migrations/20260522065420_*.sql` had a 25-row `INSERT … ON CONFLICT (beat_id) DO UPDATE`. In the live DB only Testbeat reflects the migration (its `owner_id`/`user_id`/`owner_name` match the migration values). The other 24 rows are **not in `beats`, not in `recycle_bin`, not soft-deleted**. The previous AI's claim that "26 beats were restored" was incorrect — those beats never landed in the DB.
+## Safest plan (do in this exact order)
 
-So when Mokshith opens My Beats:
-- `BeatPlanning.tsx` / `MyBeats.tsx` query `beats` with `is_active=true` and the OR filter → returns 0 from DB.
-- Anything he sees in the UI is from his local IndexedDB cache (a recently-created beat he made himself).
+### 1. Stop the proven destructive path first
+- Migration: change `beats.owner_id` from `ON DELETE CASCADE` to **`ON DELETE SET NULL`**.
+- This alone prevents the same wipe from happening again the next time a profile is recreated.
+- Review every other `ON DELETE CASCADE` from `profiles` listed above and decide which should also become `SET NULL` (especially `hierarchy_*` and `petty_cash_*`).
 
-No frontend fix can make beats appear that don't exist in the database.
+### 2. Lock down user/profile recreation flow
+- Audit any admin path that deletes + re-inserts a `profiles` row (instead of updating in place).
+- Replace delete+insert with `UPDATE`. Profile delete must be treated as a destructive operation behind explicit confirmation.
 
-## What to do
+### 3. Harden the orders deletion surface
+- Tighten the `Users can delete own data` RLS policy on `orders` — restrict to specific cancellation flows or remove client-side delete entirely; require server-side cancellation only.
+- Review `orderCleanup.ts` and any edge function that can `DELETE FROM orders`. Convert to soft delete (`deleted_at`, `deleted_by`) or move behind explicit admin action with logging.
 
-Single migration that re-inserts the 25 historical beats with the exact `beat_id` values the 654 retailers already reference, so existing retailer → beat relationships start resolving.
+### 4. Fix `admin-delete-user-data` even though it didn't fire this time
+- Stop hard-deleting `beats`; route through soft-delete + `recycle_bin`.
+- Same for `orders`.
+- Add explicit confirmation and structured logging.
 
-### Step 1 — New migration `restore_mokshith_beats_v2.sql`
+### 5. Fix audit so this is never invisible again
+- Migrate `beat_audit_log.beat_id` from `UUID` to `TEXT` so string beat IDs (`beat_177...`) actually log.
+- Add a DB-level `AFTER DELETE` trigger on `beats` and `orders` that writes to an audit table with `current_user`, `txid_current()`, `current_setting('application_name')`, timestamp, and full row payload — this captures CASCADE deletes too.
 
-Re-run the same 25-row UPSERT, but in a way we can verify:
+### 6. Preserve current evidence before any restore
+- Snapshot current state of: Mokshith's retailers (beat_id references), visits, profile row, and any related rows.
+- Keep a record of the 25 beat_ids the retailers point to.
 
-```sql
-DO $$
-DECLARE
-  before_count int;
-  after_count int;
-BEGIN
-  SELECT count(*) INTO before_count FROM public.beats
-   WHERE user_id  = '73044cad-2c19-4a47-89f1-6a755adc3362'
-      OR owner_id = '73044cad-2c19-4a47-89f1-6a755adc3362'
-      OR created_by = '73044cad-2c19-4a47-89f1-6a755adc3362';
+### 7. Restore beats safely
+- Idempotent UPSERT of the 25 beats using the exact `beat_id` values still referenced by retailers.
+- Set `owner_id = Mokshith profile id` — now safe because cascade is removed.
+- Verify count holds after running admin and profile maintenance flows.
 
-  INSERT INTO public.beats
-    (id, beat_id, beat_name, category, travel_allowance, average_km,
-     average_time_minutes, is_active, created_by, created_at, updated_at,
-     territory_id, distributor_id, owner_id, owner_name, user_id)
-  VALUES
-    -- 25 rows copied verbatim from 20260522065420_*.sql --
-  ON CONFLICT (beat_id) DO UPDATE SET
-    beat_name      = EXCLUDED.beat_name,
-    category       = EXCLUDED.category,
-    is_active      = EXCLUDED.is_active,
-    owner_id       = EXCLUDED.owner_id,
-    owner_name     = EXCLUDED.owner_name,
-    user_id        = EXCLUDED.user_id,
-    updated_at     = now();
+### 8. Restore orders — only from a real source of truth
+- Orders have no `beat_id` column, so beat linkage is indirect via `retailers.beat_id`.
+- Search for recoverable order data in:
+  - any `recycle_bin` / archive table
+  - existing restore edge functions (`restore-sardar-orders` is the same pattern used previously)
+  - any export, prior migration payload, or backup snapshot
+  - `order_items` rows still pointing at missing `orders.id`
+- Restore each order with original `id`, `user_id = Mokshith`, original `retailer_id`, `order_date`, status, amounts. Then restore `order_items`.
+- If no source of truth exists, the orders cannot be invented — confirm this with the user before declaring done.
 
-  SELECT count(*) INTO after_count FROM public.beats
-   WHERE user_id  = '73044cad-2c19-4a47-89f1-6a755adc3362'
-      OR owner_id = '73044cad-2c19-4a47-89f1-6a755adc3362'
-      OR created_by = '73044cad-2c19-4a47-89f1-6a755adc3362';
+### 9. Re-link mapping
+- Orders are linked to beats only through `orders.retailer_id → retailers.beat_id`.
+- After step 7 + 8, this mapping resolves automatically. No schema change to `orders` needed.
 
-  RAISE NOTICE 'Mokshith beats before=%, after=%', before_count, after_count;
-  IF after_count < 25 THEN
-    RAISE EXCEPTION 'Beat restore landed only % rows — aborting', after_count;
-  END IF;
-END $$;
-```
-
-The `RAISE EXCEPTION` guard guarantees we either land ≥25 rows or the migration visibly fails (so we can debug instead of silently ending up with 1 row again).
-
-### Step 2 — Verify in DB
-
-After migration applies, run:
-
-```sql
-SELECT count(*) FROM beats
- WHERE (user_id='73044cad-…' OR owner_id='73044cad-…' OR created_by='73044cad-…')
-   AND is_active = true;
-```
-Expect ≥ 24 (one of the 25, `Karkala 18`, is `is_active=false` per the source data; Testbeat is also false).
-
-### Step 3 — Refresh Mokshith's device
-
-No APK rebuild. After the migration runs:
-1. Mokshith opens **My Beat** while online → existing logic in `MyBeats.tsx` L322–342 overwrites `STORES.BEATS` cache with the freshly-restored list.
-2. Then **My Visit → All Beats → Journey Plan** uses the same cache + the patched OR filter from the prior fix.
-
-### Step 4 — Sanity-check the orphaned retailer references
-
-Confirm zero retailer `beat_id`s remain orphaned after the restore:
-
-```sql
-SELECT r.beat_id, count(*)
-  FROM retailers r
-  LEFT JOIN beats b ON b.beat_id = r.beat_id
- WHERE r.user_id = '73044cad-…'
-   AND r.beat_id NOT IN ('','unassigned')
-   AND b.beat_id IS NULL
- GROUP BY r.beat_id;
-```
-Two known stragglers (`karkala9`, `karkala-9`, `beat_1779342521597_v77drd3p3`) are not in the restore set — flag those to you separately so you can decide whether to re-map them to existing beats or leave as-is.
+### 10. Post-restore validation
+- Reconfirm beat count after running admin tools and profile updates.
+- Reconfirm Mokshith's orders are visible in UI and DB.
 
 ## Technical notes
+- The `supabase/config.toml` `project_id` differs from the connected project ref — flagging so the hardening migration is applied to the correct deployment.
+- `restoreFromRecycleBin` already handles beats with string `beat_id` correctly, so soft-delete + restore via `recycle_bin` is the right pattern for future delete flows.
 
-- No code changes are required. The earlier fixes to `MyBeats.tsx`, `BeatPlanning.tsx`, and `useMasterDataCache.ts` (filter on `user_id OR owner_id OR created_by`) are correct and stay as-is.
-- The migration is idempotent (UPSERT) and guarded, so re-running is safe.
-- No `auth.users` or other reserved-schema changes.
-
-## Out of scope
-
-- Rebuilding APK (not needed — web bundle is loaded remotely).
-- Touching `retailers` (already restored, 654 rows present).
-- The 3 orphan `beat_id`s above — surfaced for your decision, not auto-fixed.
+## What I will do once you approve
+1. Migration: change `beats.owner_id` to `ON DELETE SET NULL` + audit hardening (text `beat_id`, trigger-based delete audit on `beats` and `orders`).
+2. Patch `admin-delete-user-data` to remove hard deletes on `beats` and `orders`.
+3. Tighten the orders DELETE RLS policy and orderCleanup path.
+4. Then re-restore the 25 beats and investigate the best source for restoring Mokshith's orders.
