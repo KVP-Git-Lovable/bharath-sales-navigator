@@ -1,0 +1,186 @@
+[
+  {
+    "id": "93d39a01-13ff-4a7c-a334-a0d2dd1ae03c",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "SRI LAKSHMI GANESH",
+    "beat_name": "Elinje",
+    "created_at": "2026-05-16 06:22:15.455+00",
+    "total_amount": 295.24
+  },
+  {
+    "id": "acae145d-c2c9-4f90-9619-5661823f546e",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "AYODHYA PURE VEG",
+    "beat_name": "Bajagoli-kuduremukha",
+    "created_at": "2026-05-15 06:29:51.76+00",
+    "total_amount": 1047.6
+  },
+  {
+    "id": "88f27316-5019-4a03-adbc-ff8b46869db6",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Meharaj Mini Market",
+    "beat_name": "Hejamadi",
+    "created_at": "2026-05-14 05:55:54.725+00",
+    "total_amount": 0.0
+  },
+  {
+    "id": "50e570f6-07e6-4cf0-952d-7f62e0672ed9",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Lakshmi Gen Stores - peroor",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 07:48:08.794+00",
+    "total_amount": 266.66
+  },
+  {
+    "id": "67aebc50-035f-42e6-b7cc-b32ee47a8a1b",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "UDAYA STORE",
+    "beat_name": "Kodyadka",
+    "created_at": "2026-05-13 07:25:17.704+00",
+    "total_amount": 68.57
+  },
+  {
+    "id": "1a810be0-75cf-4c36-a647-822e93c6e8b1",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "SHANTERI GENERAL STORE - Sacheripete",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 06:56:04.943+00",
+    "total_amount": 1104.76
+  },
+  {
+    "id": "1f2468be-58cb-4501-b28d-d5b953f8f7cb",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "DHURGA Stores - Kadandhale ",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 06:41:07.584+00",
+    "total_amount": 209.52
+  },
+  {
+    "id": "0416846d-f181-4bcc-91b1-e100afc7584d",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Prajwal Gen Stores - Stores",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 06:29:26.562+00",
+    "total_amount": 209.52
+  },
+  {
+    "id": "13027e50-5f2e-4608-8a7f-a48d03832527",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "SKANDADAYA GEN STORES - Kadandhale ",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 06:20:17.546+00",
+    "total_amount": 314.29
+  },
+  {
+    "id": "9937586c-3b9a-4a8e-bbfb-e12ce4b255bd",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Sri Ganesh Gen Stores - Paladka",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 05:46:53.807+00",
+    "total_amount": 499.99
+  },
+  {
+    "id": "605343a0-c11c-44c1-aae8-896ae7ad3a36",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "D Souza Gen Stores - Maavinakatte",
+    "beat_name": "Karkala2",
+    "created_at": "2026-05-13 05:26:43.123+00",
+    "total_amount": 68.57
+  },
+  {
+    "id": "16fa88b0-92e8-42a1-bcff-a9013fde2081",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Katuvana Store",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 10:10:53.893+00",
+    "total_amount": 590.48
+  },
+  {
+    "id": "fd2e5abd-89bc-4582-a7de-203b901e876a",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "GANGA STORE",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 06:54:22.453+00",
+    "total_amount": 2514.24
+  },
+  {
+    "id": "d87dade1-8a1d-410b-b230-81e1e37fab46",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Jyothi Stores",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 06:39:18.716+00",
+    "total_amount": 419.04
+  },
+  {
+    "id": "819975ad-148e-49db-8181-45d31d5d1552",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "SRI GURUPRASAD COLD & GENERAL STORE",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 06:18:24.66+00",
+    "total_amount": 209.52
+  },
+  {
+    "id": "32c8bf36-1817-4d45-a92f-dacf0b4da52f",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Mukyaprana canteen Moodabidre",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 05:50:36.88+00",
+    "total_amount": 1085.7
+  },
+  {
+    "id": "e1d9e174-2efb-4665-bde7-5e37a0f40253",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "BHRAMHASHREE NARAYANEE GENERAL STORE",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 05:40:07.938+00",
+    "total_amount": 838.08
+  },
+  {
+    "id": "099d1a77-09a0-49a4-98cb-848759ab014c",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "VISHWAS GENERAL & PROVISION STORE",
+    "beat_name": "Moodabidre city",
+    "created_at": "2026-05-12 05:11:52.77+00",
+    "total_amount": 209.52
+  },
+  {
+    "id": "526b21a3-aabb-430c-9f62-9814e715a984",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "KUDLA BAKERY",
+    "beat_name": "Kaikamba-Mullarpatna",
+    "created_at": "2026-05-11 09:36:04.827+00",
+    "total_amount": 419.04
+  },
+  {
+    "id": "d9e01424-2376-4d06-9dc3-2128e8371559",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Ideal Rakshitha Chicken Stall & General Store",
+    "beat_name": "Kaikamba-Mullarpatna",
+    "created_at": "2026-05-11 08:08:40.344+00",
+    "total_amount": 137.14
+  },
+  {
+    "id": "dd868855-bff8-4d33-8450-d17bcdb3d0a5",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "IBRAHIM GENERAL STORE",
+    "beat_name": "Kaikamba-Mullarpatna",
+    "created_at": "2026-05-11 07:25:31.544+00",
+    "total_amount": 137.14
+  },
+  {
+    "id": "0011f646-59b7-436b-8796-1e125aa145d4",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Shrinidi Gen store ",
+    "beat_name": "Kaikamba-Mullarpatna",
+    "created_at": "2026-05-11 07:20:13.388+00",
+    "total_amount": 419.04
+  },
+  {
+    "id": "d6013535-e4b1-4741-83bc-854e79f999a1",
+    "user_id": "73044cad-2c19-4a47-89f1-6a755adc3362",
+    "retailer_name": "Shrinidi Gen store ",
+    "beat_name": "Kaikamba-Mullarpatna",
+    "created_at": "2026-05-11 06:50:01.696+00",
+    "total_amount": 321.9
+  }
+]
