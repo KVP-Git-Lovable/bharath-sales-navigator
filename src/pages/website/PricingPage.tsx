@@ -456,7 +456,7 @@ export const PricingPage = () => {
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold">₹5,000</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-muted-foreground">/Pack</span>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
                 For dedicated, high-volume WhatsApp communication.
@@ -475,7 +475,7 @@ export const PricingPage = () => {
                 ))}
               </ul>
               <div className="border-t border-border pt-3 mb-4 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Additional Pack:</span> ₹5,000 per 1,000 messages — stackable & rolls over.
+                <span className="font-semibold text-foreground">Additional Pack:</span> ₹2,000 per 1,000 messages — stackable & rolls over.
               </div>
               <Button
                 className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
@@ -500,7 +500,7 @@ export const PricingPage = () => {
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold">₹5,000</span>
-                <span className="text-muted-foreground">/month</span>
+                <span className="text-muted-foreground">/Pack</span>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
                 A unified social media marketing suite.
