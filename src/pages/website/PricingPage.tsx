@@ -554,13 +554,13 @@ export const PricingPage = () => {
         </div>
       </section>
 
-      {/* Professional Services Section */}
-      <section className="py-16 px-4 bg-muted/30">
+      {/* ============ SUPPORT & SERVICES ============ */}
+      <section id="support" className="py-16 px-4 bg-muted/30">
         <div className="container mx-auto max-w-5xl">
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
-              <Headphones className="w-4 h-4" />
-              Professional Services
+              <LifeBuoy className="w-4 h-4" />
+              Support & Services
             </div>
             <h2 className="text-2xl md:text-3xl font-bold mb-3">Enterprise-Grade Support</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -747,6 +747,12 @@ export const PricingPage = () => {
               <h3 className="font-semibold mb-2">Is there a free trial?</h3>
               <p className="text-muted-foreground text-sm">
                 Yes! All paid plans come with a 14-day free trial. No credit card required. Experience the full power of AI-guided sales.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Do Retailer Portal orders roll over?</h3>
+              <p className="text-muted-foreground text-sm">
+                The base Retailer Portal plan includes 2,000 orders that reset every month — unused orders do not carry forward. <strong>Additional Retailer Portal Packs</strong> (₹5,000 / 1,000 orders) are pack-based and <strong>do roll over</strong> until consumed.
               </p>
             </div>
           </div>
