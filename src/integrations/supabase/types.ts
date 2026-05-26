@@ -1113,6 +1113,8 @@ export type Database = {
           created_at: string | null
           id: string
           metadata: Json | null
+          new_user_id: string | null
+          old_user_id: string | null
           performed_by: string | null
         }
         Insert: {
@@ -1121,6 +1123,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           metadata?: Json | null
+          new_user_id?: string | null
+          old_user_id?: string | null
           performed_by?: string | null
         }
         Update: {
@@ -1129,6 +1133,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           metadata?: Json | null
+          new_user_id?: string | null
+          old_user_id?: string | null
           performed_by?: string | null
         }
         Relationships: []
@@ -3120,21 +3126,21 @@ export type Database = {
       }
       distributor_beat_mappings: {
         Row: {
-          beat_id: string
+          beat_id: string | null
           created_at: string
           created_by: string | null
           distributor_id: string
           id: string
         }
         Insert: {
-          beat_id: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           distributor_id: string
           id?: string
         }
         Update: {
-          beat_id?: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           distributor_id?: string
@@ -15719,7 +15725,7 @@ export type Database = {
       }
       user_business_plan_territory_beats: {
         Row: {
-          beat_id: string
+          beat_id: string | null
           beat_name: string
           business_plan_id: string
           created_at: string
@@ -15730,7 +15736,7 @@ export type Database = {
           territory_id: string
         }
         Insert: {
-          beat_id: string
+          beat_id?: string | null
           beat_name: string
           business_plan_id: string
           created_at?: string
@@ -15741,7 +15747,7 @@ export type Database = {
           territory_id: string
         }
         Update: {
-          beat_id?: string
+          beat_id?: string | null
           beat_name?: string
           business_plan_id?: string
           created_at?: string
@@ -16472,7 +16478,7 @@ export type Database = {
       van_beat_assignments: {
         Row: {
           assigned_date: string
-          beat_id: string
+          beat_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -16482,7 +16488,7 @@ export type Database = {
         }
         Insert: {
           assigned_date?: string
-          beat_id: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -16492,7 +16498,7 @@ export type Database = {
         }
         Update: {
           assigned_date?: string
-          beat_id?: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
