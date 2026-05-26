@@ -464,7 +464,7 @@ export const PricingPage = () => {
               <ul className="space-y-3 mb-6 flex-grow">
                 {[
                   "Unlimited campaigns",
-                  "2,500 messages / month",
+                  "2,500 messages included",
                   "Template & broadcast management",
                   "Delivery & engagement analytics",
                 ].map((f, i) => (
