@@ -1,61 +1,83 @@
-# Restore Missing Product Variants
+# Final plan — Beats safety, restore & audit
 
-## Root cause (verified)
+## What we already confirmed
 
-- Backup CSV has **31** variants; DB has **26**. Exactly **5** rows are missing.
-- The 5 missing variants match 1-to-1 with the 5 "missing product" names reported by the Mokshith order restore (`DAKSHIN 250G`, `ADUKU 250G`, `ELACHI 250G`, `VAYU 250G`, `BLUE 100G`).
-- No backend/cron/trigger/edge-function deletes variants. Only three code paths can delete from `product_variants`:
-  1. `executeDeleteVariant(id)` — single-row delete from Product Management UI
-  2. `executeDeleteAllProducts()` — nukes everything (would have removed all 26)
-  3. `migrateProducts()` in `productMigration.ts` — same, nukes everything
-- Since only 5 rows are gone (not 26 or 0), this was **manual per-row deletion via the UI**, likely while pruning what looked like duplicates against the base products (`ADUKU 20G`, `DAKSHIN 30G`, `VAYU 30G`, `BLUE 20G`, `ELAICHI 40G`). No automatic deletion happened.
+- Mokshith currently has **0 active beats**.
+- The destructive audit trigger captured the event: **25 beats deleted in one transaction on 2026-05-26 05:37:45 UTC**, with `application_name = supabase/dashboard`, `db_user = postgres`, `app_user = NULL`.
+- This was **not** the auto-beat-plan feature. It was a destructive action from the Supabase dashboard / SQL side, outside the app UI.
+- `beats.owner_id → profiles.id` is already `ON DELETE SET NULL` (good), but several beat-linked tables (`distributor_beat_mappings`, `van_beat_assignments`, `user_business_plan_territory_beats`) reference `beats.id` as `ON DELETE CASCADE` — so if a `beats` row is hard-deleted, those mappings vanish silently.
+- The in-app `beat_audit_log` schema is missing `old_user_id` and `new_user_id`, so the app's audit writes/reads are partially broken.
 
-## Step 1 — Restore the 5 missing variants (idempotent INSERT)
+Your 7-point checklist is correct. The plan below covers all of them as one coherent fix.
 
-Insert (via the database insert tool) only the rows whose `id` does not already exist in `product_variants`, using the exact values from the backup CSV so all existing references (orders, order_items.variant_id if any, schemes) remain intact:
+## Plan
 
-```text
-0bc4a82f-4ef1-4ae6-b8af-a413470a3fdf  ADUKU 250G   Adu250   342.86  product_id 7f9e8802…  hsn 90230
-214f989c-3f6c-4f4e-9576-575d746834b0  ELACHI 250G  Ela250   314.29  product_id b7fbd116…  hsn 90230
-9465d743-501a-4871-9d41-6cc248cfe211  DAKSHIN 250G Dak250   209.52  product_id b26b2c73…  hsn 90230
-53b8017d-955d-4bb9-899b-01b045baaffb  VAYU 250     vay250   209.52  product_id 2f5fc10b…  hsn (none)
-6db0d8e3-dce3-4fca-88a4-cae6236ded09  BLUE 100G    Blue100  333.33  product_id 44aec890…  hsn 90230
-```
+### 1. Restore Mokshith's beats with original IDs (idempotent)
+- Re-insert the 25 beats from the previous restore migration values using `ON CONFLICT (beat_id) DO UPDATE`, preserving original `beat_id`s so existing `retailers.beat_id`, `beat_plans.beat_id`, `beat_allowances.beat_id`, `orders.beat_id` references stay intact.
+- Mark all restored beats `is_active = true`.
 
-Use `INSERT ... ON CONFLICT (id) DO NOTHING` so re-running is safe. `is_active=true`, `stock_quantity=0`, discounts/focused fields default as in the CSV.
+### 2. Backfill retailer & plan mappings
+- For any `retailers` rows that lost `beat_id` linkage during the deletion window, re-link them by `beat_name` where unambiguous; leave the rest as unassigned with a report.
+- Keep `beat_plans` and `beat_allowances` rows that already exist (they were not cascade-deleted because they don't FK to `beats.id`).
 
-## Step 2 — Backfill `order_items.product_id` for the restored orders
+### 3. Replace CASCADE with SET NULL on beat-linked tables
+- Change `distributor_beat_mappings.beat_id`, `van_beat_assignments.beat_id`, `user_business_plan_territory_beats.beat_id`, and any other `REFERENCES beats(id) ON DELETE CASCADE` to `ON DELETE SET NULL`.
+- This guarantees a future beat removal can never silently wipe distributor/van/territory mappings.
 
-The restore of Mokshith's orders left `product_id = NULL` for line items where these 5 names didn't resolve. After Step 1, update those rows:
+### 4. Fix the beat audit log schema
+- Add the missing columns the app already writes/reads: `old_user_id uuid`, `new_user_id uuid`.
+- Keep existing rows; new fields nullable.
+- After the migration, the `BeatAuditTimeline` component, `MyBeats`, `BeatDetail`, and `BeatTransferDialog` writes will work end-to-end without the `as any` cast hiding mismatches.
 
-```sql
-UPDATE order_items oi
-SET product_id = pv.product_id, hsn_code = COALESCE(oi.hsn_code, '90230')
-FROM product_variants pv
-WHERE oi.product_id IS NULL
-  AND lower(trim(oi.product_name)) = lower(trim(pv.variant_name))
-  AND oi.order_id IN ( /* the 23 restored Mokshith order ids */ );
-```
+### 5. Add DB-level destructive audit + block client deletes on beats
+- The `destructive_audit_log` table and `trg_audit_delete_beats` trigger already exist and worked — they're how we identified this incident. Keep them.
+- Add a hardened DELETE policy on `public.beats`:
+  - `CREATE POLICY "No client deletes on beats" ON public.beats FOR DELETE USING (false);`
+  - This forces in-app "delete" flows to use **soft delete** (`is_active = false`), which they already do via `MyBeats.handleConfirmDeleteBeat` and `BeatDetail`. Hard deletes will then only be possible via service role / dashboard, and those will always be logged in `destructive_audit_log` with `db_user` and `application_name` identifying the source.
 
-This keeps the historical line items pointing at real catalog rows.
+### 6. Soft-delete-only for beats in the app
+- Audit the three deletion code paths in the app:
+  - `src/pages/MyBeats.tsx` (already soft-delete via `update is_active=false`) — confirm no hard delete branch remains.
+  - `src/pages/BeatDetail.tsx` (already soft-delete) — confirm.
+  - `src/hooks/useOfflineSync.ts` case `'DELETE_BEAT'` currently does `from('beats').delete()` — change this to `update({ is_active: false })` so queued offline deletions cannot hard-delete from `beats`.
+- Ensure every soft-delete path writes a `beat_audit_log` row with action `delete` (or `deactivate`) and a non-null `performed_by`.
 
-## Step 3 — Guard against silent variant deletion
+### 7. Stop delete-and-recreate profile flows + protect profiles
+- Audit `UserDeleteDialog` / admin user removal to ensure it does **soft deactivation** (e.g. `is_active=false`, role removal) instead of `DELETE FROM profiles`.
+- Block client-side hard deletes on `profiles`:
+  - `CREATE POLICY "No client deletes on profiles" ON public.profiles FOR DELETE USING (false);`
+- Add a `destructive_audit_log` trigger on `profiles` so any future profile hard-delete (e.g. via dashboard) is captured the same way the beat deletion was.
+- This prevents the "user is removed and re-created with a new id" pattern that orphans beats/orders.
 
-Update `src/components/ProductManagement.tsx` so the per-variant Delete button routes through `useDeleteConfirm` (already used elsewhere in the project) with:
-- A typed confirmation ("DELETE") for variants that have any historical `order_items` referencing them
-- An impact line: "This variant is used in N past orders. Deleting it will not remove the orders but will break catalog linkage."
-- Keep the "Delete All Products" button gated behind the same typed confirmation it already uses.
+### 8. Surface the audit in the app
+- In `BeatAuditTimeline`, when no `beat_audit_log` entries exist for a beat, fall back to `destructive_audit_log` (filtered by `table_name='beats'` and `row_pk=beat_id`) and render the entry as "Deleted externally from {application_name} at {occurred_at}". Admin-only.
+- This makes incidents like Mokshith's instantly explainable from inside the app.
 
-No schema change — only a UI-level confirmation tightening. This is the smallest, safest change that prevents a repeat without removing admin capability.
+### 9. Verification checklist (after deploy)
+- `SELECT count(*) FROM beats WHERE owner_id = '73044…3362' AND is_active = true;` → **25**.
+- Mokshith opens **My Beats** → all beats visible with retailers re-attached.
+- Try to hard-delete a beat from the app → blocked by RLS, soft-delete still works and audit row written.
+- Delete a test beat from the Supabase dashboard → `destructive_audit_log` row appears, and the beat shows "Deleted externally" in the audit timeline.
+- `beat_audit_log` insert from the app no longer requires the `as any` cast in practice (schema matches).
 
-## Step 4 — Verify
+## Technical details (for engineers)
 
-- `SELECT count(*) FROM product_variants` → expect **31**
-- `SELECT count(*) FROM order_items WHERE product_id IS NULL AND order_id IN (…23 ids…)` → expect **0**
-- Open Product Management page → 5 variants reappear under their parent products
-- Open one of Mokshith's restored orders → line items show product link, not just text
+Files touched:
+- `supabase/migrations/<new>.sql` — items 3, 4, 5, 7 (schema + RLS + triggers).
+- Data restore via insert tool — items 1, 2.
+- `src/hooks/useOfflineSync.ts` — change `DELETE_BEAT` to soft-delete.
+- `src/components/BeatAuditTimeline.tsx` — add destructive_audit_log fallback (admin-only).
+- `src/components/admin/UserDeleteDialog.tsx` — confirm soft-deactivation path; remove any profile hard-delete.
 
-## Out of scope
+What this does NOT change:
+- The auto-beat-plan edge function (it was never the cause).
+- Existing soft-delete UX in `MyBeats` / `BeatDetail`.
+- Order, invoice, or retailer business logic.
 
-- No edge function changes, no migrations, no RLS changes (none are needed — there is no automated deleter).
-- The unrelated `productMigration.ts` "wipe everything" utility is left alone; only the per-variant UI delete is hardened.
+## Outcome
+
+After this:
+- Mokshith's beats are back, mapped to the right retailers.
+- Beats cannot be silently lost — neither from the app, nor from offline sync, nor from cascade chains.
+- Any future destructive action (even from the Supabase dashboard) is captured and visible inside the app's audit timeline.
+- Profile delete-and-recreate, which is the upstream cause of "auto-deleted" beats, is blocked at the DB layer.
