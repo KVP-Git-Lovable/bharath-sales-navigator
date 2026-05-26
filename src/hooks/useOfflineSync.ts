@@ -989,10 +989,10 @@ export function useOfflineSync() {
         break;
         
       case 'DELETE_BEAT':
-        console.log('Syncing beat deletion:', data);
+        console.log('Syncing beat deactivation (soft delete):', data);
         const { error: deleteBeatError } = await supabase
           .from('beats')
-          .delete()
+          .update({ is_active: false, updated_at: new Date().toISOString() })
           .eq('id', data.id);
         if (deleteBeatError) throw deleteBeatError;
         break;
