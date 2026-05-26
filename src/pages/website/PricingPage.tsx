@@ -1,4 +1,4 @@
-import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code } from "lucide-react";
+import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -112,11 +112,33 @@ export const PricingPage = () => {
             Everyone in your organization deserves the power of digital and AI. That's why all plans include <strong>unlimited users</strong>. 
             Built on AI-first architecture, our platform <strong>guides your team</strong> — not just collects data.
           </p>
+          <div className="mt-8 flex flex-wrap justify-center gap-2 text-sm">
+            <a href="#core" className="px-4 py-2 rounded-full bg-muted hover:bg-muted/70 transition-colors font-medium">Core Products</a>
+            <a href="#addons" className="px-4 py-2 rounded-full bg-muted hover:bg-muted/70 transition-colors font-medium">Add-Ons</a>
+            <a href="#support" className="px-4 py-2 rounded-full bg-muted hover:bg-muted/70 transition-colors font-medium">Support & Services</a>
+          </div>
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <section className="py-12 px-4">
+      {/* ============ CORE PRODUCTS ============ */}
+      <section id="core" className="pt-8 pb-4 px-4">
+        <div className="container mx-auto max-w-5xl text-center">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-3">
+            <LayoutGrid className="w-4 h-4" />
+            Core Products
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold">Choose the products that fit your business</h2>
+          <p className="text-muted-foreground mt-2">Standalone or combined — pay only for the capabilities you need.</p>
+        </div>
+      </section>
+
+      {/* Field Sales Platform */}
+      <section className="py-8 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-8">
+            <h3 className="text-xl md:text-2xl font-semibold">Field Sales Platform</h3>
+            <p className="text-sm text-muted-foreground mt-1">For your field reps, distributors, and sales operations.</p>
+          </div>
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {pricingTiers.map((tier) => {
@@ -177,6 +199,106 @@ export const PricingPage = () => {
               );
             })}
           </div>
+        </div>
+        </div>
+      </section>
+
+      {/* Retailer Portal */}
+      <section className="py-8 px-4">
+        <div className="container mx-auto max-w-5xl">
+          <div className="text-center mb-8">
+            <h3 className="text-xl md:text-2xl font-semibold">Retailer Portal</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-2xl mx-auto">
+              Let your customers and retailers self-order via mobile apps (iOS & Android) and WhatsApp AI — track shipments, view schemes, raise returns and issues.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Retailer Portal main tier */}
+            <Card className="relative p-6 flex flex-col border-primary bg-primary/5 shadow-xl shadow-primary/10">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                  New
+                </span>
+              </div>
+              <div className="mb-4">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                  <Store className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Retailer Portal</h3>
+              </div>
+              <div className="mb-4">
+                <span className="text-3xl font-bold">₹10,000</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                For brands enabling customers & retailers to place orders directly.
+              </p>
+              <ul className="space-y-3 mb-8 flex-grow">
+                {[
+                  "Unlimited retailer logins",
+                  "iOS & Android apps (Play Store + App Store)",
+                  "2,000 orders / month (resets monthly, no rollover)",
+                  "WhatsApp AI conversational order-taking",
+                  "Order placement, shipment tracking & schemes",
+                  "Returns & issue raising from the app",
+                  "Standard support",
+                ].map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => navigate("/request-demo")}
+              >
+                Start Free Trial
+              </Button>
+            </Card>
+
+            {/* Retailer Portal add-on pack */}
+            <Card className="p-6 flex flex-col border-border bg-card">
+              <div className="mb-4">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                  <PackagePlus className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Additional Retailer Portal Pack</h3>
+              </div>
+              <div className="mb-4">
+                <span className="text-3xl font-bold">₹5,000</span>
+                <span className="text-muted-foreground">/pack</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                Need more orders? Top up with stackable order packs.
+              </p>
+              <ul className="space-y-3 mb-8 flex-grow">
+                {[
+                  "1,000 additional orders per pack",
+                  "Stack as many packs as you need",
+                  "Unused orders roll over (pack-based, not monthly)",
+                  "Instant activation",
+                  "Works with the Retailer Portal plan",
+                ].map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
+                onClick={() => navigate("/request-demo")}
+              >
+                Add Pack
+              </Button>
+            </Card>
+          </div>
+
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Monthly plan orders reset each cycle. Add-on packs do not expire and roll over until consumed.
+          </p>
         </div>
       </section>
 
