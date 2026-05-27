@@ -51,7 +51,7 @@ const pricingTiers = [
     featured: true,
     features: [
       "Everything in Starter, plus:",
-      "30,000 visits/month",
+      "10,000 orders/month",
       "10 GB storage",
       "25 distributor portals",
       "Primary sales management",
