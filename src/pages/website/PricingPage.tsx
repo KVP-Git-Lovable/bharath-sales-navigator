@@ -201,101 +201,36 @@ export const PricingPage = () => {
       </section>
 
       {/* Retailer Portal */}
-      <section className="py-8 px-4">
-        <div className="container mx-auto max-w-5xl">
-          <div className="text-center mb-8">
-            <h3 className="text-xl md:text-2xl font-semibold">Retailer Portal</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-2xl mx-auto">
-              Let your customers and retailers self-order via mobile apps (iOS & Android) and WhatsApp AI — track shipments, view schemes, raise returns and issues.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Retailer Portal main tier */}
-            <Card className="relative p-6 flex flex-col border-primary bg-primary/5 shadow-xl shadow-primary/10">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                  New
-                </span>
+      {/* Capacity Packs — compact strip under Field Sales tiers */}
+      <section className="pt-2 pb-8 px-4">
+        <div className="container mx-auto max-w-7xl">
+          <Card className="p-5 border-border bg-muted/20">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <PackagePlus className="w-4 h-4 text-primary" />
+                  Extend Your Field Sales Plan — Additional Order Packs
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Stackable & roll over until consumed. Activate anytime on top of your plan.
+                </p>
               </div>
-              <div className="mb-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <Store className="w-6 h-6 text-primary" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs md:min-w-[420px]">
+                <div className="px-3 py-2 rounded-lg bg-background border border-border text-center">
+                  <p className="font-semibold">Starter Pack</p>
+                  <p className="text-muted-foreground">₹2,000 — 500 orders</p>
                 </div>
-                <h3 className="text-xl font-bold">Retailer Portal</h3>
-              </div>
-              <div className="mb-4">
-                <span className="text-3xl font-bold">₹10,000</span>
-                <span className="text-muted-foreground">/month</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                For brands enabling customers & retailers to place orders directly.
-              </p>
-              <ul className="space-y-3 mb-8 flex-grow">
-                {[
-                  "Unlimited retailer logins",
-                  "iOS & Android apps (Play Store + App Store)",
-                  "2,000 orders / month (resets monthly, no rollover)",
-                  "WhatsApp AI conversational order-taking",
-                  "Order placement, shipment tracking & schemes",
-                  "Returns & issue raising from the app",
-                  "Standard support",
-                ].map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => navigate("/request-demo")}
-              >
-                Start Free Trial
-              </Button>
-            </Card>
-
-            {/* Retailer Portal add-on pack */}
-            <Card className="p-6 flex flex-col border-border bg-card">
-              <div className="mb-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <PackagePlus className="w-6 h-6 text-primary" />
+                <div className="px-3 py-2 rounded-lg bg-primary/5 border border-primary text-center">
+                  <p className="font-semibold">Growth Pack</p>
+                  <p className="text-muted-foreground">₹5,000 — 1,500 orders</p>
                 </div>
-                <h3 className="text-xl font-bold">Additional Retailer Portal Pack</h3>
+                <div className="px-3 py-2 rounded-lg bg-background border border-border text-center">
+                  <p className="font-semibold">Scale Pack</p>
+                  <p className="text-muted-foreground">₹10,000 — 3,500 orders</p>
+                </div>
               </div>
-              <div className="mb-4">
-                <span className="text-3xl font-bold">₹5,000</span>
-                <span className="text-muted-foreground">/pack</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                Need more orders? Top up with stackable order packs.
-              </p>
-              <ul className="space-y-3 mb-8 flex-grow">
-                {[
-                  "1,000 additional orders per pack",
-                  "Stack as many packs as you need",
-                  "Unused orders roll over (pack-based, not monthly)",
-                  "Instant activation",
-                  "Works with the Retailer Portal plan",
-                ].map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
-                onClick={() => navigate("/request-demo")}
-              >
-                Add Pack
-              </Button>
-            </Card>
-          </div>
-
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Monthly plan orders reset each cycle. Add-on packs do not expire and roll over until consumed.
-          </p>
+            </div>
+          </Card>
         </div>
       </section>
 
