@@ -33,8 +33,7 @@ const pricingTiers = [
     features: [
       "Unlimited users",
       "5,000 orders/month",
-      "500 retailers/month",
-      "10,000 visits/month",
+      "5 GB storage",
       "Offline capabilities",
       "Secondary sales management",
       "Beat planning & tracking",
@@ -52,9 +51,8 @@ const pricingTiers = [
     featured: true,
     features: [
       "Everything in Starter, plus:",
-      "15,000 orders/month",
-      "1,500 retailers/month",
       "30,000 visits/month",
+      "10 GB storage",
       "25 distributor portals",
       "Primary sales management",
       "Product bundles",
@@ -73,9 +71,8 @@ const pricingTiers = [
     featured: false,
     features: [
       "Everything in Professional, plus:",
-      "40,000 orders/month",
-      "4,000 retailers/month",
       "80,000 visits/month",
+      "15 GB storage",
       "200 distributor portals",
       "Institutional sales",
       "AI-powered insights — 10,000 AI requests/month",
