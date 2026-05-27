@@ -187,12 +187,34 @@ export const PricingPage = () => {
                     {tier.description}
                   </p>
 
+                  {tier.highlights && (
+                    <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-primary mb-2">
+                        Plan capacity
+                      </div>
+                      <ul className="space-y-1.5">
+                        {tier.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm font-medium">
+                            <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <span>{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   <ul className="space-y-3 mb-8 flex-grow">
                     {tier.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm">
-                        <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
+                      feature.endsWith("plus:") ? (
+                        <li key={idx} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-1">
+                          {feature}
+                        </li>
+                      ) : (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      )
                     ))}
                   </ul>
 
