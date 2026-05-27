@@ -30,14 +30,20 @@ const pricingTiers = [
     description: "For small teams starting digital transformation",
     icon: Rocket,
     featured: false,
-    features: [
-      "Unlimited users",
+    highlights: [
       "5,000 orders/month",
       "5 GB storage",
+      "AI-powered insights — 2,500 AI requests/month",
+    ],
+    features: [
+      "Unlimited users",
       "Offline capabilities",
       "Secondary sales management",
       "Beat planning & tracking",
-      "AI-powered insights — 2,500 AI requests/month",
+      "Order management",
+      "Activity management",
+      "Scheme management",
+      "Event and counter sales process",
       "Basic analytics",
     ],
     cta: "Start Free Trial",
@@ -49,14 +55,19 @@ const pricingTiers = [
     description: "For growing teams with distributor needs",
     icon: Building2,
     featured: true,
-    features: [
-      "Everything in Starter, plus:",
+    highlights: [
       "10,000 orders/month",
       "10 GB storage",
       "25 distributor portals",
-      "Primary sales management",
-      "Product bundles",
       "AI-powered insights — 5,000 AI requests/month",
+    ],
+    features: [
+      "All features in Starter, plus:",
+      "Distributor management system",
+      "Primary sales management",
+      "Distributor Inventory Management",
+      "Field sales app for distributor sales team",
+      "Product bundles",
       "API for Integration",
       "Advanced reporting",
     ],
@@ -69,13 +80,16 @@ const pricingTiers = [
     description: "For large teams with complex operations",
     icon: Crown,
     featured: false,
-    features: [
-      "Everything in Professional, plus:",
+    highlights: [
       "15,000 orders/month",
       "15 GB storage",
       "200 distributor portals",
-      "Institutional sales",
       "AI-powered insights — 10,000 AI requests/month",
+    ],
+    features: [
+      "All features in Professional, plus:",
+      "Institutional sales",
+      "B2B full cycle CRM with CPQ (quote management)",
       "Sales coach",
       "Gamification",
       "Retailer loyalty program",
@@ -173,12 +187,34 @@ export const PricingPage = () => {
                     {tier.description}
                   </p>
 
+                  {tier.highlights && (
+                    <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-primary mb-2">
+                        Plan capacity
+                      </div>
+                      <ul className="space-y-1.5">
+                        {tier.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm font-medium">
+                            <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <span>{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   <ul className="space-y-3 mb-8 flex-grow">
                     {tier.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-sm">
-                        <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span>{feature}</span>
-                      </li>
+                      feature.endsWith("plus:") ? (
+                        <li key={idx} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-1">
+                          {feature}
+                        </li>
+                      ) : (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      )
                     ))}
                   </ul>
 
