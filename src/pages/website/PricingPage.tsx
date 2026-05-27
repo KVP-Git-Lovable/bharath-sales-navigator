@@ -71,7 +71,7 @@ const pricingTiers = [
     featured: false,
     features: [
       "Everything in Professional, plus:",
-      "80,000 visits/month",
+      "15,000 orders/month",
       "15 GB storage",
       "200 distributor portals",
       "Institutional sales",
