@@ -447,43 +447,71 @@ export const PricingPage = () => {
 
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* WhatsApp Pack */}
-            <Card className="p-6 flex flex-col border-border hover:border-primary/50 transition-colors">
-              <div className="mb-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <MessageCircle className="w-6 h-6 text-primary" />
+            <div className="flex flex-col gap-4">
+              <Card className="p-6 flex flex-col border-border hover:border-primary/50 transition-colors">
+                <div className="mb-4">
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                    <MessageCircle className="w-6 h-6 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-bold">WhatsApp Pack</h3>
                 </div>
-                <h3 className="text-xl font-bold">WhatsApp Pack</h3>
-              </div>
-              <div className="mb-4">
-                <span className="text-3xl font-bold">₹5,000</span>
-                <span className="text-muted-foreground">/Pack</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                For dedicated, high-volume WhatsApp communication.
-              </p>
-              <ul className="space-y-3 mb-6 flex-grow">
-                {[
-                  "Unlimited campaigns",
-                  "2,500 messages included",
-                  "Template & broadcast management",
-                  "Delivery & engagement analytics",
-                ].map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-border pt-3 mb-4 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Additional Pack:</span> ₹2,000 per 1,000 messages — stackable & rolls over.
-              </div>
-              <Button
-                className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
-                onClick={() => navigate("/request-demo")}
-              >
-                Activate Pack
-              </Button>
-            </Card>
+                <div className="mb-4">
+                  <span className="text-3xl font-bold">₹5,000</span>
+                  <span className="text-muted-foreground">/Pack</span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  For dedicated, high-volume WhatsApp communication.
+                </p>
+                <ul className="space-y-3 mb-6 flex-grow">
+                  {[
+                    "Unlimited campaigns",
+                    "2,500 messages included",
+                    "Template & broadcast management",
+                    "Delivery & engagement analytics",
+                  ].map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="border-t border-border pt-3 mb-4 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">Additional Pack:</span> ₹2,000 per 1,000 messages — stackable & rolls over.
+                </div>
+                <Button
+                  className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
+                  onClick={() => navigate("/request-demo")}
+                >
+                  Activate Pack
+                </Button>
+              </Card>
+
+              {/* WhatsApp Pack FAQ */}
+              <Card className="p-5 border-border bg-muted/20">
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-primary" />
+                  WhatsApp Pack — Quick Guide
+                </h4>
+                <div className="space-y-3 text-xs text-muted-foreground">
+                  <div>
+                    <p className="font-medium text-foreground mb-0.5">How are messages counted?</p>
+                    <p>Every message sent to a unique WhatsApp number counts as one message — regardless of message type (text, image, template, or AI reply).</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-0.5">Do unused messages roll over?</p>
+                    <p>Yes. Unused messages from your pack roll over and remain available until fully consumed. Additional packs (₹2,000 / 1,000 messages) also roll over.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground mb-0.5">Message types explained</p>
+                    <ul className="space-y-1 mt-1 list-disc pl-4">
+                      <li><strong className="text-foreground">Utility messages:</strong> Order confirmations, shipment alerts, payment reminders, and appointment updates.</li>
+                      <li><strong className="text-foreground">Advertisement:</strong> Promotional broadcasts, new scheme announcements, product launches, and seasonal offers sent to opted-in contacts.</li>
+                      <li><strong className="text-foreground">AI Conversation BOT:</strong> Automated two-way WhatsApp conversations where retailers can ask questions, check stock, place orders, or request scheme details via natural language.</li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+            </div>
 
             {/* Marketing Pack */}
             <Card className="p-6 flex flex-col border-primary bg-primary/5 relative">
