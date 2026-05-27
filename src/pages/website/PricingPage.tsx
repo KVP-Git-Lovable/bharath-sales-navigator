@@ -284,103 +284,21 @@ export const PricingPage = () => {
 
       {/* ============ ADD-ONS ============ */}
       <section id="addons" className="py-16 px-4">
-        <div className="container mx-auto max-w-5xl">
+        <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
               <Package className="w-4 h-4" />
               Add-Ons
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">Extend Your Plan</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">Engagement, Channels & Customer Portal</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Top up capacity or add new channels. Predictable, prepaid pricing — no per-transaction penalties.
+              Add new channels and customer-facing apps. Predictable, prepaid pricing — no per-transaction penalties.
             </p>
           </div>
 
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold">Capacity Packs</h3>
-            <p className="text-sm text-muted-foreground">For Field Sales plans — additional orders, retailers and visits.</p>
-          </div>
-
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {/* Starter Pack */}
-            <Card className="p-6 border-border hover:border-primary/50 transition-colors">
-              <div className="text-center mb-4">
-                <span className="text-3xl font-bold">₹2,000</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Orders</span>
-                  <span className="font-semibold">500</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Retailers</span>
-                  <span className="font-semibold">50</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Additional Visits</span>
-                  <span className="font-semibold">2,000</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Growth Pack */}
-            <Card className="p-6 border-primary bg-primary/5 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                  Best Value
-                </span>
-              </div>
-              <div className="text-center mb-4">
-                <span className="text-3xl font-bold">₹5,000</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Orders</span>
-                  <span className="font-semibold">1,500</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Retailers</span>
-                  <span className="font-semibold">150</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Additional Visits</span>
-                  <span className="font-semibold">6,000</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Scale Pack */}
-            <Card className="p-6 border-border hover:border-primary/50 transition-colors">
-              <div className="text-center mb-4">
-                <span className="text-3xl font-bold">₹10,000</span>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Orders</span>
-                  <span className="font-semibold">3,500</span>
-                </div>
-                <div className="flex justify-between py-2 border-b border-border/50">
-                  <span className="text-muted-foreground">Additional Retailers</span>
-                  <span className="font-semibold">350</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Additional Visits</span>
-                  <span className="font-semibold">15,000</span>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Channel & Marketing Add-Ons */}
-          <div className="mb-6 mt-12">
-            <h3 className="text-lg font-semibold">Engagement & Marketing</h3>
-            <p className="text-sm text-muted-foreground">Reach retailers and end-customers across WhatsApp and social channels.</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* WhatsApp Pack */}
-            <div className="flex flex-col gap-4">
-              <Card className="p-6 flex flex-col border-border hover:border-primary/50 transition-colors">
+            <Card className="p-6 flex flex-col border-border hover:border-primary/50 transition-colors">
                 <div className="mb-4">
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                     <MessageCircle className="w-6 h-6 text-primary" />
@@ -418,33 +336,6 @@ export const PricingPage = () => {
                 </Button>
               </Card>
 
-              {/* WhatsApp Pack FAQ */}
-              <Card className="p-5 border-border bg-muted/20">
-                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4 text-primary" />
-                  WhatsApp Pack — Quick Guide
-                </h4>
-                <div className="space-y-3 text-xs text-muted-foreground">
-                  <div>
-                    <p className="font-medium text-foreground mb-0.5">How are messages counted?</p>
-                    <p>Every message sent to a unique WhatsApp number counts as one message — regardless of message type (text, image, template, or AI reply).</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-0.5">Do unused messages roll over?</p>
-                    <p>Yes. Unused messages from your pack roll over and remain available until fully consumed. Additional packs (₹2,000 / 1,000 messages) also roll over.</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground mb-0.5">Message types explained</p>
-                    <ul className="space-y-1 mt-1 list-disc pl-4">
-                      <li><strong className="text-foreground">Utility messages:</strong> Order confirmations, shipment alerts, payment reminders, and appointment updates.</li>
-                      <li><strong className="text-foreground">Advertisement:</strong> Promotional broadcasts, new scheme announcements, product launches, and seasonal offers sent to opted-in contacts.</li>
-                      <li><strong className="text-foreground">AI Conversation BOT:</strong> Automated two-way WhatsApp conversations where retailers can ask questions, check stock, place orders, or request scheme details via natural language.</li>
-                    </ul>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
             {/* Marketing Pack */}
             <Card className="p-6 flex flex-col border-primary bg-primary/5 relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -460,7 +351,7 @@ export const PricingPage = () => {
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold">₹5,000</span>
-                <span className="text-muted-foreground">/Pack</span>
+                <span className="text-muted-foreground">/month</span>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
                 A unified social media marketing suite.
@@ -471,6 +362,7 @@ export const PricingPage = () => {
                   "Unified analytics across channels",
                   "Journey Builder",
                   "Ad Campaign Management (Facebook & Instagram)",
+                  "Return on Investment (ROI) tracking",
                 ].map((f, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
                     <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
@@ -485,7 +377,75 @@ export const PricingPage = () => {
                 Activate Pack
               </Button>
             </Card>
+
+            {/* Retailer Portal */}
+            <Card className="p-6 flex flex-col border-border hover:border-primary/50 transition-colors">
+              <div className="mb-4">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                  <Store className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold">Retailer Portal</h3>
+              </div>
+              <div className="mb-4">
+                <span className="text-3xl font-bold">₹10,000</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-6">
+                Let customers & retailers self-order via iOS, Android apps and WhatsApp AI.
+              </p>
+              <ul className="space-y-3 mb-6 flex-grow">
+                {[
+                  "Unlimited retailer logins",
+                  "iOS & Android apps (Play Store + App Store)",
+                  "2,000 orders / month (resets monthly, no rollover)",
+                  "WhatsApp AI conversational order-taking",
+                  "Order placement, shipment tracking & schemes",
+                  "Returns & issue raising from the app",
+                  "Standard support",
+                ].map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-border pt-3 mb-4 text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">Additional Pack:</span> ₹5,000 per 1,000 orders — pack-based, unused orders roll over.
+              </div>
+              <Button
+                className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
+                onClick={() => navigate("/request-demo")}
+              >
+                Start Free Trial
+              </Button>
+            </Card>
           </div>
+
+          {/* WhatsApp Pack FAQ */}
+          <Card className="p-5 border-border bg-muted/20 mb-8">
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-primary" />
+              WhatsApp Pack — Quick Guide
+            </h4>
+            <div className="grid md:grid-cols-3 gap-4 text-xs text-muted-foreground">
+              <div>
+                <p className="font-medium text-foreground mb-0.5">How are messages counted?</p>
+                <p>Every message sent to a unique WhatsApp number counts as one — regardless of message type (text, image, template, or AI reply).</p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground mb-0.5">Do unused messages roll over?</p>
+                <p>Yes. Unused messages from your pack roll over until fully consumed. Additional packs (₹2,000 / 1,000 messages) also roll over.</p>
+              </div>
+              <div>
+                <p className="font-medium text-foreground mb-0.5">Message types explained</p>
+                <ul className="space-y-1 mt-1 list-disc pl-4">
+                  <li><strong className="text-foreground">Utility:</strong> Order confirmations, shipment alerts, payment reminders.</li>
+                  <li><strong className="text-foreground">Advertisement:</strong> Promotional broadcasts, scheme announcements, product launches.</li>
+                  <li><strong className="text-foreground">AI Conversation BOT:</strong> Two-way WhatsApp chat where retailers can ask questions, check stock, or place orders.</li>
+                </ul>
+              </div>
+            </div>
+          </Card>
 
           {/* Benefits */}
           <div className="grid sm:grid-cols-3 gap-4 text-center">
