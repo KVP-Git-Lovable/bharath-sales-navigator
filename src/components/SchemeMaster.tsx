@@ -200,7 +200,7 @@ export const SchemeMaster = () => {
     // Fetch base products
     const { data: productsData, error: productsError } = await supabase
       .from('products')
-      .select('id, sku, name, description, category_id, rate, unit, is_active')
+      .select('id, sku, name, description, category_id, rate, base_unit, is_active')
       .eq('is_active', true)
       .order('name');
     
@@ -216,7 +216,7 @@ export const SchemeMaster = () => {
         product_id, 
         price, 
         is_active,
-        product:products!product_id(name, category_id, unit)
+        product:products!product_id(name, category_id, base_unit)
       `)
       .eq('is_active', true)
       .order('variant_name');
@@ -231,7 +231,7 @@ export const SchemeMaster = () => {
       description: p.description || '',
       category_id: p.category_id || '',
       rate: p.rate,
-      unit: p.unit || '',
+      unit: p.base_unit || '',
       is_active: p.is_active,
       type: 'product' as const
     }));
@@ -243,7 +243,7 @@ export const SchemeMaster = () => {
       description: '',
       category_id: v.product?.category_id || '',
       rate: v.price || 0,
-      unit: v.product?.unit || '',
+      unit: v.product?.base_unit || '',
       is_active: v.is_active,
       type: 'variant' as const,
       parent_product_id: v.product_id
