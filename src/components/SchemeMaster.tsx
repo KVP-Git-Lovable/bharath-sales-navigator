@@ -43,6 +43,7 @@ interface Product {
 
 interface ProductScheme {
   id: string;
+  product_id?: string;
   product?: Product;
   variant_id?: string;
   category_id?: string;
@@ -329,8 +330,9 @@ export const SchemeMaster = () => {
       
       // Determine product_id and target_product_ids based on mode
       const isMultiProduct = schemeForm.multi_product_mode && (schemeForm.target_product_ids || []).length > 0;
-      const productId = isMultiProduct ? null : (schemeForm.product_id || null);
-      const targetProductIds = isMultiProduct ? schemeForm.target_product_ids : null;
+      const targetProductIds = isMultiProduct
+        ? schemeForm.target_product_ids
+        : (schemeForm.product_id ? [schemeForm.product_id] : null);
       const perProductDiscounts = isMultiProduct && schemeForm.discount_mode === 'different' 
         ? schemeForm.per_product_discounts 
         : null;
@@ -339,14 +341,12 @@ export const SchemeMaster = () => {
         const { error } = await supabase
           .from('product_schemes')
           .update({
-            product_id: productId,
             variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
             category_id: schemeForm.category_id || null,
             name: schemeForm.name,
             description: schemeForm.description,
             scheme_type: schemeForm.scheme_type,
             condition_quantity: schemeForm.condition_quantity,
-            quantity_condition_type: schemeForm.quantity_condition_type,
             discount_percentage: schemeForm.discount_percentage,
             discount_amount: schemeForm.discount_amount,
             free_quantity: schemeForm.free_quantity,
@@ -371,9 +371,6 @@ export const SchemeMaster = () => {
             per_product_discounts: perProductDiscounts,
             max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (Number(schemeForm.max_discount_per_unit) || 0)
-              : null,
-            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
-              ? (schemeForm.discount_unit || 'kg')
               : null,
             discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
@@ -386,14 +383,12 @@ export const SchemeMaster = () => {
         const { data, error } = await supabase
           .from('product_schemes')
           .insert({
-            product_id: productId,
             variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
             category_id: schemeForm.category_id || null,
             name: schemeForm.name,
             description: schemeForm.description,
             scheme_type: schemeForm.scheme_type,
             condition_quantity: schemeForm.condition_quantity,
-            quantity_condition_type: schemeForm.quantity_condition_type,
             discount_percentage: schemeForm.discount_percentage,
             discount_amount: schemeForm.discount_amount,
             free_quantity: schemeForm.free_quantity,
@@ -418,9 +413,6 @@ export const SchemeMaster = () => {
             per_product_discounts: perProductDiscounts,
             max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (Number(schemeForm.max_discount_per_unit) || 0)
-              : null,
-            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
-              ? (schemeForm.discount_unit || 'kg')
               : null,
             discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
@@ -545,7 +537,7 @@ export const SchemeMaster = () => {
     
     setSchemeForm({
       id: scheme.id,
-      product_id: scheme.product_id || '',
+      product_id: scheme.product_id || (schemeAny.target_product_ids?.length === 1 ? schemeAny.target_product_ids[0] : ''),
       variant_id: scheme.variant_id || 'all',
       category_id: scheme.category_id || '',
       name: scheme.name,
@@ -618,7 +610,8 @@ export const SchemeMaster = () => {
       const matchesSearch = 
         scheme.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         scheme.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        scheme.product?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+        scheme.product_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        scheme.category_name?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesType = typeFilter === 'all' || scheme.scheme_type === typeFilter;
       
@@ -1009,7 +1002,7 @@ export const SchemeMaster = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        {scheme.product?.name || scheme.category?.name || 'All Products'}
+                        {scheme.product_name || scheme.category_name || 'All Products'}
                       </TableCell>
                       <TableCell>
                         <Badge 
