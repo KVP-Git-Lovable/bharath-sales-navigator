@@ -1,21 +1,40 @@
 ## Problem
 
-The Scheme Master page crashes with "Something went wrong" and the schemes tab shows "Failed to fetch data". Console error:
+Products are not visible in Product Master (and consequently in Scheme dropdowns) because the `products` and `product_variants` tables have RLS enabled but **no SELECT policy**. PostgREST therefore returns zero rows even though 11 active products and 31 variants exist in the database.
 
-```
-column products.unit does not exist
-```
-
-## Root cause
-
-`src/components/SchemeMaster.tsx` queries a `unit` column on `products`, but the actual column in the database is `base_unit`. Both the direct products query and the nested join via `product_variants` fail, which throws and triggers the error boundary (same error appears when adding a scheme because the same fetch runs).
+Confirmed via `pg_policy`:
+- `public.products` → only an `is_system_admin` DELETE policy, no SELECT
+- `public.product_variants` → only INSERT/DELETE admin policies, no SELECT
+- `public.product_categories` → already has authenticated SELECT (this is why categories work but products don't)
 
 ## Fix
 
-Update `src/components/SchemeMaster.tsx` to use `base_unit`:
+Add SELECT policies so any authenticated user can read products and variants (matching the existing pattern on `product_categories`).
 
-- Line 203 — change `select('id, sku, name, description, category_id, rate, unit, is_active')` to use `base_unit`.
-- Line 219 — change nested select `product:products!product_id(name, category_id, unit)` to `base_unit`.
-- Lines 234 and 246 — read `p.base_unit` / `v.product?.base_unit` when mapping into the `unit` field of the local `Product` type (keep the local field name `unit` so the rest of the component is unaffected).
+```sql
+CREATE POLICY "Auth can read products"
+  ON public.products FOR SELECT
+  TO authenticated USING (true);
 
-No schema change, no other files affected.
+CREATE POLICY "Auth can read product_variants"
+  ON public.product_variants FOR SELECT
+  TO authenticated USING (true);
+```
+
+Also add UPDATE policy for products (admin only) since the audit showed only INSERT/DELETE on variants and DELETE on products — verifying ProductManagement edits still work. I'll add:
+
+```sql
+CREATE POLICY "Admin can insert products"
+  ON public.products FOR INSERT
+  TO authenticated WITH CHECK (is_system_admin(auth.uid()));
+
+CREATE POLICY "Admin can update products"
+  ON public.products FOR UPDATE
+  TO authenticated USING (is_system_admin(auth.uid()));
+
+CREATE POLICY "Admin can update product_variants"
+  ON public.product_variants FOR UPDATE
+  TO authenticated USING (is_system_admin(auth.uid()));
+```
+
+No frontend code changes needed — once the SELECT policies exist, both Product Master and Scheme product dropdowns will populate.
