@@ -43,11 +43,13 @@ interface Product {
 
 interface ProductScheme {
   id: string;
-  product_id?: string;
   product?: Product;
   variant_id?: string;
   category_id?: string;
   category?: ProductCategory;
+  product_name?: string;
+  category_name?: string;
+  free_product_name?: string;
   name: string;
   description: string;
   scheme_type: string;
@@ -182,18 +184,72 @@ export const SchemeMaster = () => {
   };
 
   const fetchSchemes = async () => {
-    const { data, error } = await supabase
+    const { data: schemesData, error } = await supabase
       .from('product_schemes')
-      .select(`
-        *,
-        product:products!product_schemes_product_id_fkey(*),
-        category:product_categories(*),
-        free_product:products!product_schemes_free_product_id_fkey(*)
-      `)
+      .select('*')
       .order('name');
     
     if (error) throw error;
-    setSchemes((data as any) || []);
+
+    const schemes = (schemesData as any[]) || [];
+    const targetProductIds = [...new Set(
+      schemes.flatMap((scheme) => scheme.target_product_ids || []).filter(Boolean)
+    )];
+    const freeProductIds = [...new Set(schemes.map((scheme) => scheme.free_product_id).filter(Boolean))];
+    const categoryIds = [...new Set(schemes.map((scheme) => scheme.category_id).filter(Boolean))];
+    const variantIds = [...new Set(schemes.map((scheme) => scheme.variant_id).filter(Boolean))];
+
+    const [productsResult, categoriesResult, variantsResult] = await Promise.all([
+      targetProductIds.length || freeProductIds.length
+        ? supabase
+            .from('products')
+            .select('id, name')
+            .in('id', [...new Set([...targetProductIds, ...freeProductIds])])
+        : Promise.resolve({ data: [], error: null }),
+      categoryIds.length
+        ? supabase
+            .from('product_categories')
+            .select('id, name')
+            .in('id', categoryIds)
+        : Promise.resolve({ data: [], error: null }),
+      variantIds.length
+        ? supabase
+            .from('product_variants')
+            .select('id, variant_name')
+            .in('id', variantIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (productsResult.error) throw productsResult.error;
+    if (categoriesResult.error) throw categoriesResult.error;
+    if (variantsResult.error) throw variantsResult.error;
+
+    const productMap = new Map((productsResult.data || []).map((product) => [product.id, product.name]));
+    const categoryMap = new Map((categoriesResult.data || []).map((category) => [category.id, category.name]));
+    const variantMap = new Map((variantsResult.data || []).map((variant) => [variant.id, variant.variant_name]));
+
+    const hydratedSchemes: ProductScheme[] = schemes.map((scheme: any) => {
+      const targetNames = (scheme.target_product_ids || [])
+        .map((id: string) => productMap.get(id))
+        .filter(Boolean) as string[];
+
+      const primaryProductName = scheme.variant_id
+        ? variantMap.get(scheme.variant_id) || targetNames[0] || undefined
+        : targetNames[0] || undefined;
+
+      return {
+        ...scheme,
+        product_name: primaryProductName,
+        category_name: scheme.category_id ? categoryMap.get(scheme.category_id) || undefined : undefined,
+        free_product_name: scheme.free_product_id ? productMap.get(scheme.free_product_id) || undefined : undefined,
+        product: primaryProductName ? { name: primaryProductName } as Product : undefined,
+        category: scheme.category_id
+          ? ({ id: scheme.category_id, name: categoryMap.get(scheme.category_id) || 'Unknown Category', description: '' } as ProductCategory)
+          : undefined,
+      };
+    });
+
+    setSchemes(hydratedSchemes);
   };
 
   const fetchProducts = async () => {
