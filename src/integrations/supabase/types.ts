@@ -17700,6 +17700,21 @@ export type Database = {
       }
     }
     Views: {
+      analytics_productivity_summary: {
+        Row: {
+          activity_date: string | null
+          pending: number | null
+          planned: number | null
+          productive: number | null
+          ptv_pct: number | null
+          unproductive: number | null
+          user_id: string | null
+          user_name: string | null
+          username: string | null
+          vto_pct: number | null
+        }
+        Relationships: []
+      }
       orders_total_amount: {
         Row: {
           total_amount: number | null
