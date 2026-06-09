@@ -9170,7 +9170,6 @@ export type Database = {
           hsn_code: string | null
           id: string
           order_id: string | null
-          original_rate: number | null
           product_id: string | null
           product_name: string
           quantity: number
@@ -9188,7 +9187,6 @@ export type Database = {
           hsn_code?: string | null
           id?: string
           order_id?: string | null
-          original_rate?: number | null
           product_id?: string | null
           product_name: string
           quantity: number
@@ -9206,7 +9204,6 @@ export type Database = {
           hsn_code?: string | null
           id?: string
           order_id?: string | null
-          original_rate?: number | null
           product_id?: string | null
           product_name?: string
           quantity?: number
