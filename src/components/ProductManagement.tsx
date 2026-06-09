@@ -776,16 +776,6 @@ const [productForm, setProductForm] = useState({
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete All Products
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      toast.loading('Syncing products...');
-                      fetchData();
-                    }}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Sync Products
-                  </Button>
                   <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
                     <DialogTrigger asChild>
                       <Button onClick={() => setProductForm({
