@@ -19,7 +19,6 @@ import { Plus, Edit2, Trash2, Package, Tag, Search, Grid3X3, Camera, Loader2, Re
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProductFormFields } from './ProductFormFields';
 import { VariantFocusedFields } from './VariantFocusedFields';
-import { migrateProducts } from '@/utils/productMigration';
 
 interface ProductCategory {
   id: string;
