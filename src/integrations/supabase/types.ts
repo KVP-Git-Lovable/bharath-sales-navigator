@@ -11814,7 +11814,6 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_focused_product: boolean | null
-          price: number
           product_id: string | null
           qr_code: string | null
           sku: string
@@ -11837,7 +11836,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_focused_product?: boolean | null
-          price?: number
           product_id?: string | null
           qr_code?: string | null
           sku: string
@@ -11860,7 +11858,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_focused_product?: boolean | null
-          price?: number
           product_id?: string | null
           qr_code?: string | null
           sku?: string
