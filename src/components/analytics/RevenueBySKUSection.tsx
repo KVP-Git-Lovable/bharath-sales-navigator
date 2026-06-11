@@ -210,9 +210,10 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
       const quantityKG = (unit === 'grams' || unit === 'gram' || unit === 'g') 
         ? item.quantity_sold / 1000 
         : item.quantity_sold;
+      const productName = item.product_name || 'Unknown Product';
       return {
-        name: item.product_name.length > 15 ? item.product_name.substring(0, 15) + '...' : item.product_name,
-        fullName: item.product_name,
+        name: productName.length > 15 ? productName.substring(0, 15) + '...' : productName,
+        fullName: productName,
         value: quantityKG, // Use quantity in KG for chart sizing
         revenue: item.revenue,
         quantity: item.quantity_sold,
