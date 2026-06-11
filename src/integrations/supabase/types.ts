@@ -11820,6 +11820,7 @@ export type Database = {
           sku: string
           stock_quantity: number
           updated_at: string
+          variant_name: string | null
         }
         Insert: {
           barcode?: string | null
@@ -11842,6 +11843,7 @@ export type Database = {
           sku: string
           stock_quantity?: number
           updated_at?: string
+          variant_name?: string | null
         }
         Update: {
           barcode?: string | null
@@ -11864,6 +11866,7 @@ export type Database = {
           sku?: string
           stock_quantity?: number
           updated_at?: string
+          variant_name?: string | null
         }
         Relationships: [
           {
@@ -11897,8 +11900,10 @@ export type Database = {
           name: string
           product_number: string | null
           qr_code: string | null
+          rate: number
           sku: string
           sku_image_url: string | null
+          unit: string
           updated_at: string
         }
         Insert: {
@@ -11922,8 +11927,10 @@ export type Database = {
           name: string
           product_number?: string | null
           qr_code?: string | null
+          rate?: number
           sku: string
           sku_image_url?: string | null
+          unit?: string
           updated_at?: string
         }
         Update: {
@@ -11947,8 +11954,10 @@ export type Database = {
           name?: string
           product_number?: string | null
           qr_code?: string | null
+          rate?: number
           sku?: string
           sku_image_url?: string | null
+          unit?: string
           updated_at?: string
         }
         Relationships: [
