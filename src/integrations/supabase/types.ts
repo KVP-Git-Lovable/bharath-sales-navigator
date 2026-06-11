@@ -9174,7 +9174,6 @@ export type Database = {
           product_id: string | null
           product_name: string
           quantity: number
-          rate: number
           sgst_amount: number | null
           total: number
           unit: string
@@ -9192,7 +9191,6 @@ export type Database = {
           product_id?: string | null
           product_name: string
           quantity: number
-          rate?: number
           sgst_amount?: number | null
           total: number
           unit: string
@@ -9210,7 +9208,6 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           quantity?: number
-          rate?: number
           sgst_amount?: number | null
           total?: number
           unit?: string
