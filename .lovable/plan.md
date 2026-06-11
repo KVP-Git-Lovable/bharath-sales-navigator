@@ -1,29 +1,43 @@
-## Goal
-Restore the missing `order_items.rate` column so offline order sync stops failing with `column "rate" of relation "order_items" does not exist`.
+## Summary
+Remove the dangerous "Delete All Products" button and its backing logic from the Product Management admin screen. Also clean up the already-removed `productMigration` utility reference.
 
-## Verified state
-- `public.order_items` currently has **no `rate` column** (confirmed via information_schema).
-- `original_rate` column exists and is populated for **6,643 / 6,651** rows (8 rows are NULL — these will fall back to the `DEFAULT 0`).
-- Triggers and the `sync_order_with_items` function reference `NEW.rate` — they will work as soon as the column exists again.
-- No application code changes needed; frontend already writes `rate` in the insert payload.
+## Verified Changes
 
-## Migration (single statement block)
-```sql
-ALTER TABLE public.order_items
-  ADD COLUMN IF NOT EXISTS rate numeric NOT NULL DEFAULT 0;
+### Change 1 — productMigration cleanup (already done)
+- `src/utils/productMigration.ts` does not exist in the codebase.
+- No import of `migrateProducts` exists in `src/components/ProductManagement.tsx`.
+- No action needed.
 
-UPDATE public.order_items
-  SET rate = original_rate
-  WHERE original_rate IS NOT NULL
-    AND rate = 0;
-```
+### Change 2 — Remove "Delete All Products" feature from ProductManagement.tsx
 
-## Post-migration verification
-1. `SELECT COUNT(*) FROM order_items WHERE rate = 0;` — expect ~8 (the rows whose `original_rate` was NULL).
-2. Retry the stuck "Satish kirana – ₹640.00" sync item from the Sync Progress drawer; expect success.
-3. Spot-check 3 recent orders: `rate * quantity` ≈ `total` (minus discount).
+1. **Remove type union member** (line 96)
+   Remove `'all-products'` from:
+   ```ts
+   type: 'product' | 'category' | 'variant' | 'all-products' | null;
+   ```
+   Result: `type: 'product' | 'category' | 'variant' | null;`
 
-## Out of scope
-- No changes to `sync_order_with_items`, `trg_apply_event_stock_after_order_items`, or any code file.
-- Not adding `retailer_price` (separate prior decision).
-- Not touching the 8 NULL `original_rate` rows beyond the `0` default — flag for user only if verification shows they're recent/active orders.
+2. **Remove `executeDeleteAllProducts` function** (lines 161–190)
+   Deletes the entire async function that wipes `van_live_inventory`, `van_inward_grn_items`, `van_closing_stock_items`, `van_return_grn_items`, `van_order_fulfillment`, `product_schemes`, `product_variants`, and finally `products`.
+
+3. **Remove `all-products` branch in `handleConfirmAction`** (lines 200–202)
+   Removes:
+   ```ts
+   } else if (deleteConfirm.type === 'all-products') {
+     executeDeleteAllProducts();
+   ```
+
+4. **Remove "Delete All Products" button** (lines 771–777)
+   Removes the destructive red button block inside the products tab header.
+
+5. **Remove dialog text for `all-products`** (line 1525)
+   Removes the conditional suffix:
+   ```tsx
+   {deleteConfirm.type === 'all-products' && ' including all related data (van inventory, schemes, variants)'}.
+   ```
+
+## Why this matters
+This single button could wipe the entire product catalog (including variants, schemes, and van inventory) with one click. Removing it eliminates a catastrophic accidental-deletion vector. No other code in the repo references `executeDeleteAllProducts`, `all-products`, or the removed button.
+
+## Rollback
+All changes are in one file (`src/components/ProductManagement.tsx`). Revert via git if needed.
