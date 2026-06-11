@@ -31,7 +31,7 @@ export interface SchemaHealthResult {
   checkedAt: number;
 }
 
-const CACHE_KEY = 'schemaHealth:v1';
+const CACHE_KEY = 'schemaHealth:v2';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const EVENT_NAME = 'schemaHealthChanged';
 
