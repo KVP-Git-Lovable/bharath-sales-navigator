@@ -17,6 +17,7 @@ import { useAndroidBackButton } from "@/hooks/useAndroidBackButton";
 import { visitStatusCache } from "@/lib/visitStatusCache";
 import { NetworkProvider } from "@/contexts/NetworkContext";
 import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
+import { SchemaHealthBanner } from "@/components/SchemaHealthBanner";
 // PWA install prompt removed per user request
 import ForcedPasswordChangeDialog from "@/components/auth/ForcedPasswordChangeDialog";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
@@ -290,6 +291,7 @@ const App = () => {
             <TooltipProvider>
               <BrowserRouter>
                 <SlowConnectionBanner />
+                <SchemaHealthBanner />
                 <AppContent hasError={hasError} />
               </BrowserRouter>
             </TooltipProvider>
