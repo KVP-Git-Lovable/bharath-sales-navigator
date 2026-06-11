@@ -5,6 +5,7 @@ import { addOrderToSnapshot } from '@/lib/myVisitsSnapshot';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { isSlowConnection } from '@/utils/internetSpeedCheck';
 import { markVisitDataChanged } from '@/lib/visitChangeMarker';
+import { runSchemaHealthCheck, isOrderPlacementBlocked } from '@/utils/schemaHealthCheck';
 
 const SYNC_TIMEOUT_MS = 5000; // 5 second timeout for all sync operations
 
@@ -26,6 +27,21 @@ export async function submitOrderWithOfflineSupport(
     connectivityStatus?: 'online' | 'offline' | 'unknown';
   } = {}
 ) {
+  // Pre-submit guard: refuse to queue when the DB is missing critical columns.
+  // Prevents orders from dead-lettering after 48h x 5 retries against a
+  // schema that can't accept order_items.rate or compute totals from
+  // product_variants.price.
+  if (isOrderPlacementBlocked()) {
+    // Re-probe in case the schema has been restored since the cache was set.
+    const fresh = await runSchemaHealthCheck({ force: true }).catch(() => null);
+    if (fresh && !fresh.ok) {
+      const missing = fresh.missing.join(', ');
+      throw new Error(
+        `Order placement blocked: database schema issue (missing ${missing}). Contact your admin.`
+      );
+    }
+  }
+
   // STEP 1: Generate order ID and prepare data FIRST
   const orderId = crypto.randomUUID();
   const orderDate = orderData.order_date || getLocalTodayDate();
