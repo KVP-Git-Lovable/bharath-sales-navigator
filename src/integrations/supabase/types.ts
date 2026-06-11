@@ -9172,7 +9172,7 @@ export type Database = {
           order_id: string | null
           original_rate: number | null
           product_id: string | null
-          product_name: string
+          product_name: string | null
           quantity: number
           rate: number
           sgst_amount: number | null
@@ -9190,7 +9190,7 @@ export type Database = {
           order_id?: string | null
           original_rate?: number | null
           product_id?: string | null
-          product_name: string
+          product_name?: string | null
           quantity: number
           rate?: number
           sgst_amount?: number | null
@@ -9208,7 +9208,7 @@ export type Database = {
           order_id?: string | null
           original_rate?: number | null
           product_id?: string | null
-          product_name?: string
+          product_name?: string | null
           quantity?: number
           rate?: number
           sgst_amount?: number | null
