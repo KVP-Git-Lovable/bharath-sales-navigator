@@ -93,7 +93,7 @@ const ProductManagement = () => {
   const [isVariantsViewOpen, setIsVariantsViewOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
-    type: 'product' | 'category' | 'variant' | 'all-products' | null;
+    type: 'product' | 'category' | 'variant' | null;
     id: string;
     name: string;
     usageCount?: number;
@@ -158,38 +158,6 @@ const [productForm, setProductForm] = useState({
     qr_code: ''
   } as any);
 
-  const executeDeleteAllProducts = async () => {
-    try {
-      toast.loading('Deleting all products and related data...');
-      
-      // Delete in order: child tables first, then parent
-      await supabase.from('van_live_inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('van_inward_grn_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('van_closing_stock_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('van_return_grn_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('van_order_fulfillment').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('product_schemes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('product_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      
-      if (error) throw error;
-      
-      toast.dismiss();
-      toast.success('All products and related data deleted successfully');
-      fetchData();
-      setDeleteConfirm({ open: false, type: null, id: '', name: '' });
-    } catch (error) {
-      toast.dismiss();
-      console.error('Error deleting products:', error);
-      toast.error('Failed to delete products. Check console for details.');
-    }
-  };
-
-
   const handleConfirmAction = () => {
     if (deleteConfirm.type === 'product') {
       executeDeleteProduct(deleteConfirm.id);
@@ -197,8 +165,6 @@ const [productForm, setProductForm] = useState({
       executeDeleteCategory(deleteConfirm.id);
     } else if (deleteConfirm.type === 'variant') {
       executeDeleteVariant(deleteConfirm.id);
-    } else if (deleteConfirm.type === 'all-products') {
-      executeDeleteAllProducts();
     }
   };
 
@@ -768,13 +734,6 @@ const [productForm, setProductForm] = useState({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => setDeleteConfirm({ open: true, type: 'all-products', id: 'all', name: 'ALL products and related data' })}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete All Products
-                  </Button>
                   <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
                     <DialogTrigger asChild>
                       <Button onClick={() => setProductForm({
@@ -1522,7 +1481,7 @@ const [productForm, setProductForm] = useState({
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete <strong>{deleteConfirm.name}</strong>
-              {deleteConfirm.type === 'all-products' && ' including all related data (van inventory, schemes, variants)'}.
+              .
               {deleteConfirm.type === 'variant' && (deleteConfirm.usageCount ?? 0) > 0 && (
                 <span className="mt-3 block rounded-md bg-destructive/10 p-3 text-destructive">
                   This variant is referenced by <strong>{deleteConfirm.usageCount}</strong> historical order line item(s).
