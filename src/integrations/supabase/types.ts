@@ -11815,7 +11815,6 @@ export type Database = {
           is_active: boolean | null
           is_focused_product: boolean | null
           price: number
-          product_id: string | null
           qr_code: string | null
           sku: string
           stock_quantity: number
@@ -11838,7 +11837,6 @@ export type Database = {
           is_active?: boolean | null
           is_focused_product?: boolean | null
           price?: number
-          product_id?: string | null
           qr_code?: string | null
           sku: string
           stock_quantity?: number
@@ -11861,22 +11859,13 @@ export type Database = {
           is_active?: boolean | null
           is_focused_product?: boolean | null
           price?: number
-          product_id?: string | null
           qr_code?: string | null
           sku?: string
           stock_quantity?: number
           updated_at?: string
           variant_name?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "product_variants_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       products: {
         Row: {
