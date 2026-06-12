@@ -1,43 +1,71 @@
-## Summary
-Remove the dangerous "Delete All Products" button and its backing logic from the Product Management admin screen. Also clean up the already-removed `productMigration` utility reference.
+## Production DB Protection — Plan
 
-## Verified Changes
+Three coordinated changes to stop the recurring column-drop / data-overwrite cycle. All changes are additive and idempotent; no existing data is destroyed.
 
-### Change 1 — productMigration cleanup (already done)
-- `src/utils/productMigration.ts` does not exist in the codebase.
-- No import of `migrateProducts` exists in `src/components/ProductManagement.tsx`.
-- No action needed.
+### Item 1 — Anchor migration (runs last on every deploy)
 
-### Change 2 — Remove "Delete All Products" feature from ProductManagement.tsx
+New file: `supabase/migrations/<latest-timestamp>_anchor_schema_guard.sql`
 
-1. **Remove type union member** (line 96)
-   Remove `'all-products'` from:
-   ```ts
-   type: 'product' | 'category' | 'variant' | 'all-products' | null;
-   ```
-   Result: `type: 'product' | 'category' | 'variant' | null;`
+Contents = exactly the SQL you provided:
 
-2. **Remove `executeDeleteAllProducts` function** (lines 161–190)
-   Deletes the entire async function that wipes `van_live_inventory`, `van_inward_grn_items`, `van_closing_stock_items`, `van_return_grn_items`, `van_order_fulfillment`, `product_schemes`, `product_variants`, and finally `products`.
+- **Part A — Column existence guards** (`ADD COLUMN IF NOT EXISTS`):
+  - `order_items`: `rate` (numeric, default 0, not null), `product_name` (text), `original_rate` (numeric)
+  - `product_variants`: `price` (numeric, default 0, not null), `product_id` (uuid), `variant_name` (text), `sku` (text)
+- **Part B — Pattern-based data guards** (only touch broken rows, never correct ones):
+  - Guard 1: backfill `order_items.rate` from `original_rate` when rate=0 and original_rate>0
+  - Guard 2: backfill `order_items.rate` from `total/quantity` when both rate and original_rate are 0
+  - Guard 3: null out `product_variants.variant_name` only when it equals `sku` (Lovable overwrite pattern)
+  - Guard 4: re-link `product_variants.product_id` only when NULL, using sku→product map
+  - Guard 5: re-create `"Auth can read product_variants"` SELECT policy if missing
+  - Guard 6: re-create `"Admins can insert order items"` + `"Order owners can insert order items"` INSERT policies if no INSERT policy exists
 
-3. **Remove `all-products` branch in `handleConfirmAction`** (lines 200–202)
-   Removes:
-   ```ts
-   } else if (deleteConfirm.type === 'all-products') {
-     executeDeleteAllProducts();
-   ```
+Because the file is the highest-versioned migration, it always runs last and reverses any column drops introduced earlier in the deploy.
 
-4. **Remove "Delete All Products" button** (lines 771–777)
-   Removes the destructive red button block inside the products tab header.
+### Item 2 — Harden `sync_order_with_items` RPC
 
-5. **Remove dialog text for `all-products`** (line 1525)
-   Removes the conditional suffix:
-   ```tsx
-   {deleteConfirm.type === 'all-products' && ' including all related data (van inventory, schemes, variants)'}.
-   ```
+`CREATE OR REPLACE FUNCTION public.sync_order_with_items` in the same migration, identical to the live definition except every column in both `INSERT INTO public.order_items (...)` blocks (existing-order branch + new-order branch) gets a defensive `COALESCE(..., default)` wrapper:
 
-## Why this matters
-This single button could wipe the entire product catalog (including variants, schemes, and van inventory) with one click. Removing it eliminates a catastrophic accidental-deletion vector. No other code in the repo references `executeDeleteAllProducts`, `all-products`, or the removed button.
+- `rate` → `COALESCE(NULLIF(item->>'rate','')::numeric, NULLIF(item->>'price','')::numeric, NULLIF(item->>'original_rate','')::numeric, 0)`
+- `product_name` → `COALESCE(item->>'product_name', item->>'name', 'Unknown Item')`
+- `original_rate` → `COALESCE(NULLIF(item->>'original_rate','')::numeric, NULLIF(item->>'rate','')::numeric, 0)`
+- `product_id` (added to column list) → `COALESCE(public._safe_uuid(item->>'product_id'), NULL)`
+- `variant_id` → existing fallback chain kept, wrapped so a null result never aborts the insert
 
-## Rollback
-All changes are in one file (`src/components/ProductManagement.tsx`). Revert via git if needed.
+Result: even if a column is briefly missing or an item field is null, the RPC inserts a safe row instead of throwing — offline sync queue stops retrying forever.
+
+### Item 3 — Idempotency rule for all future migrations
+
+Save a project memory rule (`mem://constraints/migration-idempotency`) and add to `mem://index.md` Core so every future migration I write obeys:
+
+1. `CREATE TABLE` → `CREATE TABLE IF NOT EXISTS`
+2. `ADD COLUMN` → `ADD COLUMN IF NOT EXISTS`
+3. `CREATE POLICY "X" ...` → preceded by `DROP POLICY IF EXISTS "X" ON <table>`
+4. `CREATE FUNCTION` → `CREATE OR REPLACE FUNCTION`
+5. No `UPDATE ... SET col = value` without a `WHERE` guard proving the existing value is wrong (e.g. `WHERE col IS NULL` or `WHERE col = sku`)
+
+### Not changing (per your instruction)
+
+`offlineStorage`, `useStartupCleanup`, `forceRefresh`, `useMasterDataCache`, any IndexedDB logic — untouched.
+
+### Files touched
+
+- **Add:** `supabase/migrations/<new-timestamp>_anchor_schema_guard.sql` (Items 1 + 2)
+- **Add:** `mem://constraints/migration-idempotency` + update `mem://index.md` (Item 3)
+- **No code/TS changes.**
+
+### Approval needed
+
+The migration is destructive-safe (only `ADD COLUMN IF NOT EXISTS`, pattern-guarded UPDATEs, `CREATE OR REPLACE FUNCTION`, idempotent policy creates). It will be submitted via the migration tool which requires your explicit approval before it runs.  
+  
+**Approve with 3 corrections:**
+
+1. Guard 3: add `AND sku NOT IN ('Vayu Spec')` to the WHERE clause so it doesn't null out intentional name=sku variants
+2. Guard 4: add a direct fallback `UPDATE product_variants SET product_id = '2f5fc10b-8ef2-4511-a532-eb90aeefbf1c' WHERE sku = 'Vayu Spec' AND product_id IS NULL`
+3. Item 2: the RPC is already hardened — only add `product_id` to the INSERT column list in both branches, do not rewrite the function  
+  
+-- Vayu Spec belongs to VAYU product (same as vay250, BLEND V)
+  UPDATE public.product_variants
+  SET product_id = '2f5fc10b-8ef2-4511-a532-eb90aeefbf1c'
+  WHERE sku = 'Vayu Spec' AND product_id IS NULL;
+
+Reply **approve** to apply.
