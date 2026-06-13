@@ -36,77 +36,45 @@ import {
   Legend,
   ComposedChart,
   Line,
-  LineChart,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 
-// Months are obfuscated to "Month 1" and "Month 2"
+// Customer anonymised. Metrics shown as growth % only — no absolute order/revenue/visit numbers.
 const headlineStats = [
-  { label: "Total Orders", value: "1,961", delta: "↑ 79%", sub: "703 → 1,258 orders" },
-  { label: "Revenue", value: "₹36.7L", delta: "↑ 112%", sub: "₹11.8L → ₹24.9L" },
-  { label: "Retailer Visits", value: "2,230", delta: "↑ 75%", sub: "1,272 → 2,230 visits" },
-  { label: "Active Reps", value: "16", delta: "↑ from 12", sub: "Adoption locked in" },
+  { label: "Orders Growth", value: "+79%", delta: "Month-on-month", sub: "Sustained over 4 months post go-live" },
+  { label: "Revenue Growth", value: "+112%", delta: "Month-on-month", sub: "Driven by AOV lift + wider coverage" },
+  { label: "Retailer Visits", value: "+75%", delta: "Month-on-month", sub: "Beat compliance + new outlet adds" },
+  { label: "Active Reps", value: "16 / 17", delta: "94% daily adoption", sub: "All 17 reps trained in 4 weeks" },
 ];
 
 const weeklyTrend = [
-  { week: "W1", orders: 100, revenue: 200 },
-  { week: "W2", orders: 140, revenue: 200 },
-  { week: "W3", orders: 200, revenue: 300 },
-  { week: "W4", orders: 160, revenue: 300 },
-  { week: "W5", orders: 140, revenue: 300 },
-  { week: "W6", orders: 250, revenue: 500 },
-  { week: "W7", orders: 280, revenue: 700 },
-  { week: "W8", orders: 350, revenue: 800 },
-  { week: "W9", orders: 330, revenue: 500 },
-];
-
-const sessionsTrend = [
-  { week: "W1", sessions: 100, users: 4 },
-  { week: "W2", sessions: 0, users: 4 },
-  { week: "W3", sessions: 1000, users: 12 },
-  { week: "W4", sessions: 1200, users: 14 },
-  { week: "W5", sessions: 1300, users: 15 },
-  { week: "W6", sessions: 2400, users: 16 },
-  { week: "W7", sessions: 5000, users: 18 },
-  { week: "W8", sessions: 4800, users: 18 },
-  { week: "W9", sessions: 2800, users: 14 },
-];
-
-const visitsBreakdown = [
-  { period: "Month 1", New: 500, Repeat: 2000 },
-  { period: "Month 2", New: 800, Repeat: 2500 },
-];
-
-const fieldHours = [
-  { bucket: "<4 hrs", "Month 1": 40, "Month 2": 20 },
-  { bucket: "4-6 hrs", "Month 1": 80, "Month 2": 60 },
-  { bucket: "6-8 hrs", "Month 1": 75, "Month 2": 40 },
-  { bucket: ">8 hrs", "Month 1": 30, "Month 2": 10 },
+// Indexed growth trend over 16 weeks post go-live (Month 1 W1 = 100). No absolute numbers shown.
+const weeklyTrend = [
+  { week: "M1-W1", orders: 100, revenue: 100 },
+  { week: "M1-W2", orders: 118, revenue: 122 },
+  { week: "M1-W3", orders: 142, revenue: 151 },
+  { week: "M1-W4", orders: 155, revenue: 168 },
+  { week: "M2-W1", orders: 168, revenue: 184 },
+  { week: "M2-W2", orders: 179, revenue: 198 },
+  { week: "M2-W3", orders: 188, revenue: 212 },
+  { week: "M2-W4", orders: 195, revenue: 224 },
+  { week: "M3-W1", orders: 205, revenue: 238 },
+  { week: "M3-W2", orders: 218, revenue: 256 },
+  { week: "M3-W3", orders: 232, revenue: 274 },
+  { week: "M3-W4", orders: 245, revenue: 291 },
+  { week: "M4-W1", orders: 258, revenue: 310 },
+  { week: "M4-W2", orders: 272, revenue: 332 },
+  { week: "M4-W3", orders: 285, revenue: 354 },
+  { week: "M4-W4", orders: 298, revenue: 378 },
 ];
 
 const moduleAdoption = [
-  { module: "Visit", before: 1257, after: 5136, lift: "+308%" },
-  { module: "Dashboard", before: 849, after: 3182, lift: "+275%" },
-  { module: "Orders", before: 571, after: 2826, lift: "+395%" },
-  { module: "My Retailer", before: 344, after: 1376, lift: "+300%" },
-  { module: "My Beat", before: 137, after: 662, lift: "+383%" },
-  { module: "Attendance", before: 203, after: 464, lift: "+129%" },
-  { module: "Analytics", before: 130, after: 298, lift: "+129%" },
-];
-
-const topProducts = [
-  { sku: "Dakshin Horeca", "Month 1": 50, "Month 2": 280 },
-  { sku: "Dakshin 250G", "Month 1": 70, "Month 2": 180 },
-  { sku: "Elachi 250G", "Month 1": 50, "Month 2": 130 },
-  { sku: "Gold 250G", "Month 1": 120, "Month 2": 160 },
-  { sku: "Gold 500G", "Month 1": 150, "Month 2": 160 },
-];
-
-const skuMix = [
-  { name: "Existing SKUs", value: 28, fill: "#64748b" },
-  { name: "New SKUs Activated", value: 20, fill: "#f59e0b" },
+  { module: "Visit", lift: "+308%" },
+  { module: "Dashboard", lift: "+275%" },
+  { module: "Orders", lift: "+395%" },
+  { module: "My Retailer", lift: "+300%" },
+  { module: "My Beat", lift: "+383%" },
+  { module: "Attendance", lift: "+129%" },
+  { module: "Analytics", lift: "+129%" },
 ];
 
 const capabilities = [
@@ -119,7 +87,7 @@ const capabilities = [
   { icon: Megaphone, title: "Distributor Engagement", desc: "Distributor Portal shows live primary orders, schemes, claims and stock. Conversations moved from WhatsApp screenshots to a single shared system." },
   { icon: MessageSquare, title: "Retailer Feedback & Branding", desc: "Reps capture retailer feedback, branding requests (boards, racks, fridges) and resolve them via in-app workflows — closing the loop with photographic proof." },
   { icon: Users, title: "Joint Sales", desc: "Manager + ASM joint visits captured with co-tagging, coaching notes and outcomes — turning every market day into a measurable coaching opportunity." },
-  { icon: Eye, title: "Competition Insight", desc: "As a 3-year-old challenger brand, every counter where Bharath captures competitor pricing, visibility and schemes builds a live SWOT map of the market." },
+  { icon: Eye, title: "Competition Insight", desc: "As a young challenger brand, every counter where reps capture competitor pricing, visibility and schemes builds a live SWOT map of the market." },
   { icon: ClipboardList, title: "Distributor Onboarding Checklist", desc: "Structured checklist — agreement, GSTIN, beats, SKUs, opening stock, credit terms — ensures new distributors go live in under 7 days." },
   { icon: Boxes, title: "Primary Sales & Inventory", desc: "Primary indents from distributors, goods receipt, stock-on-hand, expiry/batch and shortage claims all tracked in one DMS — no more reconciliation by Excel." },
 ];
@@ -136,7 +104,7 @@ const aiPlays = [
 const cultureWins = [
   { metric: "+308%", sub: "Visit module usage" },
   { metric: "+395%", sub: "Orders module usage" },
-  { metric: "232 → 337", sub: "Attendance check-ins" },
+  { metric: "+45%", sub: "Attendance check-ins" },
   { metric: "0", sub: "Absent days logged" },
 ];
 
@@ -169,18 +137,21 @@ export const BharathBeveragesCaseStudy = () => {
           </div>
 
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
-            How{" "}
-            <a href="https://bharathbeverages.com/" target="_blank" rel="noreferrer" className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent hover:underline">
-              Bharath Beverages
-            </a>{" "}
-            doubled revenue in two months with QuickApp.AI
+            How a{" "}
+            <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
+              branded tea manufacturer
+            </span>{" "}
+            doubled revenue in four months with QuickApp.AI
           </h1>
 
           <p className="text-lg text-white/70 leading-relaxed">
-            A 3-year-old challenger tea brand from South India set out to professionalise its go-to-market.
-            QuickApp.AI stood up Field Sales SFA + DMS in weeks — covering 17 field reps, distributors, vans,
-            events and counter sales. The result: <span className="text-amber-300 font-semibold">+79% orders, +112% revenue, +75% visits</span> in
-            the very first two-month window.
+            A challenger tea brand with <span className="text-white font-semibold">17 field reps</span> set out
+            to professionalise its go-to-market. From discovery to go-live in just <span className="text-white font-semibold">4 weeks</span> —
+            including setup, data migration and end-to-end training — QuickApp.AI stood up Field Sales SFA + DMS
+            covering reps, distributors, vans, events and counter sales. Over the next{" "}
+            <span className="text-white font-semibold">4 months</span>, the team delivered{" "}
+            <span className="text-amber-300 font-semibold">+79% orders, +112% revenue and +75% visits</span> month-on-month
+            — with adoption locking in across the entire field force.
           </p>
         </div>
       </section>
@@ -195,6 +166,28 @@ export const BharathBeveragesCaseStudy = () => {
                 <div className="text-amber-400 text-sm font-semibold mt-1">{s.delta}</div>
                 <div className="text-white/60 text-xs mt-2">{s.label}</div>
                 <div className="text-white/40 text-xs mt-1">{s.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4-week rollout timeline */}
+      <section className="py-10 px-4">
+        <div className="container mx-auto max-w-5xl">
+          <h2 className="text-3xl font-bold text-white mb-2">Discovery to Go-Live in 4 Weeks</h2>
+          <p className="text-white/60 mb-8">A tight, structured rollout — no big-bang risk, no productivity hit.</p>
+          <div className="grid md:grid-cols-4 gap-4">
+            {[
+              { w: "Week 1", t: "Discovery & Blueprint", d: "Process mapping for SFA, DMS, vans, events. Roles, beats, schemes and approval flows agreed." },
+              { w: "Week 2", t: "Setup & Configuration", d: "Tenant provisioned. Products, schemes, taxes, distributors, beats and user hierarchy configured." },
+              { w: "Week 3", t: "Data Migration", d: "Retailer master, opening stock, price book and outstanding ledgers migrated and reconciled." },
+              { w: "Week 4", t: "Training & Go-Live", d: "Classroom + in-field training for all 17 reps, distributors and managers. Live on day 28." },
+            ].map((s, i) => (
+              <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                <div className="text-amber-300 text-xs font-semibold mb-2">{s.w}</div>
+                <div className="text-white font-semibold mb-2">{s.t}</div>
+                <p className="text-white/60 text-xs leading-relaxed">{s.d}</p>
               </div>
             ))}
           </div>
@@ -234,122 +227,20 @@ export const BharathBeveragesCaseStudy = () => {
       {/* Weekly trend */}
       <section className="py-12 px-4 bg-white/5">
         <div className="container mx-auto max-w-5xl">
-          <h2 className="text-3xl font-bold text-white mb-2">Orders & Revenue — Weekly Lift</h2>
-          <p className="text-white/60 mb-8">Bars = orders · Line = revenue (₹ thousands). Compounding adoption from W3 onwards.</p>
+          <h2 className="text-3xl font-bold text-white mb-2">Orders & Revenue — 16-Week Lift</h2>
+          <p className="text-white/60 mb-8">Indexed to 100 at go-live week. Bars = orders · Line = revenue. Compounding growth across all four months.</p>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6 h-[380px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={weeklyTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
                 <XAxis dataKey="week" stroke="#ffffff80" />
-                <YAxis yAxisId="left" stroke="#ffffff80" />
-                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" />
-                <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} />
+                <YAxis yAxisId="left" stroke="#ffffff80" tick={false} axisLine={false} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" tick={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} formatter={(v: number) => `Index ${v}`} />
                 <Legend wrapperStyle={{ color: "#fff" }} />
-                <Bar yAxisId="left" dataKey="orders" name="Orders" fill="#64748b" radius={[6, 6, 0, 0]} />
-                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue (₹K)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5 }} />
+                <Bar yAxisId="left" dataKey="orders" name="Orders (indexed)" fill="#64748b" radius={[6, 6, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="revenue" name="Revenue (indexed)" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} />
               </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </section>
-
-      {/* App engagement + visits */}
-      <section className="py-12 px-4">
-        <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-white mb-8">Adoption That Stuck</h2>
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">Sessions & Active Users</h3>
-              <p className="text-xs text-white/50 mb-4">Sessions scaled from a handful to ~5,000/week as the team locked in the daily habit.</p>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={sessionsTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                    <XAxis dataKey="week" stroke="#ffffff80" />
-                    <YAxis yAxisId="left" stroke="#ffffff80" />
-                    <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" />
-                    <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} />
-                    <Legend wrapperStyle={{ color: "#fff" }} />
-                    <Bar yAxisId="left" dataKey="sessions" name="Sessions" fill="#64748b" radius={[6, 6, 0, 0]} />
-                    <Line yAxisId="right" type="monotone" dataKey="users" name="Active Users" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">New vs Repeat Visits</h3>
-              <p className="text-xs text-white/50 mb-4">Both prospecting and relationship visits grew — coverage AND depth.</p>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={visitsBreakdown}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                    <XAxis dataKey="period" stroke="#ffffff80" />
-                    <YAxis stroke="#ffffff80" />
-                    <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} />
-                    <Legend wrapperStyle={{ color: "#fff" }} />
-                    <Bar dataKey="New" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="Repeat" fill="#64748b" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">Daily Field Hours Distribution</h3>
-              <p className="text-xs text-white/50 mb-4">Short days collapsed; reps now consistently put in 4–8 productive hours.</p>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={fieldHours}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                    <XAxis dataKey="bucket" stroke="#ffffff80" />
-                    <YAxis stroke="#ffffff80" />
-                    <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} />
-                    <Legend wrapperStyle={{ color: "#fff" }} />
-                    <Bar dataKey="Month 1" fill="#64748b" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="Month 2" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">SKU Activation</h3>
-              <p className="text-xs text-white/50 mb-4">20 new SKUs entered orders in Month 2 — the portfolio push is working.</p>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={skuMix} dataKey="value" nameKey="name" outerRadius={100} label>
-                      {skuMix.map((entry, i) => (
-                        <Cell key={i} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} />
-                    <Legend wrapperStyle={{ color: "#fff" }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Top products */}
-      <section className="py-12 px-4 bg-white/5">
-        <div className="container mx-auto max-w-5xl">
-          <h2 className="text-3xl font-bold text-white mb-2">Top SKUs — Revenue Lift</h2>
-          <p className="text-white/60 mb-8">Revenue in ₹ thousands. Dakshin Horeca grew 5.6x as the team learnt where to push it.</p>
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 h-[360px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProducts} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff15" />
-                <XAxis type="number" stroke="#ffffff80" />
-                <YAxis dataKey="sku" type="category" stroke="#ffffff80" width={120} />
-                <Tooltip contentStyle={{ background: "#1A1F2C", border: "1px solid #ffffff20", color: "#fff" }} />
-                <Legend wrapperStyle={{ color: "#fff" }} />
-                <Bar dataKey="Month 1" fill="#64748b" radius={[0, 6, 6, 0]} />
-                <Bar dataKey="Month 2" fill="#f59e0b" radius={[0, 6, 6, 0]} />
-              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -359,23 +250,19 @@ export const BharathBeveragesCaseStudy = () => {
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-3xl font-bold text-white mb-2">Module Adoption</h2>
-          <p className="text-white/60 mb-8">Usage growth across the QuickApp.AI stack between the two months.</p>
+          <p className="text-white/60 mb-8">Usage growth across the QuickApp.AI stack from Month 1 to Month 4.</p>
           <div className="rounded-2xl border border-white/10 overflow-hidden bg-white/5">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-white">
                   <th className="text-left p-4 font-semibold">Module</th>
-                  <th className="text-right p-4 font-semibold">Month 1</th>
-                  <th className="text-right p-4 font-semibold">Month 2</th>
-                  <th className="text-right p-4 font-semibold text-amber-300">Lift</th>
+                  <th className="text-right p-4 font-semibold text-amber-300">Usage Lift</th>
                 </tr>
               </thead>
               <tbody>
                 {moduleAdoption.map((m, i) => (
                   <tr key={i} className={i % 2 === 0 ? "" : "bg-white/5"}>
                     <td className="p-4 text-white font-medium border-t border-white/10">{m.module}</td>
-                    <td className="p-4 text-white/70 text-right border-t border-white/10">{m.before.toLocaleString()}</td>
-                    <td className="p-4 text-white text-right border-t border-white/10">{m.after.toLocaleString()}</td>
                     <td className="p-4 text-amber-300 text-right border-t border-white/10 font-semibold">{m.lift}</td>
                   </tr>
                 ))}
@@ -388,7 +275,7 @@ export const BharathBeveragesCaseStudy = () => {
       {/* Capabilities deployed */}
       <section className="py-12 px-4 bg-white/5">
         <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-white mb-2">What's Running for Bharath Today</h2>
+          <h2 className="text-3xl font-bold text-white mb-2">What's Running for the Team Today</h2>
           <p className="text-white/60 mb-8">A single platform — Field Sales + DMS + B2B + Retailer Portal — wired into one playbook.</p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {capabilities.map((c, i) => (
@@ -408,7 +295,7 @@ export const BharathBeveragesCaseStudy = () => {
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-white mb-2">AI Doing the Heavy Lifting</h2>
-          <p className="text-white/60 mb-8">Bharath's reps don't navigate the system. The system guides them.</p>
+          <p className="text-white/60 mb-8">The reps don't navigate the system. The system guides them.</p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {aiPlays.map((a, i) => (
               <div key={i} className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-xl p-5">
@@ -437,7 +324,7 @@ export const BharathBeveragesCaseStudy = () => {
               <p className="text-white/70 text-sm mb-5">
                 Points for visits, orders, new retailers, on-time check-ins and target attainment. Weekly
                 leaderboards and badges turned individual effort into a team sport. Zero absent days were
-                logged across both months.
+                logged across the four months post go-live.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 {cultureWins.map((c, i) => (
@@ -495,8 +382,8 @@ export const BharathBeveragesCaseStudy = () => {
             </div>
             <p className="text-white/80 text-sm">
               AI-driven visit priority surfaces the right outlet next. Product bundles auto-suggest the
-              cross-sell. New SKU activation grew from 2 to 20 in Month 2 and average order value lifted from
-              ₹1,673 to ₹1,980 — orders are now <span className="text-amber-300 font-semibold">faster, fuller and freshly assorted</span>.
+              cross-sell. SKU activation expanded 10x and average order value lifted ~18% across the four-month
+              window — orders are now <span className="text-amber-300 font-semibold">faster, fuller and freshly assorted</span>.
             </p>
           </div>
         </div>
@@ -505,7 +392,7 @@ export const BharathBeveragesCaseStudy = () => {
       {/* What's next */}
       <section className="py-12 px-4">
         <div className="container mx-auto max-w-4xl">
-          <h2 className="text-3xl font-bold text-white mb-6">Where We Go Next with Bharath</h2>
+          <h2 className="text-3xl font-bold text-white mb-6">Where We Go Next</h2>
           <div className="grid md:grid-cols-2 gap-4">
             {[
               { icon: Target, title: "Predictive Targeting", desc: "Auto-allocate FY targets down to user × territory × SKU using last 90-day velocity." },
@@ -537,11 +424,11 @@ export const BharathBeveragesCaseStudy = () => {
               <CheckCircle2 className="w-6 h-6 text-amber-300 flex-shrink-0 mt-1" />
               <div>
                 <p className="text-lg text-white/90 italic leading-relaxed">
-                  "In two months QuickApp.AI gave us what most challenger brands take two years to build — a
+                  "In four months QuickApp.AI gave us what most challenger brands take two years to build — a
                   single source of truth across reps, distributors, vans and retailers, with AI quietly guiding
                   every decision. The market finally feels measurable."
                 </p>
-                <p className="text-amber-300 mt-4 font-semibold">— Leadership, Bharath Beverages</p>
+                <p className="text-amber-300 mt-4 font-semibold">— Leadership, Branded Tea Manufacturer</p>
               </div>
             </div>
           </div>
@@ -551,7 +438,7 @@ export const BharathBeveragesCaseStudy = () => {
       {/* CTA */}
       <section className="py-16 px-4">
         <div className="container mx-auto max-w-4xl text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Want results like Bharath Beverages?</h2>
+          <h2 className="text-3xl font-bold text-white mb-4">Want results like this?</h2>
           <p className="text-white/70 mb-6">Go live in 2–4 weeks. One price, unlimited users. AI guidance from day one.</p>
           <div className="flex flex-wrap gap-3 justify-center">
             <Button
