@@ -36,7 +36,6 @@ const pricingTiers = [
     ],
     features: [
       "Unlimited users",
-      "Offline capabilities",
       "Secondary sales management",
       "Beat planning & tracking",
       "Visit plan AI (recommended visits)",
@@ -44,6 +43,7 @@ const pricingTiers = [
       "Retailer onboarding - Whatsapp and SMS based verification",
       "Order management",
       "Scheme management",
+      "Offline capabilities",
       "Basic analytics",
       "Marketing Pack & Retailer Portal available as add-ons (₹)",
     ],
@@ -68,9 +68,9 @@ const pricingTiers = [
       "Distributor Inventory Management",
       "Field sales app for distributor sales team",
       "Product bundles",
-      "Event and counter sales process",
-      "API for Integration",
+      "Event ROI track and counter sales",
       "GPS tracking",
+      "API for Integration",
       "Advanced reporting",
       "Marketing Pack & Retailer Portal available as add-ons (₹)",
     ],
@@ -90,8 +90,7 @@ const pricingTiers = [
     ],
     features: [
       "All features in Professional, plus:",
-      "Institutional sales",
-      "B2B full cycle CRM with CPQ (quote management)",
+      "Institutional sales - B2B full cycle CRM with CPQ (quote management)",
       "Sales coach",
       "Gamification",
       "Retailer loyalty program",
@@ -703,7 +702,7 @@ export const PricingPage = () => {
             <div>
               <h3 className="font-semibold mb-2">How much retailer records or orders can be consumed in one GB?</h3>
               <p className="text-muted-foreground text-sm">
-                One GB typically stores around 10,000–12,000 retailer records or 25,000–30,000 order records. The exact count depends on the amount of metadata, images, and attachments associated with each record. Storage usage scales with your data richness, not just count.
+                One GB typically stores around 10,000–12,000 retailer records or 10,000 to 20,000 order records depending on line items per orders. The exact count depends on the amount of metadata, images, and attachments associated with each record. Storage usage scales with your data richness, not just count.
               </p>
             </div>
           </div>
