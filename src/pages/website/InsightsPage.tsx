@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, ArrowRight, FileText, CheckSquare, Calculator, Sparkles, Users, ClipboardCheck, Briefcase } from "lucide-react";
+import { Search, Filter, ArrowRight, FileText, CheckSquare, Calculator, Sparkles, Users, ClipboardCheck, Briefcase, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,16 @@ import { WebsiteHeader } from "@/components/website/WebsiteHeader";
 import { WebsiteFooter } from "@/components/website/WebsiteFooter";
 
 const insightCards = [
+  {
+    id: "why-quickapp",
+    title: "Why QuickApp.AI Beats Traditional SFA & DMS",
+    description: "How QuickApp.AI stacks up against Bizom, FieldAssist, Botree SFA and ZNI CRM. USPs, capability radar, cost comparison and the impact we deliver — with charts.",
+    icon: Trophy,
+    category: "Best Practices",
+    readTime: "7 min read",
+    href: "/insights/why-quickapp",
+    gradient: "from-amber-500 to-orange-500",
+  },
   {
     id: "implementation-toolkit",
     title: "Implementation Toolkit",
