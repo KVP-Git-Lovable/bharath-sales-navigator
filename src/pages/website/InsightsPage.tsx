@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, ArrowRight, FileText, CheckSquare, Calculator, Sparkles, Users, ClipboardCheck, Briefcase, Trophy } from "lucide-react";
+import { Search, Filter, ArrowRight, FileText, CheckSquare, Calculator, Sparkles, Users, ClipboardCheck, Briefcase, Trophy, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,16 @@ import { WebsiteHeader } from "@/components/website/WebsiteHeader";
 import { WebsiteFooter } from "@/components/website/WebsiteFooter";
 
 const insightCards = [
+  {
+    id: "bharath-beverages-case-study",
+    title: "Bharath Beverages: +112% Revenue in 2 Months with QuickApp.AI",
+    description: "A 3-year-old challenger tea brand doubled revenue, lifted orders 79% and tripled module adoption after going live on QuickApp.AI Field Sales SFA + DMS. Full case study with charts.",
+    icon: Building2,
+    category: "Case Studies",
+    readTime: "9 min read",
+    href: "/insights/bharath-beverages-case-study",
+    gradient: "from-emerald-500 to-teal-500",
+  },
   {
     id: "why-quickapp",
     title: "Why QuickApp.AI Beats Traditional SFA & DMS",
