@@ -1352,9 +1352,148 @@ export const ROICalculator = () => {
               </div>
             </div>
 
+            {/* Tailored Business Benefits */}
+            {benefits.length > 0 && (
+              <Card className="p-6 border-emerald-500/20 bg-emerald-500/5">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  Business Benefits Tailored to You
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">Outcomes we expect based on the responses you provided.</p>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {benefits.map((b, i) => (
+                    <div key={i} className="p-4 rounded-lg bg-background/60 border">
+                      <p className="text-2xl font-bold text-emerald-600">{b.value}</p>
+                      <p className="text-sm font-medium mt-1">{b.metric}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{b.rationale}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Step-by-step Implementation Roadmap */}
+            <Card className="p-6 border-primary/20">
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                <Rocket className="w-5 h-5 text-primary" />
+                Step-by-Step Implementation Roadmap
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">Each phase is mapped to the challenges and goals you shared.</p>
+              <div className="relative pl-6 border-l-2 border-primary/20 space-y-6">
+                {roadmap.map((p, i) => (
+                  <div key={i} className="relative">
+                    <span className="absolute -left-[34px] top-1 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <h4 className="font-semibold">{p.phase}</h4>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{p.weeks}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{p.goal}</p>
+                    <ul className="mt-2 space-y-1">
+                      {p.activities.map((a, j) => (
+                        <li key={j} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>{a}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {p.mappedTo.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="text-xs text-muted-foreground">Addresses:</span>
+                        {p.mappedTo.map((m, k) => (
+                          <span key={k} className="text-[11px] bg-muted px-2 py-0.5 rounded-full">{m}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Project Plan Snapshot */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Project Plan Snapshot
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase text-muted-foreground border-b">
+                      <th className="py-2 pr-3">Phase</th>
+                      <th className="py-2 pr-3">Timeline</th>
+                      <th className="py-2">Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roadmap.map((p, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-2 pr-3 font-medium">{p.phase}</td>
+                        <td className="py-2 pr-3 text-muted-foreground">{p.weeks}</td>
+                        <td className="py-2 text-muted-foreground">{p.goal}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Next Steps */}
+            <Card className="p-6 border-blue-500/20 bg-blue-500/5">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                Your Next Steps
+              </h3>
+              <ol className="space-y-2">
+                {nextStepsList.map((s, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm">
+                    <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+
+            {/* Contact Us */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                Talk to a QuickApp Expert
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">Share your details and we&apos;ll reach out within one business day with a tailored walkthrough.</p>
+              <form onSubmit={handleContactSubmit} className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Full name *</Label>
+                  <Input value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} required />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Company</Label>
+                  <Input value={contact.company} onChange={(e) => setContact({ ...contact, company: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Work email *</Label>
+                  <Input type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} required />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Phone</Label>
+                  <Input value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">What would you like to discuss?</Label>
+                  <Textarea rows={3} value={contact.message} onChange={(e) => setContact({ ...contact, message: e.target.value })} placeholder="Tell us about your team, timelines or specific questions" />
+                </div>
+                <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3 justify-end">
+                  <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+                    <Download className="w-4 h-4" /> Download Report
+                  </Button>
+                  <Button type="submit" disabled={submitting} className="gap-2">
+                    {submitting ? "Sending..." : "Request Callback"} <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </form>
+            </Card>
+
             {/* CTA */}
             <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-              {/* placeholder */}
               <div className="text-center space-y-4">
                 <h3 className="text-xl font-semibold">Ready to Get Started?</h3>
                 <p className="text-muted-foreground max-w-lg mx-auto">
