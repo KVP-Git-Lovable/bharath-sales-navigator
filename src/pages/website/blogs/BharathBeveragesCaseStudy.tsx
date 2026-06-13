@@ -46,7 +46,6 @@ const headlineStats = [
   { label: "Active Reps", value: "16 / 17", delta: "94% daily adoption", sub: "All 17 reps trained in 4 weeks" },
 ];
 
-const weeklyTrend = [
 // Indexed growth trend over 16 weeks post go-live (Month 1 W1 = 100). No absolute numbers shown.
 const weeklyTrend = [
   { week: "M1-W1", orders: 100, revenue: 100 },
@@ -78,10 +77,10 @@ const moduleAdoption = [
 ];
 
 const capabilities = [
-  { icon: Users, title: "Sales Productivity", desc: "Daily app sessions grew 28x and 16 of 17 reps now hit ≥6 productive field hours/day — auto-tracked attendance, GPS check-ins and visit timestamps removed admin friction." },
+  { icon: Users, title: "Sales Productivity", desc: "Daily app sessions grew sharply and 16 of 17 reps now hit ≥6 productive field hours/day — auto-tracked attendance, GPS check-ins and visit timestamps removed admin friction." },
   { icon: MapPin, title: "Field Tracking & GPS", desc: "Every visit geo-stamped to a retailer location. Live dashboards show beat compliance, idle time and route deviations — without nagging the team." },
-  { icon: Building2, title: "Retailer Onboarding", desc: "1,961 new retailers added with WhatsApp/SMS based verification, on-the-spot KYC photos and auto-geocoding. Onboarding time dropped from days to minutes." },
-  { icon: Package, title: "Order Execution", desc: "Catalog, schemes, taxes and stock validated in-app. Average order value lifted from ₹1,673 to ₹1,980 (+18%) as reps placed larger, more confident orders." },
+  { icon: Building2, title: "Retailer Onboarding", desc: "New retailers added via WhatsApp/SMS based verification, on-the-spot KYC photos and auto-geocoding. Onboarding time dropped from days to minutes." },
+  { icon: Package, title: "Order Execution", desc: "Catalog, schemes, taxes and stock validated in-app. Average order value lifted ~18% as reps placed larger, more confident orders." },
   { icon: Truck, title: "Van Sales", desc: "Van load-in, on-vehicle stock, instant invoice and cash settlement work fully offline. Reps now close on-the-spot sales instead of carrying paper indents back." },
   { icon: Target, title: "Event ROI & Counter Sales", desc: "Event setup, counter-sale capture, sample distribution and footfall logged per activation — finance can now see ₹ returned per ₹ spent on each event." },
   { icon: Megaphone, title: "Distributor Engagement", desc: "Distributor Portal shows live primary orders, schemes, claims and stock. Conversations moved from WhatsApp screenshots to a single shared system." },
