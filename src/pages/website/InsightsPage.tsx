@@ -9,8 +9,8 @@ import { WebsiteFooter } from "@/components/website/WebsiteFooter";
 const insightCards = [
   {
     id: "bharath-beverages-case-study",
-    title: "Bharath Beverages: +112% Revenue in 2 Months with QuickApp.AI",
-    description: "A 3-year-old challenger tea brand doubled revenue, lifted orders 79% and tripled module adoption after going live on QuickApp.AI Field Sales SFA + DMS. Full case study with charts.",
+    title: "Branded Tea Manufacturer: +112% Revenue in 4 Months with QuickApp.AI",
+    description: "A challenger tea brand with 17 field reps went live in 4 weeks and delivered +112% revenue, +79% orders and +75% visits month-on-month over 4 months on QuickApp.AI Field Sales SFA + DMS.",
     icon: Building2,
     category: "Case Studies",
     readTime: "9 min read",
