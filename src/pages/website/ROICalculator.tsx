@@ -183,7 +183,7 @@ export const ROICalculator = () => {
       case "institutional": return answers.hasInstitutionalSales !== "";
       case "analytics": return answers.analyticsMaturity !== "";
       case "ai-readiness": return answers.aiAdoption !== "";
-      case "goals": return answers.topPriority !== "";
+      case "goals": return answers.priorities.length > 0;
       default: return true;
     }
   };
