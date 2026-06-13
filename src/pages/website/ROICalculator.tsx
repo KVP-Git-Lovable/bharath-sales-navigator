@@ -43,6 +43,7 @@ interface Answer {
   aiInterest: string[];
   // Goals
   topPriority: string;
+  priorities: string[];
 }
 
 const initialAnswers: Answer = {
@@ -58,6 +59,7 @@ const initialAnswers: Answer = {
   aiAdoption: "",
   aiInterest: [],
   topPriority: "",
+  priorities: [],
 };
 
 const processOptions = [
@@ -181,7 +183,7 @@ export const ROICalculator = () => {
       case "institutional": return answers.hasInstitutionalSales !== "";
       case "analytics": return answers.analyticsMaturity !== "";
       case "ai-readiness": return answers.aiAdoption !== "";
-      case "goals": return answers.topPriority !== "";
+      case "goals": return answers.priorities.length > 0;
       default: return true;
     }
   };
@@ -1176,30 +1178,62 @@ export const ROICalculator = () => {
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <Target className="w-8 h-8 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">What&apos;s your top priority?</h2>
-              <p className="text-muted-foreground">What would make the biggest impact for your business?</p>
+              <h2 className="text-2xl font-bold mb-2">What are your top priorities?</h2>
+              <p className="text-muted-foreground">Click in order — your first pick becomes Priority 1, next pick Priority 2, and so on. Click again to remove.</p>
             </div>
-            <RadioGroup
-              value={answers.topPriority}
-              onValueChange={(v) => setAnswers(prev => ({ ...prev, topPriority: v }))}
-              className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-3xl mx-auto"
-            >
-              {priorityOptions.map((option) => (
-                <Label
-                  key={option.value}
-                  className={cn(
-                    "flex flex-col p-5 rounded-lg border cursor-pointer transition-all",
-                    answers.topPriority === option.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <RadioGroupItem value={option.value} className="sr-only" />
-                  <p className="font-semibold mb-1">{option.label}</p>
-                  <p className="text-sm text-muted-foreground">{option.description}</p>
-                </Label>
-              ))}
-            </RadioGroup>
+            <div className="max-w-3xl mx-auto space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {answers.priorities.length === 0
+                    ? "No priorities selected yet"
+                    : `${answers.priorities.length} selected — in order`}
+                </span>
+                {answers.priorities.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAnswers(prev => ({ ...prev, priorities: [], topPriority: "" }))}
+                    className="gap-1.5"
+                  >
+                    <Zap className="w-3.5 h-3.5" /> Clear all
+                  </Button>
+                )}
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {priorityOptions.map((option) => {
+                  const rank = answers.priorities.indexOf(option.value);
+                  const isSelected = rank >= 0;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setAnswers(prev => {
+                          const next = isSelected
+                            ? prev.priorities.filter(v => v !== option.value)
+                            : [...prev.priorities, option.value];
+                          return { ...prev, priorities: next, topPriority: next[0] || "" };
+                        });
+                      }}
+                      className={cn(
+                        "relative flex flex-col p-5 rounded-lg border text-left transition-all",
+                        isSelected
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      {isSelected && (
+                        <span className="absolute top-3 right-3 w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                          {rank + 1}
+                        </span>
+                      )}
+                      <p className="font-semibold mb-1 pr-8">{option.label}</p>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         );
 
@@ -1571,28 +1605,31 @@ export const ROICalculator = () => {
           <div className="flex justify-between">
             <Button
               variant="outline"
+              size="lg"
               onClick={prevStep}
               disabled={currentStepIndex === 0}
-              className="gap-2"
+              className="gap-2 min-w-[160px] h-12 text-base justify-center"
             >
               <ArrowLeft className="w-4 h-4" /> Back
             </Button>
             {currentStep !== "results" ? (
               <Button
+                size="lg"
                 onClick={nextStep}
                 disabled={!canProceed()}
-                className="gap-2"
+                className="gap-2 min-w-[160px] h-12 text-base justify-center"
               >
                 Continue <ArrowRight className="w-4 h-4" />
               </Button>
             ) : (
               <Button
+                size="lg"
                 onClick={() => {
                   setCurrentStep("team");
                   setAnswers(initialAnswers);
                 }}
                 variant="outline"
-                className="gap-2"
+                className="gap-2 min-w-[160px] h-12 text-base justify-center"
               >
                 <Zap className="w-4 h-4" /> Start Over
               </Button>
