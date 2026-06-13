@@ -13,7 +13,7 @@ const pricingTiers = [
     icon: Zap,
     featured: false,
     features: [
-      "Up to 10 users",
+      "Up to 5 users",
       "25 orders per day",
       "50 retailers",
       "5 beats",
@@ -31,7 +31,6 @@ const pricingTiers = [
     icon: Rocket,
     featured: false,
     highlights: [
-      "5,000 orders/month",
       "5 GB storage",
       "AI-powered insights — 2,500 AI requests/month",
     ],
@@ -43,8 +42,8 @@ const pricingTiers = [
       "Order management",
       "Activity management",
       "Scheme management",
-      "Event and counter sales process",
       "Basic analytics",
+      "Marketing Pack & Retailer Portal available as add-ons (₹)",
     ],
     cta: "Start Free Trial",
   },
@@ -56,7 +55,6 @@ const pricingTiers = [
     icon: Building2,
     featured: true,
     highlights: [
-      "10,000 orders/month",
       "10 GB storage",
       "25 distributor portals",
       "AI-powered insights — 5,000 AI requests/month",
@@ -68,8 +66,10 @@ const pricingTiers = [
       "Distributor Inventory Management",
       "Field sales app for distributor sales team",
       "Product bundles",
+      "Event and counter sales process",
       "API for Integration",
       "Advanced reporting",
+      "Marketing Pack & Retailer Portal available as add-ons (₹)",
     ],
     cta: "Start Free Trial",
   },
@@ -81,7 +81,6 @@ const pricingTiers = [
     icon: Crown,
     featured: false,
     highlights: [
-      "15,000 orders/month",
       "15 GB storage",
       "200 distributor portals",
       "AI-powered insights — 10,000 AI requests/month",
@@ -93,6 +92,10 @@ const pricingTiers = [
       "Sales coach",
       "Gamification",
       "Retailer loyalty program",
+      "Retailer Portal (unlimited retailer logins)",
+      "Marketing Pack (unlimited campaigns)",
+      "Microsoft Power BI connector (add-on ₹)",
+      "Dedicated Customer Success Manager",
       "Priority support",
     ],
     cta: "Contact Sales",
@@ -245,24 +248,16 @@ export const PricingPage = () => {
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-2">
                   <PackagePlus className="w-4 h-4 text-primary" />
-                  Extend Your Field Sales Plan — Additional Order Packs
+                  Extend Your Field Sales Plan — Additional Storage
                 </h4>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Stackable & roll over until consumed. Activate anytime on top of your plan.
+                  Add storage anytime on top of your plan. Simple, predictable pricing.
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs md:min-w-[420px]">
-                <div className="px-3 py-2 rounded-lg bg-background border border-border text-center">
-                  <p className="font-semibold">Starter Pack</p>
-                  <p className="text-muted-foreground">₹2,000 — 500 orders</p>
-                </div>
-                <div className="px-3 py-2 rounded-lg bg-primary/5 border border-primary text-center">
-                  <p className="font-semibold">Growth Pack</p>
-                  <p className="text-muted-foreground">₹5,000 — 1,500 orders</p>
-                </div>
-                <div className="px-3 py-2 rounded-lg bg-background border border-border text-center">
-                  <p className="font-semibold">Scale Pack</p>
-                  <p className="text-muted-foreground">₹10,000 — 3,500 orders</p>
+              <div className="text-xs md:min-w-[280px]">
+                <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
+                  <p className="font-semibold text-sm">Storage Pack</p>
+                  <p className="text-muted-foreground">₹500 per 1 GB / month</p>
                 </div>
               </div>
             </div>
@@ -433,7 +428,7 @@ export const PricingPage = () => {
                 {[
                   "Unlimited retailer logins",
                   "iOS & Android apps (Play Store + App Store)",
-                  "2,000 orders / month (resets monthly, no rollover)",
+                  "Storage as per the edition you choose",
                   "WhatsApp AI conversational order-taking",
                   "Order placement, shipment tracking & schemes",
                   "Returns & issue raising from the app",
@@ -445,9 +440,6 @@ export const PricingPage = () => {
                   </li>
                 ))}
               </ul>
-              <div className="border-t border-border pt-3 mb-4 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Additional Pack:</span> ₹5,000 per 1,000 orders — pack-based, unused orders roll over.
-              </div>
               <Button
                 className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
                 onClick={() => navigate("/request-demo")}
@@ -703,12 +695,6 @@ export const PricingPage = () => {
               <h3 className="font-semibold mb-2">Is there a free trial?</h3>
               <p className="text-muted-foreground text-sm">
                 Yes! All paid plans come with a 14-day free trial. No credit card required. Experience the full power of AI-guided sales.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Do Retailer Portal orders roll over?</h3>
-              <p className="text-muted-foreground text-sm">
-                The base Retailer Portal plan includes 2,000 orders that reset every month — unused orders do not carry forward. <strong>Additional Retailer Portal Packs</strong> (₹5,000 / 1,000 orders) are pack-based and <strong>do roll over</strong> until consumed.
               </p>
             </div>
           </div>
