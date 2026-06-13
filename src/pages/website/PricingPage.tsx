@@ -428,7 +428,7 @@ export const PricingPage = () => {
                 {[
                   "Unlimited retailer logins",
                   "iOS & Android apps (Play Store + App Store)",
-                  "2,000 orders / month (resets monthly, no rollover)",
+                  "Storage as per the edition you choose",
                   "WhatsApp AI conversational order-taking",
                   "Order placement, shipment tracking & schemes",
                   "Returns & issue raising from the app",
@@ -440,9 +440,6 @@ export const PricingPage = () => {
                   </li>
                 ))}
               </ul>
-              <div className="border-t border-border pt-3 mb-4 text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">Additional Pack:</span> ₹5,000 per 1,000 orders — pack-based, unused orders roll over.
-              </div>
               <Button
                 className="w-full bg-muted text-foreground hover:bg-muted/80 border border-border"
                 onClick={() => navigate("/request-demo")}
