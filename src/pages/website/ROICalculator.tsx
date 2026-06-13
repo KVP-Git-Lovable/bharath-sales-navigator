@@ -1605,28 +1605,31 @@ export const ROICalculator = () => {
           <div className="flex justify-between">
             <Button
               variant="outline"
+              size="lg"
               onClick={prevStep}
               disabled={currentStepIndex === 0}
-              className="gap-2"
+              className="gap-2 min-w-[160px] h-12 text-base justify-center"
             >
               <ArrowLeft className="w-4 h-4" /> Back
             </Button>
             {currentStep !== "results" ? (
               <Button
+                size="lg"
                 onClick={nextStep}
                 disabled={!canProceed()}
-                className="gap-2"
+                className="gap-2 min-w-[160px] h-12 text-base justify-center"
               >
                 Continue <ArrowRight className="w-4 h-4" />
               </Button>
             ) : (
               <Button
+                size="lg"
                 onClick={() => {
                   setCurrentStep("team");
                   setAnswers(initialAnswers);
                 }}
                 variant="outline"
-                className="gap-2"
+                className="gap-2 min-w-[160px] h-12 text-base justify-center"
               >
                 <Zap className="w-4 h-4" /> Start Over
               </Button>
