@@ -1213,6 +1213,12 @@ export const ROICalculator = () => {
               </div>
               <h2 className="text-2xl font-bold mb-2">Your Personalized Assessment</h2>
               <p className="text-muted-foreground">Based on your responses, here&apos;s our analysis</p>
+              <div className="mt-4 flex justify-center">
+                <Button onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  {generatingPdf ? "Preparing PDF..." : "Download Full Report (PDF)"}
+                </Button>
+              </div>
             </div>
 
             {/* ROI Score */}
@@ -1228,6 +1234,23 @@ export const ROICalculator = () => {
                 <span className="text-2xl text-muted-foreground mb-2">/100</span>
               </div>
               <Progress value={score} className="h-3" />
+              {/* Score explainer */}
+              <div className="mt-6 grid sm:grid-cols-2 gap-3 text-xs">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-background/60 border">
+                  <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm mb-1">What does this score mean?</p>
+                    <p className="text-muted-foreground">It estimates how much measurable value QuickApp can unlock for you — based on team size, current process, challenges, distribution, analytics and AI readiness. Higher means more upside.</p>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-background/60 border space-y-1.5">
+                  <p className="font-medium text-sm flex items-center gap-1.5"><HelpCircle className="w-4 h-4 text-primary" /> Score bands</p>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500" /><span className="text-muted-foreground">0–24 Moderate opportunity</span></div>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500" /><span className="text-muted-foreground">25–49 Good fit</span></div>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-muted-foreground">50–74 Significant value</span></div>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-muted-foreground">75–100 High impact</span></div>
+                </div>
+              </div>
             </Card>
 
             {/* Current Situation Summary */}
