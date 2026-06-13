@@ -1354,6 +1354,7 @@ export const ROICalculator = () => {
 
             {/* CTA */}
             <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+              {/* placeholder */}
               <div className="text-center space-y-4">
                 <h3 className="text-xl font-semibold">Ready to Get Started?</h3>
                 <p className="text-muted-foreground max-w-lg mx-auto">
