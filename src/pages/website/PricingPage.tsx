@@ -697,12 +697,6 @@ export const PricingPage = () => {
                 Yes! All paid plans come with a 14-day free trial. No credit card required. Experience the full power of AI-guided sales.
               </p>
             </div>
-            <div>
-              <h3 className="font-semibold mb-2">Do Retailer Portal orders roll over?</h3>
-              <p className="text-muted-foreground text-sm">
-                The base Retailer Portal plan includes 2,000 orders that reset every month — unused orders do not carry forward. <strong>Additional Retailer Portal Packs</strong> (₹5,000 / 1,000 orders) are pack-based and <strong>do roll over</strong> until consumed.
-              </p>
-            </div>
           </div>
         </div>
       </section>
