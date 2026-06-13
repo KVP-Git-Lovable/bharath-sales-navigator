@@ -153,6 +153,9 @@ export const ROICalculator = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<StepId>("team");
   const [answers, setAnswers] = useState<Answer>(initialAnswers);
+  const [contact, setContact] = useState({ name: "", email: "", phone: "", company: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const steps: { id: StepId; label: string }[] = [
     { id: "team", label: "Your Team" },
