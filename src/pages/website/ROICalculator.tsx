@@ -3,7 +3,9 @@ import {
   ArrowRight, ArrowLeft, Calculator, Users, Target, Clock, 
   TrendingUp, AlertTriangle, CheckCircle2, Sparkles, Calendar,
   BarChart3, Smartphone, Award, Zap, Building2, Brain, Truck,
-  LineChart, FileText, ShieldCheck, Lightbulb, Handshake
+  LineChart, FileText, ShieldCheck, Lightbulb, Handshake,
+  Download, Info, Rocket, Phone, Mail, User, MessageSquare,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,6 +16,12 @@ import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import { WebsiteHeader, WebsiteFooter } from "@/components/website";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import quickappLogo from "@/assets/quickapp-logo-full.png";
 
 type StepId = "team" | "process" | "challenges" | "distributor" | "institutional" | "analytics" | "ai-readiness" | "goals" | "results";
 
