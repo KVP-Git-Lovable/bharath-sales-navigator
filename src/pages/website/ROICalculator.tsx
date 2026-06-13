@@ -492,6 +492,305 @@ export const ROICalculator = () => {
   const problems = generateProblemStatements();
   const recommendations = generateRecommendations();
 
+  // Tailored business benefits derived from the user's responses
+  const generateBenefits = () => {
+    const benefits: { metric: string; value: string; rationale: string }[] = [];
+    if (answers.challenges.includes("productivity") || answers.currentProcess === "manual" || answers.currentProcess === "none") {
+      benefits.push({ metric: "Rep Productivity", value: "+25–40%", rationale: "Automated check-ins, beat plans and offline order capture eliminate admin overhead." });
+    }
+    if (answers.challenges.includes("visibility")) {
+      benefits.push({ metric: "Field Visibility", value: "Real-time", rationale: "Live GPS, attendance and visit telemetry across every rep and territory." });
+    }
+    if (answers.challenges.includes("accuracy")) {
+      benefits.push({ metric: "Data Accuracy", value: "+90%", rationale: "Structured catalogs, validated orders and scheme engine remove manual errors." });
+    }
+    if (answers.challenges.includes("collections") || answers.distributorChallenges.includes("claims")) {
+      benefits.push({ metric: "Collections Cycle", value: "-30%", rationale: "AI credit scoring, automated reminders and digital claims accelerate cash." });
+    }
+    if (answers.distributorCount !== "none" && answers.distributorCount !== "") {
+      benefits.push({ metric: "Distributor Engagement", value: "2× faster", rationale: "Self-serve portal for primary orders, stock visibility and claims." });
+    }
+    if (situation.hasInstitutional) {
+      benefits.push({ metric: "B2B Pipeline Conversion", value: "+15–25%", rationale: "CRM, CPQ and structured follow-ups capture every institutional opportunity." });
+    }
+    if (answers.analyticsMaturity === "none" || answers.analyticsMaturity === "basic") {
+      benefits.push({ metric: "Decision Speed", value: "Days → Minutes", rationale: "Role-based dashboards and AI-ready reports replace spreadsheet cycles." });
+    }
+    if (answers.aiInterest.length > 0) {
+      benefits.push({ metric: "AI Coverage", value: `${answers.aiInterest.length} use-cases`, rationale: "Tailored AI modules deployed against the capabilities you shortlisted." });
+    }
+    if (answers.topPriority === "growth") {
+      benefits.push({ metric: "Top-line Growth", value: "+12–20%", rationale: "Smart basket, focus SKUs and gamified targets push secondary sales." });
+    }
+    return benefits.slice(0, 8);
+  };
+
+  // Step-by-step implementation roadmap mapped to identified needs
+  const generateRoadmap = () => {
+    const phases: { phase: string; weeks: string; goal: string; activities: string[]; mappedTo: string[] }[] = [];
+    phases.push({
+      phase: "Phase 1 — Discovery & Setup",
+      weeks: "Week 1",
+      goal: "Configure QuickApp to mirror your operating model.",
+      activities: [
+        "Kickoff workshop: territories, beats, roles, hierarchy",
+        "Master data import: retailers, products, schemes, price lists",
+        "Configure approval flows, attendance and leave policies",
+        "Branding, invoice templates and tax masters set up",
+      ],
+      mappedTo: ["Current process: " + situation.processLabel],
+    });
+    phases.push({
+      phase: "Phase 2 — Field Rollout",
+      weeks: "Week 2",
+      goal: "Get every rep transacting on QuickApp daily.",
+      activities: [
+        "Install mobile app, enable GPS + face-verified attendance",
+        "Train reps on beat plans, visits and offline order capture",
+        "Launch gamification: leaderboards, badges, weekly contests",
+        ...(answers.challenges.includes("adoption") ? ["Adoption nudges & daily streaks to lock in tool usage"] : []),
+      ],
+      mappedTo: [
+        ...(answers.challenges.includes("productivity") ? ["Low rep productivity"] : []),
+        ...(answers.challenges.includes("adoption") ? ["Poor tool adoption"] : []),
+        ...(answers.challenges.includes("visibility") ? ["Limited field visibility"] : []),
+      ],
+    });
+    if (answers.distributorCount !== "none" && answers.distributorCount !== "") {
+      phases.push({
+        phase: "Phase 3 — Distribution Activation",
+        weeks: "Week 2–3",
+        goal: "Bring distributors onto the self-serve DMS portal.",
+        activities: [
+          "Onboard distributors and assign retailers / beats",
+          "Enable primary orders, dispatch, GRN and stock visibility",
+          "Digitise claims, schemes and credit notes",
+          "Set up retailer ledgers and WhatsApp invoice delivery",
+        ],
+        mappedTo: answers.distributorChallenges.length ? answers.distributorChallenges.map(c => distributorChallengeOptions.find(o => o.value === c)?.label || c) : ["Distribution network"],
+      });
+    }
+    if (situation.hasInstitutional) {
+      phases.push({
+        phase: "Phase 4 — Institutional Sales CRM",
+        weeks: "Week 3–4",
+        goal: "Stand up the B2B pipeline with CPQ.",
+        activities: [
+          "Lead capture, qualification and pipeline stages",
+          "CPQ: quote builder with custom pricing & approvals",
+          "Contact & account management with reminders",
+          "Collections workflow with aging dashboards",
+        ],
+        mappedTo: answers.institutionalChallenges.length ? answers.institutionalChallenges.map(c => institutionalChallengeOptions.find(o => o.value === c)?.label || c) : ["Institutional sales"],
+      });
+    }
+    phases.push({
+      phase: "Phase 5 — Analytics & AI",
+      weeks: "Week 4–6",
+      goal: "Move from data capture to decisions.",
+      activities: [
+        "Role-based dashboards: rep, manager, leadership",
+        "Scheduled reports and exception alerts",
+        ...(answers.aiInterest.includes("recommendations") ? ["Enable smart product recommendations per retailer"] : []),
+        ...(answers.aiInterest.includes("stock-detection") ? ["Activate shelf-image stock detection"] : []),
+        ...(answers.aiInterest.includes("credit-scoring") ? ["Roll out AI credit scoring for retailers"] : []),
+        ...(answers.aiInterest.includes("sales-coach") ? ["AI sales coach nudges for each rep"] : []),
+        ...(answers.aiInterest.includes("competition") ? ["Competition scan from in-store photos"] : []),
+        ...(answers.aiInterest.includes("forecasting") ? ["Demand forecasting at SKU × territory"] : []),
+      ],
+      mappedTo: [
+        ...(answers.analyticsNeeds.map(a => analyticsNeedOptions.find(o => o.value === a)?.label || a)),
+        ...(answers.aiInterest.length === 0 ? ["Analytics maturity: " + situation.analyticsLabel] : []),
+      ],
+    });
+    phases.push({
+      phase: "Phase 6 — Steady State & Optimisation",
+      weeks: "Week 6+",
+      goal: "Run cadences that compound the gains.",
+      activities: [
+        "Monthly business reviews driven by QuickApp dashboards",
+        "Quarterly scheme & target re-planning",
+        "Continuous catalog, pricing and territory refinement",
+        "Customer success check-ins and feature enablement",
+      ],
+      mappedTo: ["Top priority: " + (priorityOptions.find(p => p.value === answers.topPriority)?.label || "Operational excellence")],
+    });
+    return phases;
+  };
+
+  const benefits = generateBenefits();
+  const roadmap = generateRoadmap();
+
+  const nextStepsList = [
+    "Book a 30-minute discovery call with a QuickApp solution expert",
+    "Share this report internally with sales, ops and IT stakeholders",
+    "Identify a pilot territory (10–20 reps) for the first 4-week rollout",
+    "Nominate a project owner and a master-data SPOC on your side",
+    "Confirm integrations needed (ERP, accounting, WhatsApp, payments)",
+  ];
+
+  // Branded PDF download
+  const handleDownloadPdf = async () => {
+    try {
+      setGeneratingPdf(true);
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 40;
+
+      // Load logo
+      const logoData: string = await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const c = document.createElement("canvas");
+          c.width = img.width; c.height = img.height;
+          c.getContext("2d")!.drawImage(img, 0, 0);
+          resolve(c.toDataURL("image/png"));
+        };
+        img.onerror = () => resolve("");
+        img.src = quickappLogo;
+      });
+
+      const drawHeader = () => {
+        if (logoData) doc.addImage(logoData, "PNG", margin, 24, 90, 24);
+        doc.setFontSize(9); doc.setTextColor(120);
+        doc.text("QuickApp Field Sales — ROI Assessment", pageW - margin, 38, { align: "right" });
+        doc.setDrawColor(230); doc.line(margin, 60, pageW - margin, 60);
+      };
+      const drawFooter = (pageNum: number, total: number) => {
+        doc.setFontSize(9); doc.setTextColor(120);
+        doc.text("quickapp.ai  •  Generated " + new Date().toLocaleDateString(), margin, pageH - 24);
+        doc.text(`Page ${pageNum} of ${total}`, pageW - margin, pageH - 24, { align: "right" });
+      };
+
+      let y = 80;
+      drawHeader();
+      doc.setTextColor(20); doc.setFontSize(20);
+      doc.text("Your ROI Potential Report", margin, y); y += 28;
+      doc.setFontSize(12); doc.setTextColor(80);
+      doc.text(`Score: ${score}/100  —  ${scoreLevel.label}`, margin, y); y += 24;
+
+      doc.setFontSize(11); doc.setTextColor(40);
+      const intro = "This personalised report summarises your current sales operating model, the gaps we identified, and a step-by-step plan to capture the value QuickApp can unlock for your team.";
+      doc.text(doc.splitTextToSize(intro, pageW - margin * 2), margin, y); y += 50;
+
+      // Situation
+      autoTable(doc, {
+        startY: y, theme: "grid", styles: { fontSize: 10 }, headStyles: { fillColor: [37, 99, 235] },
+        head: [["Your Situation", "Detail"]],
+        body: [
+          ["Team size", `${situation.teamSize} field reps`],
+          ["Current process", situation.processLabel],
+          ["Distribution", situation.distributorLabel || "No distributors"],
+          ["Institutional sales", situation.hasInstitutional ? "Yes" : "No"],
+          ["Analytics maturity", situation.analyticsLabel],
+          ["AI adoption", situation.aiLabel],
+          ["Top priority", priorityOptions.find(p => p.value === answers.topPriority)?.label || "—"],
+        ],
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 20;
+
+      // Challenges
+      if (problems.length) {
+        autoTable(doc, {
+          startY: y, theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [217, 119, 6] },
+          head: [["Area", "Challenge", "Business Impact"]],
+          body: problems.map(p => [p.area, p.issue, p.impact]),
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      // Benefits
+      if (benefits.length) {
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        autoTable(doc, {
+          startY: y, theme: "grid", styles: { fontSize: 10 }, headStyles: { fillColor: [16, 185, 129] },
+          head: [["Expected Benefit", "Value", "Why"]],
+          body: benefits.map(b => [b.metric, b.value, b.rationale]),
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      // Recommendations
+      doc.addPage(); drawHeader(); y = 80;
+      doc.setFontSize(16); doc.setTextColor(20);
+      doc.text("Recommended Solution", margin, y); y += 18;
+      recommendations.forEach(r => {
+        if (y > pageH - 120) { doc.addPage(); drawHeader(); y = 80; }
+        doc.setFontSize(12); doc.setTextColor(37, 99, 235);
+        doc.text(`${r.title}  (${r.timeline})`, margin, y); y += 14;
+        doc.setFontSize(10); doc.setTextColor(60);
+        const desc = doc.splitTextToSize(r.description, pageW - margin * 2);
+        doc.text(desc, margin, y); y += desc.length * 12 + 4;
+        r.approach.forEach(a => {
+          const lines = doc.splitTextToSize("• " + a, pageW - margin * 2 - 10);
+          if (y + lines.length * 12 > pageH - 60) { doc.addPage(); drawHeader(); y = 80; }
+          doc.text(lines, margin + 10, y); y += lines.length * 12;
+        });
+        y += 10;
+      });
+
+      // Roadmap
+      doc.addPage(); drawHeader(); y = 80;
+      doc.setFontSize(16); doc.setTextColor(20);
+      doc.text("Step-by-Step Implementation Roadmap", margin, y); y += 10;
+      autoTable(doc, {
+        startY: y + 10, theme: "grid", styles: { fontSize: 9, valign: "top" }, headStyles: { fillColor: [37, 99, 235] },
+        head: [["Phase", "Timeline", "Goal", "Key Activities", "Mapped To"]],
+        body: roadmap.map(p => [p.phase, p.weeks, p.goal, p.activities.map(a => "• " + a).join("\n"), p.mappedTo.join(", ") || "—"]),
+        columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 55 }, 2: { cellWidth: 90 }, 3: { cellWidth: 170 }, 4: { cellWidth: "auto" } },
+        margin: { left: margin, right: margin },
+      });
+
+      // Next steps + contact
+      doc.addPage(); drawHeader(); y = 80;
+      doc.setFontSize(16); doc.setTextColor(20); doc.text("Next Steps", margin, y); y += 18;
+      doc.setFontSize(11); doc.setTextColor(40);
+      nextStepsList.forEach((s, i) => {
+        const lines = doc.splitTextToSize(`${i + 1}. ${s}`, pageW - margin * 2);
+        doc.text(lines, margin, y); y += lines.length * 14;
+      });
+      y += 16;
+      doc.setFontSize(14); doc.setTextColor(20); doc.text("Talk to us", margin, y); y += 16;
+      doc.setFontSize(11); doc.setTextColor(60);
+      doc.text("Email: hello@quickapp.ai", margin, y); y += 14;
+      doc.text("Web: https://quickapp.ai/demo", margin, y); y += 14;
+
+      // Page numbers
+      const total = doc.getNumberOfPages();
+      for (let i = 1; i <= total; i++) { doc.setPage(i); drawFooter(i, total); }
+
+      doc.save(`QuickApp-ROI-Report-${Date.now()}.pdf`);
+      toast.success("ROI report downloaded");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Could not generate PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contact.name || !contact.email) { toast.error("Name and email are required"); return; }
+    setSubmitting(true);
+    try {
+      // Persist intent locally; integration with backend can be wired later
+      const payload = { ...contact, score, scoreLevel: scoreLevel.label, answers, submittedAt: new Date().toISOString() };
+      const existing = JSON.parse(localStorage.getItem("roi_contact_requests") || "[]");
+      existing.push(payload);
+      localStorage.setItem("roi_contact_requests", JSON.stringify(existing));
+      toast.success("Thanks! Our team will reach out shortly.");
+      setContact({ name: "", email: "", phone: "", company: "", message: "" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case "team":
