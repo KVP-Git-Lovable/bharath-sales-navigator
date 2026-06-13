@@ -248,24 +248,16 @@ export const PricingPage = () => {
               <div>
                 <h4 className="text-sm font-semibold flex items-center gap-2">
                   <PackagePlus className="w-4 h-4 text-primary" />
-                  Extend Your Field Sales Plan — Additional Order Packs
+                  Extend Your Field Sales Plan — Additional Storage
                 </h4>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Stackable & roll over until consumed. Activate anytime on top of your plan.
+                  Add storage anytime on top of your plan. Simple, predictable pricing.
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs md:min-w-[420px]">
-                <div className="px-3 py-2 rounded-lg bg-background border border-border text-center">
-                  <p className="font-semibold">Starter Pack</p>
-                  <p className="text-muted-foreground">₹2,000 — 500 orders</p>
-                </div>
-                <div className="px-3 py-2 rounded-lg bg-primary/5 border border-primary text-center">
-                  <p className="font-semibold">Growth Pack</p>
-                  <p className="text-muted-foreground">₹5,000 — 1,500 orders</p>
-                </div>
-                <div className="px-3 py-2 rounded-lg bg-background border border-border text-center">
-                  <p className="font-semibold">Scale Pack</p>
-                  <p className="text-muted-foreground">₹10,000 — 3,500 orders</p>
+              <div className="text-xs md:min-w-[280px]">
+                <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
+                  <p className="font-semibold text-sm">Storage Pack</p>
+                  <p className="text-muted-foreground">₹500 per 1 GB / month</p>
                 </div>
               </div>
             </div>
