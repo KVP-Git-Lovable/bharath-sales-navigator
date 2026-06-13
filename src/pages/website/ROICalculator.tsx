@@ -3,7 +3,9 @@ import {
   ArrowRight, ArrowLeft, Calculator, Users, Target, Clock, 
   TrendingUp, AlertTriangle, CheckCircle2, Sparkles, Calendar,
   BarChart3, Smartphone, Award, Zap, Building2, Brain, Truck,
-  LineChart, FileText, ShieldCheck, Lightbulb, Handshake
+  LineChart, FileText, ShieldCheck, Lightbulb, Handshake,
+  Download, Info, Rocket, Phone, Mail, User, MessageSquare,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,6 +16,12 @@ import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import { WebsiteHeader, WebsiteFooter } from "@/components/website";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import quickappLogo from "@/assets/quickapp-logo-full.png";
 
 type StepId = "team" | "process" | "challenges" | "distributor" | "institutional" | "analytics" | "ai-readiness" | "goals" | "results";
 
@@ -145,6 +153,9 @@ export const ROICalculator = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<StepId>("team");
   const [answers, setAnswers] = useState<Answer>(initialAnswers);
+  const [contact, setContact] = useState({ name: "", email: "", phone: "", company: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const steps: { id: StepId; label: string }[] = [
     { id: "team", label: "Your Team" },
@@ -480,6 +491,305 @@ export const ROICalculator = () => {
   const situation = generateSituationSummary();
   const problems = generateProblemStatements();
   const recommendations = generateRecommendations();
+
+  // Tailored business benefits derived from the user's responses
+  const generateBenefits = () => {
+    const benefits: { metric: string; value: string; rationale: string }[] = [];
+    if (answers.challenges.includes("productivity") || answers.currentProcess === "manual" || answers.currentProcess === "none") {
+      benefits.push({ metric: "Rep Productivity", value: "+25–40%", rationale: "Automated check-ins, beat plans and offline order capture eliminate admin overhead." });
+    }
+    if (answers.challenges.includes("visibility")) {
+      benefits.push({ metric: "Field Visibility", value: "Real-time", rationale: "Live GPS, attendance and visit telemetry across every rep and territory." });
+    }
+    if (answers.challenges.includes("accuracy")) {
+      benefits.push({ metric: "Data Accuracy", value: "+90%", rationale: "Structured catalogs, validated orders and scheme engine remove manual errors." });
+    }
+    if (answers.challenges.includes("collections") || answers.distributorChallenges.includes("claims")) {
+      benefits.push({ metric: "Collections Cycle", value: "-30%", rationale: "AI credit scoring, automated reminders and digital claims accelerate cash." });
+    }
+    if (answers.distributorCount !== "none" && answers.distributorCount !== "") {
+      benefits.push({ metric: "Distributor Engagement", value: "2× faster", rationale: "Self-serve portal for primary orders, stock visibility and claims." });
+    }
+    if (situation.hasInstitutional) {
+      benefits.push({ metric: "B2B Pipeline Conversion", value: "+15–25%", rationale: "CRM, CPQ and structured follow-ups capture every institutional opportunity." });
+    }
+    if (answers.analyticsMaturity === "none" || answers.analyticsMaturity === "basic") {
+      benefits.push({ metric: "Decision Speed", value: "Days → Minutes", rationale: "Role-based dashboards and AI-ready reports replace spreadsheet cycles." });
+    }
+    if (answers.aiInterest.length > 0) {
+      benefits.push({ metric: "AI Coverage", value: `${answers.aiInterest.length} use-cases`, rationale: "Tailored AI modules deployed against the capabilities you shortlisted." });
+    }
+    if (answers.topPriority === "growth") {
+      benefits.push({ metric: "Top-line Growth", value: "+12–20%", rationale: "Smart basket, focus SKUs and gamified targets push secondary sales." });
+    }
+    return benefits.slice(0, 8);
+  };
+
+  // Step-by-step implementation roadmap mapped to identified needs
+  const generateRoadmap = () => {
+    const phases: { phase: string; weeks: string; goal: string; activities: string[]; mappedTo: string[] }[] = [];
+    phases.push({
+      phase: "Phase 1 — Discovery & Setup",
+      weeks: "Week 1",
+      goal: "Configure QuickApp to mirror your operating model.",
+      activities: [
+        "Kickoff workshop: territories, beats, roles, hierarchy",
+        "Master data import: retailers, products, schemes, price lists",
+        "Configure approval flows, attendance and leave policies",
+        "Branding, invoice templates and tax masters set up",
+      ],
+      mappedTo: ["Current process: " + situation.processLabel],
+    });
+    phases.push({
+      phase: "Phase 2 — Field Rollout",
+      weeks: "Week 2",
+      goal: "Get every rep transacting on QuickApp daily.",
+      activities: [
+        "Install mobile app, enable GPS + face-verified attendance",
+        "Train reps on beat plans, visits and offline order capture",
+        "Launch gamification: leaderboards, badges, weekly contests",
+        ...(answers.challenges.includes("adoption") ? ["Adoption nudges & daily streaks to lock in tool usage"] : []),
+      ],
+      mappedTo: [
+        ...(answers.challenges.includes("productivity") ? ["Low rep productivity"] : []),
+        ...(answers.challenges.includes("adoption") ? ["Poor tool adoption"] : []),
+        ...(answers.challenges.includes("visibility") ? ["Limited field visibility"] : []),
+      ],
+    });
+    if (answers.distributorCount !== "none" && answers.distributorCount !== "") {
+      phases.push({
+        phase: "Phase 3 — Distribution Activation",
+        weeks: "Week 2–3",
+        goal: "Bring distributors onto the self-serve DMS portal.",
+        activities: [
+          "Onboard distributors and assign retailers / beats",
+          "Enable primary orders, dispatch, GRN and stock visibility",
+          "Digitise claims, schemes and credit notes",
+          "Set up retailer ledgers and WhatsApp invoice delivery",
+        ],
+        mappedTo: answers.distributorChallenges.length ? answers.distributorChallenges.map(c => distributorChallengeOptions.find(o => o.value === c)?.label || c) : ["Distribution network"],
+      });
+    }
+    if (situation.hasInstitutional) {
+      phases.push({
+        phase: "Phase 4 — Institutional Sales CRM",
+        weeks: "Week 3–4",
+        goal: "Stand up the B2B pipeline with CPQ.",
+        activities: [
+          "Lead capture, qualification and pipeline stages",
+          "CPQ: quote builder with custom pricing & approvals",
+          "Contact & account management with reminders",
+          "Collections workflow with aging dashboards",
+        ],
+        mappedTo: answers.institutionalChallenges.length ? answers.institutionalChallenges.map(c => institutionalChallengeOptions.find(o => o.value === c)?.label || c) : ["Institutional sales"],
+      });
+    }
+    phases.push({
+      phase: "Phase 5 — Analytics & AI",
+      weeks: "Week 4–6",
+      goal: "Move from data capture to decisions.",
+      activities: [
+        "Role-based dashboards: rep, manager, leadership",
+        "Scheduled reports and exception alerts",
+        ...(answers.aiInterest.includes("recommendations") ? ["Enable smart product recommendations per retailer"] : []),
+        ...(answers.aiInterest.includes("stock-detection") ? ["Activate shelf-image stock detection"] : []),
+        ...(answers.aiInterest.includes("credit-scoring") ? ["Roll out AI credit scoring for retailers"] : []),
+        ...(answers.aiInterest.includes("sales-coach") ? ["AI sales coach nudges for each rep"] : []),
+        ...(answers.aiInterest.includes("competition") ? ["Competition scan from in-store photos"] : []),
+        ...(answers.aiInterest.includes("forecasting") ? ["Demand forecasting at SKU × territory"] : []),
+      ],
+      mappedTo: [
+        ...(answers.analyticsNeeds.map(a => analyticsNeedOptions.find(o => o.value === a)?.label || a)),
+        ...(answers.aiInterest.length === 0 ? ["Analytics maturity: " + situation.analyticsLabel] : []),
+      ],
+    });
+    phases.push({
+      phase: "Phase 6 — Steady State & Optimisation",
+      weeks: "Week 6+",
+      goal: "Run cadences that compound the gains.",
+      activities: [
+        "Monthly business reviews driven by QuickApp dashboards",
+        "Quarterly scheme & target re-planning",
+        "Continuous catalog, pricing and territory refinement",
+        "Customer success check-ins and feature enablement",
+      ],
+      mappedTo: ["Top priority: " + (priorityOptions.find(p => p.value === answers.topPriority)?.label || "Operational excellence")],
+    });
+    return phases;
+  };
+
+  const benefits = generateBenefits();
+  const roadmap = generateRoadmap();
+
+  const nextStepsList = [
+    "Book a 30-minute discovery call with a QuickApp solution expert",
+    "Share this report internally with sales, ops and IT stakeholders",
+    "Identify a pilot territory (10–20 reps) for the first 4-week rollout",
+    "Nominate a project owner and a master-data SPOC on your side",
+    "Confirm integrations needed (ERP, accounting, WhatsApp, payments)",
+  ];
+
+  // Branded PDF download
+  const handleDownloadPdf = async () => {
+    try {
+      setGeneratingPdf(true);
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 40;
+
+      // Load logo
+      const logoData: string = await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const c = document.createElement("canvas");
+          c.width = img.width; c.height = img.height;
+          c.getContext("2d")!.drawImage(img, 0, 0);
+          resolve(c.toDataURL("image/png"));
+        };
+        img.onerror = () => resolve("");
+        img.src = quickappLogo;
+      });
+
+      const drawHeader = () => {
+        if (logoData) doc.addImage(logoData, "PNG", margin, 24, 90, 24);
+        doc.setFontSize(9); doc.setTextColor(120);
+        doc.text("QuickApp Field Sales — ROI Assessment", pageW - margin, 38, { align: "right" });
+        doc.setDrawColor(230); doc.line(margin, 60, pageW - margin, 60);
+      };
+      const drawFooter = (pageNum: number, total: number) => {
+        doc.setFontSize(9); doc.setTextColor(120);
+        doc.text("quickapp.ai  •  Generated " + new Date().toLocaleDateString(), margin, pageH - 24);
+        doc.text(`Page ${pageNum} of ${total}`, pageW - margin, pageH - 24, { align: "right" });
+      };
+
+      let y = 80;
+      drawHeader();
+      doc.setTextColor(20); doc.setFontSize(20);
+      doc.text("Your ROI Potential Report", margin, y); y += 28;
+      doc.setFontSize(12); doc.setTextColor(80);
+      doc.text(`Score: ${score}/100  —  ${scoreLevel.label}`, margin, y); y += 24;
+
+      doc.setFontSize(11); doc.setTextColor(40);
+      const intro = "This personalised report summarises your current sales operating model, the gaps we identified, and a step-by-step plan to capture the value QuickApp can unlock for your team.";
+      doc.text(doc.splitTextToSize(intro, pageW - margin * 2), margin, y); y += 50;
+
+      // Situation
+      autoTable(doc, {
+        startY: y, theme: "grid", styles: { fontSize: 10 }, headStyles: { fillColor: [37, 99, 235] },
+        head: [["Your Situation", "Detail"]],
+        body: [
+          ["Team size", `${situation.teamSize} field reps`],
+          ["Current process", situation.processLabel],
+          ["Distribution", situation.distributorLabel || "No distributors"],
+          ["Institutional sales", situation.hasInstitutional ? "Yes" : "No"],
+          ["Analytics maturity", situation.analyticsLabel],
+          ["AI adoption", situation.aiLabel],
+          ["Top priority", priorityOptions.find(p => p.value === answers.topPriority)?.label || "—"],
+        ],
+        margin: { left: margin, right: margin },
+      });
+      y = (doc as any).lastAutoTable.finalY + 20;
+
+      // Challenges
+      if (problems.length) {
+        autoTable(doc, {
+          startY: y, theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [217, 119, 6] },
+          head: [["Area", "Challenge", "Business Impact"]],
+          body: problems.map(p => [p.area, p.issue, p.impact]),
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      // Benefits
+      if (benefits.length) {
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        autoTable(doc, {
+          startY: y, theme: "grid", styles: { fontSize: 10 }, headStyles: { fillColor: [16, 185, 129] },
+          head: [["Expected Benefit", "Value", "Why"]],
+          body: benefits.map(b => [b.metric, b.value, b.rationale]),
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      // Recommendations
+      doc.addPage(); drawHeader(); y = 80;
+      doc.setFontSize(16); doc.setTextColor(20);
+      doc.text("Recommended Solution", margin, y); y += 18;
+      recommendations.forEach(r => {
+        if (y > pageH - 120) { doc.addPage(); drawHeader(); y = 80; }
+        doc.setFontSize(12); doc.setTextColor(37, 99, 235);
+        doc.text(`${r.title}  (${r.timeline})`, margin, y); y += 14;
+        doc.setFontSize(10); doc.setTextColor(60);
+        const desc = doc.splitTextToSize(r.description, pageW - margin * 2);
+        doc.text(desc, margin, y); y += desc.length * 12 + 4;
+        r.approach.forEach(a => {
+          const lines = doc.splitTextToSize("• " + a, pageW - margin * 2 - 10);
+          if (y + lines.length * 12 > pageH - 60) { doc.addPage(); drawHeader(); y = 80; }
+          doc.text(lines, margin + 10, y); y += lines.length * 12;
+        });
+        y += 10;
+      });
+
+      // Roadmap
+      doc.addPage(); drawHeader(); y = 80;
+      doc.setFontSize(16); doc.setTextColor(20);
+      doc.text("Step-by-Step Implementation Roadmap", margin, y); y += 10;
+      autoTable(doc, {
+        startY: y + 10, theme: "grid", styles: { fontSize: 9, valign: "top" }, headStyles: { fillColor: [37, 99, 235] },
+        head: [["Phase", "Timeline", "Goal", "Key Activities", "Mapped To"]],
+        body: roadmap.map(p => [p.phase, p.weeks, p.goal, p.activities.map(a => "• " + a).join("\n"), p.mappedTo.join(", ") || "—"]),
+        columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 55 }, 2: { cellWidth: 90 }, 3: { cellWidth: 170 }, 4: { cellWidth: "auto" } },
+        margin: { left: margin, right: margin },
+      });
+
+      // Next steps + contact
+      doc.addPage(); drawHeader(); y = 80;
+      doc.setFontSize(16); doc.setTextColor(20); doc.text("Next Steps", margin, y); y += 18;
+      doc.setFontSize(11); doc.setTextColor(40);
+      nextStepsList.forEach((s, i) => {
+        const lines = doc.splitTextToSize(`${i + 1}. ${s}`, pageW - margin * 2);
+        doc.text(lines, margin, y); y += lines.length * 14;
+      });
+      y += 16;
+      doc.setFontSize(14); doc.setTextColor(20); doc.text("Talk to us", margin, y); y += 16;
+      doc.setFontSize(11); doc.setTextColor(60);
+      doc.text("Email: hello@quickapp.ai", margin, y); y += 14;
+      doc.text("Web: https://quickapp.ai/demo", margin, y); y += 14;
+
+      // Page numbers
+      const total = doc.getNumberOfPages();
+      for (let i = 1; i <= total; i++) { doc.setPage(i); drawFooter(i, total); }
+
+      doc.save(`QuickApp-ROI-Report-${Date.now()}.pdf`);
+      toast.success("ROI report downloaded");
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Could not generate PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contact.name || !contact.email) { toast.error("Name and email are required"); return; }
+    setSubmitting(true);
+    try {
+      // Persist intent locally; integration with backend can be wired later
+      const payload = { ...contact, score, scoreLevel: scoreLevel.label, answers, submittedAt: new Date().toISOString() };
+      const existing = JSON.parse(localStorage.getItem("roi_contact_requests") || "[]");
+      existing.push(payload);
+      localStorage.setItem("roi_contact_requests", JSON.stringify(existing));
+      toast.success("Thanks! Our team will reach out shortly.");
+      setContact({ name: "", email: "", phone: "", company: "", message: "" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const renderStep = () => {
     switch (currentStep) {
@@ -903,6 +1213,12 @@ export const ROICalculator = () => {
               </div>
               <h2 className="text-2xl font-bold mb-2">Your Personalized Assessment</h2>
               <p className="text-muted-foreground">Based on your responses, here&apos;s our analysis</p>
+              <div className="mt-4 flex justify-center">
+                <Button onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  {generatingPdf ? "Preparing PDF..." : "Download Full Report (PDF)"}
+                </Button>
+              </div>
             </div>
 
             {/* ROI Score */}
@@ -918,6 +1234,23 @@ export const ROICalculator = () => {
                 <span className="text-2xl text-muted-foreground mb-2">/100</span>
               </div>
               <Progress value={score} className="h-3" />
+              {/* Score explainer */}
+              <div className="mt-6 grid sm:grid-cols-2 gap-3 text-xs">
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-background/60 border">
+                  <Info className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm mb-1">What does this score mean?</p>
+                    <p className="text-muted-foreground">It estimates how much measurable value QuickApp can unlock for you — based on team size, current process, challenges, distribution, analytics and AI readiness. Higher means more upside.</p>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-background/60 border space-y-1.5">
+                  <p className="font-medium text-sm flex items-center gap-1.5"><HelpCircle className="w-4 h-4 text-primary" /> Score bands</p>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-500" /><span className="text-muted-foreground">0–24 Moderate opportunity</span></div>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500" /><span className="text-muted-foreground">25–49 Good fit</span></div>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-muted-foreground">50–74 Significant value</span></div>
+                  <div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-green-500" /><span className="text-muted-foreground">75–100 High impact</span></div>
+                </div>
+              </div>
             </Card>
 
             {/* Current Situation Summary */}
@@ -1018,6 +1351,146 @@ export const ROICalculator = () => {
                 })}
               </div>
             </div>
+
+            {/* Tailored Business Benefits */}
+            {benefits.length > 0 && (
+              <Card className="p-6 border-emerald-500/20 bg-emerald-500/5">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  Business Benefits Tailored to You
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">Outcomes we expect based on the responses you provided.</p>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {benefits.map((b, i) => (
+                    <div key={i} className="p-4 rounded-lg bg-background/60 border">
+                      <p className="text-2xl font-bold text-emerald-600">{b.value}</p>
+                      <p className="text-sm font-medium mt-1">{b.metric}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{b.rationale}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Step-by-step Implementation Roadmap */}
+            <Card className="p-6 border-primary/20">
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                <Rocket className="w-5 h-5 text-primary" />
+                Step-by-Step Implementation Roadmap
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">Each phase is mapped to the challenges and goals you shared.</p>
+              <div className="relative pl-6 border-l-2 border-primary/20 space-y-6">
+                {roadmap.map((p, i) => (
+                  <div key={i} className="relative">
+                    <span className="absolute -left-[34px] top-1 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <h4 className="font-semibold">{p.phase}</h4>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{p.weeks}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{p.goal}</p>
+                    <ul className="mt-2 space-y-1">
+                      {p.activities.map((a, j) => (
+                        <li key={j} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>{a}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {p.mappedTo.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="text-xs text-muted-foreground">Addresses:</span>
+                        {p.mappedTo.map((m, k) => (
+                          <span key={k} className="text-[11px] bg-muted px-2 py-0.5 rounded-full">{m}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Project Plan Snapshot */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Project Plan Snapshot
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase text-muted-foreground border-b">
+                      <th className="py-2 pr-3">Phase</th>
+                      <th className="py-2 pr-3">Timeline</th>
+                      <th className="py-2">Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roadmap.map((p, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-2 pr-3 font-medium">{p.phase}</td>
+                        <td className="py-2 pr-3 text-muted-foreground">{p.weeks}</td>
+                        <td className="py-2 text-muted-foreground">{p.goal}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Next Steps */}
+            <Card className="p-6 border-blue-500/20 bg-blue-500/5">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                Your Next Steps
+              </h3>
+              <ol className="space-y-2">
+                {nextStepsList.map((s, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm">
+                    <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+
+            {/* Contact Us */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                Talk to a QuickApp Expert
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">Share your details and we&apos;ll reach out within one business day with a tailored walkthrough.</p>
+              <form onSubmit={handleContactSubmit} className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Full name *</Label>
+                  <Input value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} required />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Company</Label>
+                  <Input value={contact.company} onChange={(e) => setContact({ ...contact, company: e.target.value })} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Work email *</Label>
+                  <Input type="email" value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} required />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Phone</Label>
+                  <Input value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label className="text-xs">What would you like to discuss?</Label>
+                  <Textarea rows={3} value={contact.message} onChange={(e) => setContact({ ...contact, message: e.target.value })} placeholder="Tell us about your team, timelines or specific questions" />
+                </div>
+                <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3 justify-end">
+                  <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+                    <Download className="w-4 h-4" /> Download Report
+                  </Button>
+                  <Button type="submit" disabled={submitting} className="gap-2">
+                    {submitting ? "Sending..." : "Request Callback"} <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </form>
+            </Card>
 
             {/* CTA */}
             <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
