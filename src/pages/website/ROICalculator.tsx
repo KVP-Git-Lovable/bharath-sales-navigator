@@ -43,6 +43,7 @@ interface Answer {
   aiInterest: string[];
   // Goals
   topPriority: string;
+  priorities: string[];
 }
 
 const initialAnswers: Answer = {
@@ -58,6 +59,7 @@ const initialAnswers: Answer = {
   aiAdoption: "",
   aiInterest: [],
   topPriority: "",
+  priorities: [],
 };
 
 const processOptions = [
