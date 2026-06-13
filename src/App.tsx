@@ -41,6 +41,7 @@ import MigrationPlanPage from "./pages/website/MigrationPlanPage";
 import MigrationChecklistPage from "./pages/website/MigrationChecklistPage";
 import ImplementationToolkitPage from "./pages/website/ImplementationToolkitPage";
 import { ProfessionalServicesROIBlog } from "./pages/website/blogs/ProfessionalServicesROIBlog";
+import { WhyQuickappBlog } from "./pages/website/blogs/WhyQuickappBlog";
 import { ProfessionalServicesChecklistBlog } from "./pages/website/blogs/ProfessionalServicesChecklistBlog";
 import { ContactPage } from "./pages/website/ContactPage";
 import PrivacyPolicyPage from "./pages/website/PrivacyPolicyPage";
@@ -359,6 +360,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/insights/implementation-toolkit" element={<ImplementationToolkitPage />} />
         <Route path="/insights/professional-services-roi" element={<ProfessionalServicesROIBlog />} />
         <Route path="/insights/professional-services-checklist" element={<ProfessionalServicesChecklistBlog />} />
+        <Route path="/insights/why-quickapp" element={<WhyQuickappBlog />} />
         <Route path="/request-demo" element={<DemoRequestPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
