@@ -39,8 +39,10 @@ const pricingTiers = [
       "Offline capabilities",
       "Secondary sales management",
       "Beat planning & tracking",
+      "Visit plan AI (recommended visits)",
+      "Territory management",
+      "Retailer onboarding - Whatsapp and SMS based verification",
       "Order management",
-      "Activity management",
       "Scheme management",
       "Basic analytics",
       "Marketing Pack & Retailer Portal available as add-ons (₹)",
@@ -68,6 +70,7 @@ const pricingTiers = [
       "Product bundles",
       "Event and counter sales process",
       "API for Integration",
+      "GPS tracking",
       "Advanced reporting",
       "Marketing Pack & Retailer Portal available as add-ons (₹)",
     ],
@@ -257,7 +260,7 @@ export const PricingPage = () => {
               <div className="text-xs md:min-w-[280px]">
                 <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
                   <p className="font-semibold text-sm">Storage Pack</p>
-                  <p className="text-muted-foreground">₹500 per 1 GB / month</p>
+                  <p className="text-muted-foreground">₹1,000 per 1 GB / month</p>
                 </div>
               </div>
             </div>
@@ -695,6 +698,12 @@ export const PricingPage = () => {
               <h3 className="font-semibold mb-2">Is there a free trial?</h3>
               <p className="text-muted-foreground text-sm">
                 Yes! All paid plans come with a 14-day free trial. No credit card required. Experience the full power of AI-guided sales.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">How much retailer records or orders can be consumed in one GB?</h3>
+              <p className="text-muted-foreground text-sm">
+                One GB typically stores around 10,000–12,000 retailer records or 25,000–30,000 order records. The exact count depends on the amount of metadata, images, and attachments associated with each record. Storage usage scales with your data richness, not just count.
               </p>
             </div>
           </div>
