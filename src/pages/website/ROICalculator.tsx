@@ -770,6 +770,10 @@ export const ROICalculator = () => {
 
   // Branded PDF download
   const handleDownloadPdf = async () => {
+    if (!contact.name?.trim() || !contact.email?.trim()) {
+      toast.error("Please enter your name and work email below to download the report");
+      return;
+    }
     try {
       setGeneratingPdf(true);
       const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -792,10 +796,15 @@ export const ROICalculator = () => {
       });
 
       const drawHeader = () => {
-        if (logoData) doc.addImage(logoData, "PNG", margin, 24, 90, 24);
-        doc.setFontSize(9); doc.setTextColor(120);
-        doc.text("QuickApp Field Sales — ROI Assessment", pageW - margin, 38, { align: "right" });
-        doc.setDrawColor(230); doc.line(margin, 60, pageW - margin, 60);
+        // Logo is square (500x500). Draw at preserved 1:1 aspect ratio so it stays legible.
+        const logoSize = 32;
+        if (logoData) doc.addImage(logoData, "PNG", margin, 20, logoSize, logoSize);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(20);
+        doc.text("QuickApp.AI", margin + logoSize + 10, 38);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120);
+        doc.text("Field Sales — ROI Assessment", margin + logoSize + 10, 50);
+        doc.text("quickapp.ai", pageW - margin, 38, { align: "right" });
+        doc.setDrawColor(230); doc.line(margin, 64, pageW - margin, 64);
       };
       const drawFooter = (pageNum: number, total: number) => {
         doc.setFontSize(9); doc.setTextColor(120);
@@ -803,7 +812,7 @@ export const ROICalculator = () => {
         doc.text(`Page ${pageNum} of ${total}`, pageW - margin, pageH - 24, { align: "right" });
       };
 
-      let y = 80;
+      let y = 90;
       drawHeader();
       doc.setTextColor(20); doc.setFontSize(20);
       doc.text("Your ROI Potential Report", margin, y); y += 28;
@@ -844,7 +853,7 @@ export const ROICalculator = () => {
 
       // Value Map
       if (valueMap.length) {
-        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 90; }
         doc.setFontSize(14); doc.setTextColor(20);
         doc.text("Value Map — Challenges → QuickApp.AI Value", margin, y); y += 10;
         autoTable(doc, {
@@ -859,7 +868,7 @@ export const ROICalculator = () => {
 
       // Benefits
       if (benefits.length) {
-        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 90; }
         autoTable(doc, {
           startY: y, theme: "grid", styles: { fontSize: 10 }, headStyles: { fillColor: [16, 185, 129] },
           head: [["Expected Benefit", "Value", "Why"]],
@@ -870,11 +879,11 @@ export const ROICalculator = () => {
       }
 
       // Recommendations
-      doc.addPage(); drawHeader(); y = 80;
+      doc.addPage(); drawHeader(); y = 90;
       doc.setFontSize(16); doc.setTextColor(20);
       doc.text("Recommended Solution", margin, y); y += 18;
       recommendations.forEach(r => {
-        if (y > pageH - 120) { doc.addPage(); drawHeader(); y = 80; }
+        if (y > pageH - 120) { doc.addPage(); drawHeader(); y = 90; }
         doc.setFontSize(12); doc.setTextColor(37, 99, 235);
         doc.text(`${r.title}  (${r.timeline})`, margin, y); y += 14;
         doc.setFontSize(10); doc.setTextColor(60);
@@ -882,14 +891,14 @@ export const ROICalculator = () => {
         doc.text(desc, margin, y); y += desc.length * 12 + 4;
         r.approach.forEach(a => {
           const lines = doc.splitTextToSize("• " + a, pageW - margin * 2 - 10);
-          if (y + lines.length * 12 > pageH - 60) { doc.addPage(); drawHeader(); y = 80; }
+          if (y + lines.length * 12 > pageH - 60) { doc.addPage(); drawHeader(); y = 90; }
           doc.text(lines, margin + 10, y); y += lines.length * 12;
         });
         y += 10;
       });
 
       // Roadmap
-      doc.addPage(); drawHeader(); y = 80;
+      doc.addPage(); drawHeader(); y = 90;
       doc.setFontSize(16); doc.setTextColor(20);
       doc.text("Step-by-Step Implementation Roadmap", margin, y); y += 10;
       autoTable(doc, {
@@ -901,7 +910,7 @@ export const ROICalculator = () => {
       });
 
       // Next steps + contact
-      doc.addPage(); drawHeader(); y = 80;
+      doc.addPage(); drawHeader(); y = 90;
       doc.setFontSize(16); doc.setTextColor(20); doc.text("Next Steps", margin, y); y += 18;
       doc.setFontSize(11); doc.setTextColor(40);
       nextStepsList.forEach((s, i) => {
@@ -1410,11 +1419,20 @@ export const ROICalculator = () => {
               </div>
               <h2 className="text-2xl font-bold mb-2">Your Personalized Assessment</h2>
               <p className="text-muted-foreground">Based on your responses, here&apos;s our analysis</p>
-              <div className="mt-4 flex justify-center">
-                <Button onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <Button
+                  onClick={handleDownloadPdf}
+                  disabled={generatingPdf || !contact.name?.trim() || !contact.email?.trim()}
+                  className="gap-2"
+                >
                   <Download className="w-4 h-4" />
                   {generatingPdf ? "Preparing PDF..." : "Download Full Report (PDF)"}
                 </Button>
+                {(!contact.name?.trim() || !contact.email?.trim()) && (
+                  <p className="text-xs text-muted-foreground">
+                    Enter your name and work email in the "Talk to a QuickApp Expert" form below to unlock the PDF.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1727,7 +1745,13 @@ export const ROICalculator = () => {
                   <Textarea rows={3} value={contact.message} onChange={(e) => setContact({ ...contact, message: e.target.value })} placeholder="Tell us about your team, timelines or specific questions" />
                 </div>
                 <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3 justify-end">
-                  <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDownloadPdf}
+                    disabled={generatingPdf || !contact.name?.trim() || !contact.email?.trim()}
+                    className="gap-2"
+                  >
                     <Download className="w-4 h-4" /> Download Report
                   </Button>
                   <Button type="submit" disabled={submitting} className="gap-2">
