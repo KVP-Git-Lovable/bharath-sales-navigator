@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   ArrowRight, ArrowLeft, Calculator, Users, Target, Clock, 
   TrendingUp, AlertTriangle, CheckCircle2, Sparkles, Calendar,
@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import quickappLogo from "@/assets/quickapp-logo-full.png";
+import { insertRoiEntry, insertWebsiteLead } from "@/lib/websiteLeads";
 
 type StepId = "team" | "process" | "challenges" | "distributor" | "institutional" | "analytics" | "ai-readiness" | "goals" | "results";
 
