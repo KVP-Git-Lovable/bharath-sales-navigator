@@ -1,5 +1,8 @@
 project_id = "aoxdosjkwqyuvccuwhzc"
 
+[functions.notify-teams-lead]
+verify_jwt = false
+
 [functions.roi-tracker-assessment]
 verify_jwt = false
 
