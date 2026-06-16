@@ -849,7 +849,7 @@ export const ROICalculator = () => {
 
       // Value Map
       if (valueMap.length) {
-        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 90; }
         doc.setFontSize(14); doc.setTextColor(20);
         doc.text("Value Map — Challenges → QuickApp.AI Value", margin, y); y += 10;
         autoTable(doc, {
@@ -864,7 +864,7 @@ export const ROICalculator = () => {
 
       // Benefits
       if (benefits.length) {
-        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 90; }
         autoTable(doc, {
           startY: y, theme: "grid", styles: { fontSize: 10 }, headStyles: { fillColor: [16, 185, 129] },
           head: [["Expected Benefit", "Value", "Why"]],
@@ -875,11 +875,11 @@ export const ROICalculator = () => {
       }
 
       // Recommendations
-      doc.addPage(); drawHeader(); y = 80;
+      doc.addPage(); drawHeader(); y = 90;
       doc.setFontSize(16); doc.setTextColor(20);
       doc.text("Recommended Solution", margin, y); y += 18;
       recommendations.forEach(r => {
-        if (y > pageH - 120) { doc.addPage(); drawHeader(); y = 80; }
+        if (y > pageH - 120) { doc.addPage(); drawHeader(); y = 90; }
         doc.setFontSize(12); doc.setTextColor(37, 99, 235);
         doc.text(`${r.title}  (${r.timeline})`, margin, y); y += 14;
         doc.setFontSize(10); doc.setTextColor(60);
@@ -887,14 +887,14 @@ export const ROICalculator = () => {
         doc.text(desc, margin, y); y += desc.length * 12 + 4;
         r.approach.forEach(a => {
           const lines = doc.splitTextToSize("• " + a, pageW - margin * 2 - 10);
-          if (y + lines.length * 12 > pageH - 60) { doc.addPage(); drawHeader(); y = 80; }
+          if (y + lines.length * 12 > pageH - 60) { doc.addPage(); drawHeader(); y = 90; }
           doc.text(lines, margin + 10, y); y += lines.length * 12;
         });
         y += 10;
       });
 
       // Roadmap
-      doc.addPage(); drawHeader(); y = 80;
+      doc.addPage(); drawHeader(); y = 90;
       doc.setFontSize(16); doc.setTextColor(20);
       doc.text("Step-by-Step Implementation Roadmap", margin, y); y += 10;
       autoTable(doc, {
@@ -906,7 +906,7 @@ export const ROICalculator = () => {
       });
 
       // Next steps + contact
-      doc.addPage(); drawHeader(); y = 80;
+      doc.addPage(); drawHeader(); y = 90;
       doc.setFontSize(16); doc.setTextColor(20); doc.text("Next Steps", margin, y); y += 18;
       doc.setFontSize(11); doc.setTextColor(40);
       nextStepsList.forEach((s, i) => {
