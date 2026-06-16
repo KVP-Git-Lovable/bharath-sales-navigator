@@ -45,20 +45,24 @@ export interface WebsiteLeadInput {
 
 export async function insertWebsiteLead(input: WebsiteLeadInput) {
   const utm = captureUtm();
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : undefined;
   const payload = {
+    ...(id ? { id } : {}),
     ...input,
     metadata: input.metadata ?? {},
     ...utm,
   };
-  const { data, error } = await supabase
-    .from("website_leads")
-    .insert(payload)
-    .select("id")
-    .single();
+  // NOTE: do NOT chain .select() here — the anon role has no SELECT policy
+  // on website_leads, so requesting the row back triggers a 42501 RLS error
+  // even though the INSERT itself succeeds.
+  const { error } = await supabase.from("website_leads").insert(payload);
   if (error) {
     console.error("[websiteLeads] insert failed", error);
   }
-  return { data, error };
+  return { data: id ? { id } : null, error };
 }
 
 export interface RoiEntryInput {
@@ -76,20 +80,22 @@ export interface RoiEntryInput {
 
 export async function insertRoiEntry(input: RoiEntryInput) {
   const utm = captureUtm();
+  const id =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : undefined;
   const payload = {
+    ...(id ? { id } : {}),
     ...input,
     calculated_results: input.calculated_results ?? {},
     roi_summary: input.roi_summary ?? {},
     source_page: "/roi-calculator",
     ...utm,
   };
-  const { data, error } = await supabase
-    .from("roi_calculator_entries")
-    .insert(payload)
-    .select("id")
-    .single();
+  // Same reason as above — anon has no SELECT policy on this table.
+  const { error } = await supabase.from("roi_calculator_entries").insert(payload);
   if (error) {
     console.error("[websiteLeads] ROI insert failed", error);
   }
-  return { data, error };
+  return { data: id ? { id } : null, error };
 }
