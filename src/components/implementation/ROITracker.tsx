@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { TrendingUp, BarChart2, CheckCircle, AlertCircle, IndianRupee, MapPin, Activity, Sparkles, UserPlus } from "lucide-react";
+import { TrendingUp, BarChart2, CheckCircle, AlertCircle, IndianRupee, MapPin, Activity, Sparkles, Target as TargetIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -267,7 +267,7 @@ export function ROITracker({ value, onChange }: ROITrackerProps) {
       <Card className="bg-white/5 border-white/10">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Target className="w-5 h-5 text-amber-400" />
+            <TargetIcon className="w-5 h-5 text-amber-400" />
             Adoption Metrics
           </CardTitle>
         </CardHeader>
