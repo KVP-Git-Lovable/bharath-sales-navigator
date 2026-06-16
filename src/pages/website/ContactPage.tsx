@@ -18,6 +18,7 @@ import {
   HeadphonesIcon
 } from "lucide-react";
 import { toast } from "sonner";
+import { insertWebsiteLead } from "@/lib/websiteLeads";
 
 type InquiryType = "general" | "sales" | "support" | "careers";
 
@@ -51,10 +52,20 @@ export const ContactPage = () => {
     }
 
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
+    await insertWebsiteLead({
+      lead_type: "contact_request",
+      lead_sub_type: inquiryType,
+      source_page: "/contact",
+      form_origin: "ContactPage",
+      full_name: formData.fullName,
+      email: formData.email,
+      phone: formData.phone || null,
+      company: formData.company || null,
+      message: formData.message,
+      metadata: { subject: formData.subject, inquiry_type: inquiryType },
+    });
+
     toast.success("Message sent successfully! We'll get back to you soon.");
     setFormData({
       fullName: "",
