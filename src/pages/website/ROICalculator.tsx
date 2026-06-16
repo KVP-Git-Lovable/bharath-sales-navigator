@@ -732,6 +732,14 @@ export const ROICalculator = () => {
   const benefits = generateBenefits();
   const roadmap = generateRoadmap();
 
+  const nextStepsList = [
+    "Book a 30-minute discovery call with a QuickApp solution expert",
+    "Share this report internally with sales, ops and IT stakeholders",
+    "Identify a pilot territory (10–20 reps) for the first 4-week rollout",
+    "Nominate a project owner and a master-data SPOC on your side",
+    "Confirm integrations needed (ERP, accounting, WhatsApp, payments)",
+  ];
+
   // Persist ROI questionnaire once when user reaches the results step.
   const roiEntryIdRef = useRef<string | null>(null);
   const roiCaptureSentRef = useRef(false);
@@ -757,15 +765,8 @@ export const ROICalculator = () => {
       });
       if (data?.id) roiEntryIdRef.current = data.id;
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
-
-  const nextStepsList = [
-    "Book a 30-minute discovery call with a QuickApp solution expert",
-    "Share this report internally with sales, ops and IT stakeholders",
-    "Identify a pilot territory (10–20 reps) for the first 4-week rollout",
-    "Nominate a project owner and a master-data SPOC on your side",
-    "Confirm integrations needed (ERP, accounting, WhatsApp, payments)",
-  ];
 
   // Branded PDF download
   const handleDownloadPdf = async () => {
