@@ -53,10 +53,10 @@ const comparisonData = [
 
 export const USPSection = () => {
   return (
-    <section id="why-us" className="py-20 px-4 bg-muted/30">
+    <section id="why-us" className="py-20 px-3 sm:px-4 bg-muted/30">
       <div className="container mx-auto">
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-accent-gold/10 text-accent-gold px-4 py-2 rounded-full text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 bg-accent-gold/10 text-accent-gold px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-4">
             <Zap className="h-4 w-4" />
             Why Choose QuickApp.AI
           </div>

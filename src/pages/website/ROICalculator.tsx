@@ -1564,9 +1564,9 @@ export const ROICalculator = () => {
       <WebsiteHeader />
       
       {/* Hero */}
-      <section className="pt-28 pb-8 px-4">
+      <section className="pt-28 pb-8 px-3 sm:px-4">
         <div className="container mx-auto text-center max-w-3xl">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Calculator className="w-4 h-4" />
             ROI Assessment Tool
           </div>
@@ -1591,7 +1591,7 @@ export const ROICalculator = () => {
       </section>
 
       {/* Step Content */}
-      <section className="py-8 px-4">
+      <section className="py-8 px-3 sm:px-4">
         <div className="container mx-auto max-w-4xl">
           <Card className="p-6 md:p-10">
             {renderStep()}
@@ -1600,7 +1600,7 @@ export const ROICalculator = () => {
       </section>
 
       {/* Navigation */}
-      <section className="py-8 px-4">
+      <section className="py-8 px-3 sm:px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="flex justify-between">
             <Button

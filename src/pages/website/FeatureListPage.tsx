@@ -197,9 +197,9 @@ const FeatureListPage = () => {
       <WebsiteHeader />
 
       {/* Hero Section - Compact */}
-      <section className="pt-8 pb-6 px-4">
+      <section className="pt-8 pb-6 px-3 sm:px-4">
         <div className="container mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-2 mb-4">
+          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 sm:px-4 py-2 mb-4">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span className="text-amber-400 text-sm font-medium">AI-First • Unlimited Users • 100+ Features</span>
           </div>
@@ -220,7 +220,7 @@ const FeatureListPage = () => {
       <section className="px-4 pb-4 sticky top-[60px] z-40 bg-gradient-to-b from-[#1A1F2C] to-[#1A1F2C]/95 backdrop-blur-sm">
         <div className="container mx-auto">
           {/* Scrollable tabs */}
-          <div className="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          <div className="overflow-x-auto pb-2 -mx-4 px-3 sm:px-4 scrollbar-hide">
             <div className="flex gap-2 min-w-max">
               {featureCategories.map((category, idx) => {
                 const isActive = activeCategory === category.id;
@@ -229,7 +229,7 @@ const FeatureListPage = () => {
                     key={category.id}
                     onClick={() => setActiveCategory(category.id)}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-300 whitespace-nowrap font-medium",
+                      "flex items-center gap-2 px-3 sm:px-4 py-3 rounded-xl transition-all duration-300 whitespace-nowrap font-medium",
                       isActive 
                         ? `bg-gradient-to-r ${category.color} text-white shadow-lg scale-105` 
                         : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10"
@@ -353,7 +353,7 @@ const FeatureListPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 px-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-t border-white/10">
+      <section className="py-16 px-3 sm:px-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-t border-white/10">
         <div className="container mx-auto text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
             Ready to Experience All Features?
@@ -382,7 +382,7 @@ const FeatureListPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-4 border-t border-white/10">
+      <footer className="py-8 px-3 sm:px-4 border-t border-white/10">
         <div className="container mx-auto text-center text-white/40 text-sm">
           © 2024 QuickApp.AI. All rights reserved.
         </div>

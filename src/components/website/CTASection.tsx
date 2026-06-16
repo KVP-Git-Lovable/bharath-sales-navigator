@@ -13,7 +13,7 @@ export const CTASection = () => {
   ];
 
   return (
-    <section className="py-20 px-4 bg-gradient-hero relative overflow-hidden">
+    <section className="py-20 px-3 sm:px-4 bg-gradient-hero relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/40"></div>
       
       {/* Background elements */}
@@ -24,7 +24,7 @@ export const CTASection = () => {
 
       <div className="container mx-auto text-center relative z-10">
         {/* AI Badge */}
-        <div className="inline-flex items-center gap-2 bg-accent-gold/20 text-accent-gold px-4 py-2 rounded-full text-sm font-medium mb-6 backdrop-blur border border-accent-gold/30">
+        <div className="inline-flex items-center gap-2 bg-accent-gold/20 text-accent-gold px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-6 backdrop-blur border border-accent-gold/30">
           <Brain className="h-4 w-4" />
           AI-First • Guides Your Team to Success
         </div>
@@ -44,7 +44,7 @@ export const CTASection = () => {
         {/* Benefits */}
         <div className="flex flex-wrap justify-center gap-4 mb-10">
           {benefits.map((benefit, index) => (
-            <div key={index} className="flex items-center gap-2 text-white/90 text-sm bg-white/10 px-4 py-2 rounded-full backdrop-blur">
+            <div key={index} className="flex items-center gap-2 text-white/90 text-sm bg-white/10 px-3 sm:px-4 py-2 rounded-full backdrop-blur">
               <CheckCircle className="h-4 w-4 text-accent-gold" />
               {benefit}
             </div>

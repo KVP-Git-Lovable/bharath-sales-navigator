@@ -119,7 +119,7 @@ export const BharathBeveragesCaseStudy = () => {
       <WebsiteHeader />
 
       {/* Hero */}
-      <section className="pt-12 pb-8 px-4">
+      <section className="pt-12 pb-8 px-3 sm:px-4">
         <div className="container mx-auto max-w-5xl">
           <Button
             variant="ghost"
@@ -130,7 +130,7 @@ export const BharathBeveragesCaseStudy = () => {
             Back to Insights
           </Button>
 
-          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-2 mb-4">
+          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 sm:px-4 py-2 mb-4">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span className="text-amber-400 text-sm font-medium">Customer Case Study</span>
           </div>
@@ -156,7 +156,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* Headline KPIs */}
-      <section className="py-8 px-4">
+      <section className="py-8 px-3 sm:px-4">
         <div className="container mx-auto max-w-5xl">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {headlineStats.map((s, i) => (
@@ -172,7 +172,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* 4-week rollout timeline */}
-      <section className="py-10 px-4">
+      <section className="py-10 px-3 sm:px-4">
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-3xl font-bold text-white mb-2">Discovery to Go-Live in 4 Weeks</h2>
           <p className="text-white/60 mb-8">A tight, structured rollout — no big-bang risk, no productivity hit.</p>
@@ -194,7 +194,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* The brief */}
-      <section className="py-12 px-4">
+      <section className="py-12 px-3 sm:px-4">
         <div className="container mx-auto max-w-4xl">
           <h2 className="text-3xl font-bold text-white mb-6">The Brief</h2>
           <div className="grid md:grid-cols-2 gap-6">
@@ -224,7 +224,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* Weekly trend */}
-      <section className="py-12 px-4 bg-white/5">
+      <section className="py-12 px-3 sm:px-4 bg-white/5">
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-3xl font-bold text-white mb-2">Orders & Revenue — 16-Week Lift</h2>
           <p className="text-white/60 mb-8">Indexed to 100 at go-live week. Bars = orders · Line = revenue. Compounding growth across all four months.</p>
@@ -246,7 +246,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* Module adoption */}
-      <section className="py-12 px-4">
+      <section className="py-12 px-3 sm:px-4">
         <div className="container mx-auto max-w-5xl">
           <h2 className="text-3xl font-bold text-white mb-2">Module Adoption</h2>
           <p className="text-white/60 mb-8">Usage growth across the QuickApp.AI stack from Month 1 to Month 4.</p>
@@ -272,7 +272,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* Capabilities deployed */}
-      <section className="py-12 px-4 bg-white/5">
+      <section className="py-12 px-3 sm:px-4 bg-white/5">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-white mb-2">What's Running for the Team Today</h2>
           <p className="text-white/60 mb-8">A single platform — Field Sales + DMS + B2B + Retailer Portal — wired into one playbook.</p>
@@ -291,7 +291,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* AI plays */}
-      <section className="py-12 px-4">
+      <section className="py-12 px-3 sm:px-4">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-white mb-2">AI Doing the Heavy Lifting</h2>
           <p className="text-white/60 mb-8">The reps don't navigate the system. The system guides them.</p>
@@ -310,7 +310,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* Gamification + Credit + WhatsApp + Offline */}
-      <section className="py-12 px-4 bg-white/5">
+      <section className="py-12 px-3 sm:px-4 bg-white/5">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-3xl font-bold text-white mb-8">Culture, Cash and Coverage</h2>
 
@@ -389,7 +389,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* What's next */}
-      <section className="py-12 px-4">
+      <section className="py-12 px-3 sm:px-4">
         <div className="container mx-auto max-w-4xl">
           <h2 className="text-3xl font-bold text-white mb-6">Where We Go Next</h2>
           <div className="grid md:grid-cols-2 gap-4">
@@ -416,7 +416,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* Pull quote */}
-      <section className="py-12 px-4">
+      <section className="py-12 px-3 sm:px-4">
         <div className="container mx-auto max-w-4xl">
           <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-2xl p-8">
             <div className="flex items-start gap-3">
@@ -435,7 +435,7 @@ export const BharathBeveragesCaseStudy = () => {
       </section>
 
       {/* CTA */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-3 sm:px-4">
         <div className="container mx-auto max-w-4xl text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Want results like this?</h2>
           <p className="text-white/70 mb-6">Go live in 2–4 weeks. One price, unlimited users. AI guidance from day one.</p>

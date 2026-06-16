@@ -332,7 +332,7 @@ export default function ImplementationToolkitPage() {
       <WebsiteHeader />
 
       {/* Header */}
-      <section className="pt-8 pb-4 px-4">
+      <section className="pt-8 pb-4 px-3 sm:px-4">
         <div className="container mx-auto max-w-7xl">
           <Button
             variant="ghost"

@@ -45,7 +45,7 @@ export const HeroSection = () => {
 
       {/* Content */}
       <motion.div 
-        className="relative z-10 container mx-auto px-4 pt-32 md:pt-40 pb-16 flex flex-col items-center"
+        className="relative z-10 container mx-auto px-3 sm:px-4 pt-32 md:pt-40 pb-16 flex flex-col items-center"
         variants={containerVariants}
         initial="hidden"
         animate="visible"

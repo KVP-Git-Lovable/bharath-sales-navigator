@@ -93,7 +93,7 @@ export const WebsiteHeader = () => {
 
   return (
     <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div className="container mx-auto px-3 sm:px-4 py-3 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/')}>
           <img 
@@ -129,7 +129,7 @@ export const WebsiteHeader = () => {
                       <button
                         key={solution.href}
                         onClick={() => handleSolutionClick(solution.href, solution.external)}
-                        className="block w-full text-left px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        className="block w-full text-left px-3 sm:px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                       >
                         {solution.label}
                       </button>
@@ -169,7 +169,7 @@ export const WebsiteHeader = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-border/40 bg-background px-4 py-4 space-y-4">
+        <div className="md:hidden border-t border-border/40 bg-background px-3 sm:px-4 py-4 space-y-4">
           {navItems.map((item) => (
             <div key={item.label}>
               {item.hasDropdown ? (
