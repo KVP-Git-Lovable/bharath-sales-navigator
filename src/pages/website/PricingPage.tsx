@@ -149,13 +149,13 @@ export const PricingPage = () => {
       </section>
 
       {/* Field Sales Platform */}
-      <section className="py-8 px-4">
-        <div className="container mx-auto">
+      <section className="py-8 px-3 sm:px-4">
+        <div className="mx-auto w-full max-w-7xl">
           <div className="text-center mb-8">
             <h3 className="text-xl md:text-2xl font-semibold">Field Sales Platform</h3>
             <p className="text-sm text-muted-foreground mt-1">For your field reps, distributors, and sales operations.</p>
           </div>
-        <div className="container mx-auto">
+        <div className="w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {pricingTiers.map((tier) => {
               const Icon = tier.icon;
