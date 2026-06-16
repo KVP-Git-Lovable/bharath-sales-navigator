@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   ArrowRight, ArrowLeft, Calculator, Users, Target, Clock, 
   TrendingUp, AlertTriangle, CheckCircle2, Sparkles, Calendar,
@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import quickappLogo from "@/assets/quickapp-logo-full.png";
+import { insertRoiEntry, insertWebsiteLead } from "@/lib/websiteLeads";
 
 type StepId = "team" | "process" | "challenges" | "distributor" | "institutional" | "analytics" | "ai-readiness" | "goals" | "results";
 
@@ -739,6 +740,34 @@ export const ROICalculator = () => {
     "Confirm integrations needed (ERP, accounting, WhatsApp, payments)",
   ];
 
+  // Persist ROI questionnaire once when user reaches the results step.
+  const roiEntryIdRef = useRef<string | null>(null);
+  const roiCaptureSentRef = useRef(false);
+  useEffect(() => {
+    if (currentStep !== "results" || roiCaptureSentRef.current) return;
+    roiCaptureSentRef.current = true;
+    (async () => {
+      const { data } = await insertRoiEntry({
+        company_size: String(answers.teamSize),
+        submission_data: { answers },
+        calculated_results: {
+          score,
+          score_label: scoreLevel.label,
+          score_recommendation: scoreLevel.recommendation,
+          benefits,
+          roadmap,
+        },
+        roi_summary: {
+          situation,
+          value_map: valueMap,
+          next_steps: nextStepsList,
+        },
+      });
+      if (data?.id) roiEntryIdRef.current = data.id;
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
+
   // Branded PDF download
   const handleDownloadPdf = async () => {
     try {
@@ -904,11 +933,22 @@ export const ROICalculator = () => {
     if (!contact.name || !contact.email) { toast.error("Name and email are required"); return; }
     setSubmitting(true);
     try {
-      // Persist intent locally; integration with backend can be wired later
-      const payload = { ...contact, score, scoreLevel: scoreLevel.label, answers, submittedAt: new Date().toISOString() };
-      const existing = JSON.parse(localStorage.getItem("roi_contact_requests") || "[]");
-      existing.push(payload);
-      localStorage.setItem("roi_contact_requests", JSON.stringify(existing));
+      await insertWebsiteLead({
+        lead_type: "roi_callback_request",
+        lead_sub_type: "quickapp_expert",
+        source_page: "/roi-calculator",
+        form_origin: "ROICalculator:ExpertForm",
+        full_name: contact.name,
+        email: contact.email,
+        phone: contact.phone || null,
+        company: contact.company || null,
+        message: contact.message || null,
+        metadata: {
+          roi_entry_id: roiEntryIdRef.current,
+          score,
+          score_label: scoreLevel.label,
+        },
+      });
       toast.success("Thanks! Our team will reach out shortly.");
       setContact({ name: "", email: "", phone: "", company: "", message: "" });
     } finally {

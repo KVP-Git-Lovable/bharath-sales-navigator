@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { insertWebsiteLead } from "@/lib/websiteLeads";
 
 const solutions = [
   { id: "field-sales", label: "Field Sales Automation" },
@@ -109,10 +110,29 @@ export default function DemoRequestPage() {
 
     try {
       const validatedData = formSchema.parse(formData);
-      
-      // Simulate form submission (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
+      const selectedSolutionLabels = validatedData.solutions
+        .map(id => solutions.find(s => s.id === id)?.label || id);
+
+      await insertWebsiteLead({
+        lead_type: "demo_request",
+        source_page: "/request-demo",
+        form_origin: "DemoRequestPage",
+        full_name: validatedData.fullName,
+        email: validatedData.email,
+        phone: validatedData.phone,
+        company: validatedData.company,
+        job_title: validatedData.jobTitle,
+        team_size: validatedData.teamSize,
+        industry: validatedData.industry,
+        location: validatedData.location,
+        message: validatedData.message || null,
+        metadata: {
+          selected_solutions: selectedSolutionLabels,
+          selected_solution_ids: validatedData.solutions,
+        },
+      });
+
       toast.success("Demo request submitted successfully!", {
         description: "Our team will contact you within 24 hours."
       });
