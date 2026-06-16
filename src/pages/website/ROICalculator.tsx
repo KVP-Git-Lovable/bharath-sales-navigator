@@ -1494,6 +1494,54 @@ export const ROICalculator = () => {
               </div>
             </div>
 
+            {/* Value Map — challenges mapped to QuickApp.AI value propositions */}
+            {valueMap.length > 0 && (
+              <Card className="p-6 border-primary/20 bg-primary/5">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <Handshake className="w-5 h-5 text-primary" />
+                  Value Map — Your Challenges → QuickApp.AI Value
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Each challenge you shared is directly addressed by a specific QuickApp.AI proposition and capabilities.
+                </p>
+                <div className="space-y-3">
+                  {valueMap.map((row, i) => (
+                    <div
+                      key={i}
+                      className="grid md:grid-cols-12 gap-3 p-4 rounded-lg bg-background/70 border"
+                    >
+                      <div className="md:col-span-4">
+                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{row.area}</span>
+                        <div className="flex items-start gap-2 mt-1">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm font-medium">{row.challengeLabel}</p>
+                        </div>
+                      </div>
+                      <div className="hidden md:flex md:col-span-1 items-center justify-center text-primary">
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                      <div className="md:col-span-7">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {row.capabilities.map((cap, k) => (
+                            <span
+                              key={k}
+                              className="text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full"
+                            >
+                              {cap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
             {/* Tailored Business Benefits */}
             {benefits.length > 0 && (
               <Card className="p-6 border-emerald-500/20 bg-emerald-500/5">
