@@ -292,6 +292,7 @@ const App = () => {
           <AuthProvider>
             <TooltipProvider>
               <BrowserRouter>
+                <ScrollToTop />
                 <SlowConnectionBanner />
                 <SchemaHealthBanner />
                 <AppContent hasError={hasError} />
