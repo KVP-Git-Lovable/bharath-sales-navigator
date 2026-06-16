@@ -792,10 +792,15 @@ export const ROICalculator = () => {
       });
 
       const drawHeader = () => {
-        if (logoData) doc.addImage(logoData, "PNG", margin, 24, 90, 24);
-        doc.setFontSize(9); doc.setTextColor(120);
-        doc.text("QuickApp Field Sales — ROI Assessment", pageW - margin, 38, { align: "right" });
-        doc.setDrawColor(230); doc.line(margin, 60, pageW - margin, 60);
+        // Logo is square (500x500). Draw at preserved 1:1 aspect ratio so it stays legible.
+        const logoSize = 32;
+        if (logoData) doc.addImage(logoData, "PNG", margin, 20, logoSize, logoSize);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(20);
+        doc.text("QuickApp.AI", margin + logoSize + 10, 38);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(120);
+        doc.text("Field Sales — ROI Assessment", margin + logoSize + 10, 50);
+        doc.text("quickapp.ai", pageW - margin, 38, { align: "right" });
+        doc.setDrawColor(230); doc.line(margin, 64, pageW - margin, 64);
       };
       const drawFooter = (pageNum: number, total: number) => {
         doc.setFontSize(9); doc.setTextColor(120);
@@ -803,7 +808,7 @@ export const ROICalculator = () => {
         doc.text(`Page ${pageNum} of ${total}`, pageW - margin, pageH - 24, { align: "right" });
       };
 
-      let y = 80;
+      let y = 90;
       drawHeader();
       doc.setTextColor(20); doc.setFontSize(20);
       doc.text("Your ROI Potential Report", margin, y); y += 28;
