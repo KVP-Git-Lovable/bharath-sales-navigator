@@ -112,8 +112,8 @@ export const PricingPage = () => {
       <WebsiteHeader />
       
       {/* Hero Section */}
-      <section className="pt-32 pb-16 px-4">
-        <div className="container mx-auto text-center max-w-4xl">
+      <section className="pt-32 pb-16 px-3 sm:px-4">
+        <div className="w-full mx-auto text-center max-w-4xl">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Zap className="w-4 h-4" />
             One Price • Unlimited Users • Success-Based
@@ -137,8 +137,8 @@ export const PricingPage = () => {
       </section>
 
       {/* ============ CORE PRODUCTS ============ */}
-      <section id="core" className="pt-8 pb-4 px-4">
-        <div className="container mx-auto max-w-5xl text-center">
+      <section id="core" className="pt-8 pb-4 px-3 sm:px-4">
+        <div className="w-full mx-auto max-w-5xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-3">
             <LayoutGrid className="w-4 h-4" />
             Core Products
@@ -149,13 +149,13 @@ export const PricingPage = () => {
       </section>
 
       {/* Field Sales Platform */}
-      <section className="py-8 px-4">
-        <div className="container mx-auto">
+      <section className="py-8 px-3 sm:px-4">
+        <div className="mx-auto w-full max-w-7xl">
           <div className="text-center mb-8">
             <h3 className="text-xl md:text-2xl font-semibold">Field Sales Platform</h3>
             <p className="text-sm text-muted-foreground mt-1">For your field reps, distributors, and sales operations.</p>
           </div>
-        <div className="container mx-auto">
+        <div className="w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {pricingTiers.map((tier) => {
               const Icon = tier.icon;
@@ -243,8 +243,8 @@ export const PricingPage = () => {
 
       {/* Retailer Portal */}
       {/* Capacity Packs — compact strip under Field Sales tiers */}
-      <section className="pt-2 pb-8 px-4">
-        <div className="container mx-auto max-w-7xl">
+      <section className="pt-2 pb-8 px-3 sm:px-4">
+        <div className="w-full mx-auto max-w-7xl">
           <Card className="p-5 border-border bg-muted/20">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
@@ -268,8 +268,8 @@ export const PricingPage = () => {
       </section>
 
       {/* Enterprise Plus Section */}
-      <section className="py-16 px-4">
-        <div className="container mx-auto max-w-4xl">
+      <section className="py-16 px-3 sm:px-4">
+        <div className="w-full mx-auto max-w-4xl">
           <Card className="p-8 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="flex-1">
@@ -316,8 +316,8 @@ export const PricingPage = () => {
       </section>
 
       {/* ============ ADD-ONS ============ */}
-      <section id="addons" className="py-16 px-4">
-        <div className="container mx-auto max-w-7xl">
+      <section id="addons" className="py-16 px-3 sm:px-4">
+        <div className="w-full mx-auto max-w-7xl">
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
               <Package className="w-4 h-4" />
@@ -506,7 +506,7 @@ export const PricingPage = () => {
 
       {/* ============ SUPPORT & SERVICES ============ */}
       <section id="support" className="py-16 px-4 bg-muted/30">
-        <div className="container mx-auto max-w-5xl">
+        <div className="w-full mx-auto max-w-5xl">
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
               <LifeBuoy className="w-4 h-4" />
@@ -666,7 +666,7 @@ export const PricingPage = () => {
 
       {/* FAQ Section */}
       <section className="py-16 px-4 bg-muted/30">
-        <div className="container mx-auto max-w-3xl">
+        <div className="w-full mx-auto max-w-3xl">
           <h2 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
           <div className="space-y-6">
             <div>
