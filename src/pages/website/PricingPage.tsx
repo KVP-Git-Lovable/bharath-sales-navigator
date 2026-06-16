@@ -114,7 +114,7 @@ export const PricingPage = () => {
       {/* Hero Section */}
       <section className="pt-32 pb-16 px-3 sm:px-4">
         <div className="w-full mx-auto text-center max-w-4xl">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Zap className="w-4 h-4" />
             One Price • Unlimited Users • Success-Based
           </div>
@@ -139,7 +139,7 @@ export const PricingPage = () => {
       {/* ============ CORE PRODUCTS ============ */}
       <section id="core" className="pt-8 pb-4 px-3 sm:px-4">
         <div className="w-full mx-auto max-w-5xl text-center">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-3">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-3">
             <LayoutGrid className="w-4 h-4" />
             Core Products
           </div>
@@ -319,7 +319,7 @@ export const PricingPage = () => {
       <section id="addons" className="py-16 px-3 sm:px-4">
         <div className="w-full mx-auto max-w-7xl">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-4">
               <Package className="w-4 h-4" />
               Add-Ons
             </div>
@@ -505,10 +505,10 @@ export const PricingPage = () => {
       </section>
 
       {/* ============ SUPPORT & SERVICES ============ */}
-      <section id="support" className="py-16 px-4 bg-muted/30">
+      <section id="support" className="py-16 px-3 sm:px-4 bg-muted/30">
         <div className="w-full mx-auto max-w-5xl">
           <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-4">
               <LifeBuoy className="w-4 h-4" />
               Support & Services
             </div>
@@ -665,7 +665,7 @@ export const PricingPage = () => {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-16 px-4 bg-muted/30">
+      <section className="py-16 px-3 sm:px-4 bg-muted/30">
         <div className="w-full mx-auto max-w-3xl">
           <h2 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
           <div className="space-y-6">

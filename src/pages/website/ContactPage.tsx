@@ -138,7 +138,7 @@ export const ContactPage = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent-gold/5 to-background" />
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMjIiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
         
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-3 sm:px-4 relative z-10">
           <div className="text-center max-w-3xl mx-auto">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6">
               Get in Touch
@@ -148,11 +148,11 @@ export const ContactPage = () => {
             </p>
             
             <div className="flex flex-wrap justify-center gap-4">
-              <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full px-4 py-2">
+              <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full px-3 sm:px-4 py-2">
                 <Clock className="h-4 w-4 text-accent-gold" />
                 <span className="text-sm text-muted-foreground">24/7 Support Available</span>
               </div>
-              <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full px-4 py-2">
+              <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full px-3 sm:px-4 py-2">
                 <MessageSquare className="h-4 w-4 text-accent-gold" />
                 <span className="text-sm text-muted-foreground">Response within 4 hours</span>
               </div>
@@ -163,7 +163,7 @@ export const ContactPage = () => {
 
       {/* Main Content */}
       <section className="py-16">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Contact Form */}
             <div className="lg:col-span-2">
@@ -313,7 +313,7 @@ export const ContactPage = () => {
 
       {/* Department Contacts */}
       <section className="py-16 bg-muted/30">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-12">
             Department Contacts
           </h2>
@@ -341,7 +341,7 @@ export const ContactPage = () => {
 
       {/* Connect With Us */}
       <section className="py-16">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-8">
             Connect With Us
           </h2>

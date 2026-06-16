@@ -201,6 +201,7 @@ import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
 import PackingListDetailPage from "./pages/PackingListDetail";
+import { ScrollToTop } from "./components/ScrollToTop";
 
 // ARCHIVED: Projects module hidden
 // import ProjectsPage from "./pages/pm/ProjectsPage";
@@ -292,6 +293,7 @@ const App = () => {
           <AuthProvider>
             <TooltipProvider>
               <BrowserRouter>
+                <ScrollToTop />
                 <SlowConnectionBanner />
                 <SchemaHealthBanner />
                 <AppContent hasError={hasError} />

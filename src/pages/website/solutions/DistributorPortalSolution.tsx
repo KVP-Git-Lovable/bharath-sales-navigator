@@ -81,11 +81,11 @@ export default function DistributorPortalSolution() {
       <WebsiteHeader />
       
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-primary/10 to-background">
+      <section className="pt-32 pb-20 px-3 sm:px-4 bg-gradient-to-b from-primary/10 to-background">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <span className="inline-block px-4 py-2 bg-primary/20 text-primary rounded-full text-sm font-medium mb-6">
+              <span className="inline-block px-3 sm:px-4 py-2 bg-primary/20 text-primary rounded-full text-sm font-medium mb-6">
                 Distributor Portal
               </span>
               <h1 className="text-4xl md:text-5xl font-bold mb-6">
@@ -127,7 +127,7 @@ export default function DistributorPortalSolution() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-3 sm:px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -155,7 +155,7 @@ export default function DistributorPortalSolution() {
       </section>
 
       {/* Benefits Section */}
-      <section className="py-20 px-4 bg-primary/5">
+      <section className="py-20 px-3 sm:px-4 bg-primary/5">
         <div className="container mx-auto max-w-6xl">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -201,7 +201,7 @@ export default function DistributorPortalSolution() {
       </section>
 
       {/* Related Features */}
-      <section className="py-20 px-4">
+      <section className="py-20 px-3 sm:px-4">
         <div className="container mx-auto max-w-6xl">
           <h2 className="text-2xl font-bold mb-8 text-center">Related Features</h2>
           <div className="flex flex-wrap justify-center gap-4">
@@ -220,7 +220,7 @@ export default function DistributorPortalSolution() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-primary/20 to-primary/10">
+      <section className="py-20 px-3 sm:px-4 bg-gradient-to-r from-primary/20 to-primary/10">
         <div className="container mx-auto max-w-4xl text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             Ready to Empower Your Distributors?

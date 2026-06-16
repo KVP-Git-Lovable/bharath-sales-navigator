@@ -119,7 +119,7 @@ export const ProfessionalServicesSolution = () => {
         {/* Hero Section */}
         <section className="relative py-20 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent-gold/5 to-secondary/5" />
-          <div className="container mx-auto px-4 relative">
+          <div className="container mx-auto px-3 sm:px-4 relative">
             <div className="max-w-4xl mx-auto text-center">
               <Badge variant="outline" className="mb-6 border-accent-gold/50 text-accent-gold">
                 <Award className="h-3 w-3 mr-1" />
@@ -158,7 +158,7 @@ export const ProfessionalServicesSolution = () => {
 
         {/* Support Tiers Section */}
         <section className="py-20 bg-muted/30">
-          <div className="container mx-auto px-4">
+          <div className="container mx-auto px-3 sm:px-4">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
                 Tiered Support Proposition
@@ -219,7 +219,7 @@ export const ProfessionalServicesSolution = () => {
 
         {/* What's Included Section */}
         <section className="py-20">
-          <div className="container mx-auto px-4">
+          <div className="container mx-auto px-3 sm:px-4">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
                 What's Included
@@ -267,7 +267,7 @@ export const ProfessionalServicesSolution = () => {
 
         {/* Warranty & Free Enhancements Section */}
         <section className="py-20 bg-muted/30">
-          <div className="container mx-auto px-4">
+          <div className="container mx-auto px-3 sm:px-4">
             <div className="grid lg:grid-cols-2 gap-12">
               {/* Warranty */}
               <Card className="border-border/50">
@@ -347,7 +347,7 @@ export const ProfessionalServicesSolution = () => {
 
         {/* Pricing Summary Section */}
         <section className="py-20">
-          <div className="container mx-auto px-4">
+          <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-4xl mx-auto">
               <div className="text-center mb-12">
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -401,7 +401,7 @@ export const ProfessionalServicesSolution = () => {
 
         {/* CTA Section */}
         <section className="py-20 bg-muted/30">
-          <div className="container mx-auto px-4">
+          <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-3xl mx-auto text-center">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
                 Ready to Maximize Your ROI?

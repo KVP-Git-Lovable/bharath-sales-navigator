@@ -35,7 +35,7 @@ export const WebsiteFooter = () => {
   return (
     <footer className="border-t border-border/40 bg-background">
       {/* Main Footer */}
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-3 sm:px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
           {/* Brand Column */}
           <div className="lg:col-span-2">
@@ -142,7 +142,7 @@ export const WebsiteFooter = () => {
 
       {/* Trust Badges */}
       <div className="border-t border-border/40">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-3 sm:px-4 py-6">
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-accent-gold" />
@@ -162,7 +162,7 @@ export const WebsiteFooter = () => {
 
       {/* Copyright */}
       <div className="border-t border-border/40 bg-muted/30">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-3 sm:px-4 py-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
             <p>© 2024 QuickApp.AI. All rights reserved.</p>
             <div className="flex items-center gap-6">

@@ -166,9 +166,9 @@ const TechnologyPage = () => {
         <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-background to-background" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--accent-gold)/0.15),transparent_50%)]" />
         
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-3 sm:px-4 relative z-10">
           <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-accent-gold/20 backdrop-blur px-4 py-2 rounded-full text-accent-gold text-sm border border-accent-gold/40 font-medium mb-6">
+            <div className="inline-flex items-center gap-2 bg-accent-gold/20 backdrop-blur px-3 sm:px-4 py-2 rounded-full text-accent-gold text-sm border border-accent-gold/40 font-medium mb-6">
               <Sparkles className="h-4 w-4" />
               AI-First Architecture
             </div>
@@ -209,7 +209,7 @@ const TechnologyPage = () => {
 
       {/* Core AI Modules */}
       <section className="py-16 md:py-24 bg-muted/30">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Core AI Modules
@@ -268,7 +268,7 @@ const TechnologyPage = () => {
 
       {/* Architecture Diagram */}
       <section className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               How It All Connects
@@ -368,7 +368,7 @@ const TechnologyPage = () => {
 
       {/* Infrastructure Modules */}
       <section className="py-16 md:py-24 bg-muted/30">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Infrastructure That Scales
@@ -418,7 +418,7 @@ const TechnologyPage = () => {
 
       {/* Comparison Section */}
       <section className="py-16 md:py-24">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Why AI-First Matters
@@ -455,7 +455,7 @@ const TechnologyPage = () => {
 
       {/* CTA Section */}
       <section className="py-16 md:py-24 bg-gradient-to-b from-primary/10 to-background">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3 sm:px-4">
           <div className="text-center max-w-3xl mx-auto">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Ready to Experience AI-First Sales?
