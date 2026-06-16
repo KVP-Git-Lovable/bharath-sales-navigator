@@ -36,6 +36,7 @@ import DistributorPortalSolution from "./pages/website/solutions/DistributorPort
 import VanSalesSolution from "./pages/website/solutions/VanSalesSolution";
 import { ProfessionalServicesSolution } from "./pages/website/solutions/ProfessionalServicesSolution";
 import ROICalculator from "./pages/website/ROICalculator";
+import ROITrackerPage from "./pages/website/ROITrackerPage";
 import InsightsPage from "./pages/website/InsightsPage";
 import MigrationPlanPage from "./pages/website/MigrationPlanPage";
 import MigrationChecklistPage from "./pages/website/MigrationChecklistPage";
@@ -357,6 +358,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/solutions/professional-services" element={<ProfessionalServicesSolution />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/roi-calculator" element={<ROICalculator />} />
+        <Route path="/insights/roi-tracker" element={<ROITrackerPage />} />
         <Route path="/insights" element={<InsightsPage />} />
         <Route path="/insights/migration-plan" element={<MigrationPlanPage />} />
         <Route path="/insights/migration-checklist" element={<MigrationChecklistPage />} />
