@@ -933,11 +933,22 @@ export const ROICalculator = () => {
     if (!contact.name || !contact.email) { toast.error("Name and email are required"); return; }
     setSubmitting(true);
     try {
-      // Persist intent locally; integration with backend can be wired later
-      const payload = { ...contact, score, scoreLevel: scoreLevel.label, answers, submittedAt: new Date().toISOString() };
-      const existing = JSON.parse(localStorage.getItem("roi_contact_requests") || "[]");
-      existing.push(payload);
-      localStorage.setItem("roi_contact_requests", JSON.stringify(existing));
+      await insertWebsiteLead({
+        lead_type: "roi_callback_request",
+        lead_sub_type: "quickapp_expert",
+        source_page: "/roi-calculator",
+        form_origin: "ROICalculator:ExpertForm",
+        full_name: contact.name,
+        email: contact.email,
+        phone: contact.phone || null,
+        company: contact.company || null,
+        message: contact.message || null,
+        metadata: {
+          roi_entry_id: roiEntryIdRef.current,
+          score,
+          score_label: scoreLevel.label,
+        },
+      });
       toast.success("Thanks! Our team will reach out shortly.");
       setContact({ name: "", email: "", phone: "", company: "", message: "" });
     } finally {
