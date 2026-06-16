@@ -1762,24 +1762,24 @@ export const ROICalculator = () => {
       </section>
 
       {/* Step Content */}
-      <section className="py-8 px-3 sm:px-4">
+      <section className="py-8 px-2 sm:px-4">
         <div className="container mx-auto max-w-4xl">
-          <Card className="p-6 md:p-10">
+          <Card className="p-4 sm:p-6 md:p-10">
             {renderStep()}
           </Card>
         </div>
       </section>
 
       {/* Navigation */}
-      <section className="py-8 px-3 sm:px-4">
+      <section className="py-8 px-2 sm:px-4">
         <div className="container mx-auto max-w-4xl">
-          <div className="flex justify-between">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <Button
               variant="outline"
               size="lg"
               onClick={prevStep}
               disabled={currentStepIndex === 0}
-              className="gap-2 min-w-[160px] h-12 text-base justify-center"
+              className="gap-2 h-14 text-base font-medium w-full justify-center"
             >
               <ArrowLeft className="w-4 h-4" /> Back
             </Button>
@@ -1788,7 +1788,7 @@ export const ROICalculator = () => {
                 size="lg"
                 onClick={nextStep}
                 disabled={!canProceed()}
-                className="gap-2 min-w-[160px] h-12 text-base justify-center"
+                className="gap-2 h-14 text-base font-medium w-full justify-center"
               >
                 Continue <ArrowRight className="w-4 h-4" />
               </Button>
@@ -1800,7 +1800,7 @@ export const ROICalculator = () => {
                   setAnswers(initialAnswers);
                 }}
                 variant="outline"
-                className="gap-2 min-w-[160px] h-12 text-base justify-center"
+                className="gap-2 h-14 text-base font-medium w-full justify-center"
               >
                 <Zap className="w-4 h-4" /> Start Over
               </Button>
