@@ -770,6 +770,10 @@ export const ROICalculator = () => {
 
   // Branded PDF download
   const handleDownloadPdf = async () => {
+    if (!contact.name?.trim() || !contact.email?.trim()) {
+      toast.error("Please enter your name and work email below to download the report");
+      return;
+    }
     try {
       setGeneratingPdf(true);
       const doc = new jsPDF({ unit: "pt", format: "a4" });
