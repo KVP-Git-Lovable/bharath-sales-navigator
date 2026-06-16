@@ -494,6 +494,114 @@ export const ROICalculator = () => {
   const problems = generateProblemStatements();
   const recommendations = generateRecommendations();
 
+  // Value Map — link each challenge raised by the customer to QuickApp.AI's
+  // proposition that directly addresses it.
+  const generateValueMap = () => {
+    const fieldMap: Record<string, { value: string; capabilities: string[] }> = {
+      visibility: {
+        value: "Real-time field visibility across every rep and territory",
+        capabilities: ["Live GPS & route replay", "Geo-tagged check-ins", "Beat & visit telemetry", "Manager live dashboard"],
+      },
+      productivity: {
+        value: "Reps sell more, type less — admin work is automated away",
+        capabilities: ["Offline-first order capture", "AI Smart Basket", "Auto beat plans", "1-tap visit logging"],
+      },
+      accuracy: {
+        value: "Clean, trustworthy data by design — no manual reconciliation",
+        capabilities: ["Validated product catalog", "Scheme & price engine", "Structured order forms", "Auto stock sync"],
+      },
+      adoption: {
+        value: "Adoption that actually sticks across the field team",
+        capabilities: ["Gamification 2.0 & streaks", "Vernacular UI (6+ languages)", "Lightweight Android app", "In-app coaching nudges"],
+      },
+      insights: {
+        value: "Decisions in minutes, not spreadsheet cycles",
+        capabilities: ["Role-based dashboards", "AI-ready reports", "Voice analytics", "Proactive alerts"],
+      },
+      collections: {
+        value: "Faster cash with AI-driven credit & collections",
+        capabilities: ["AI credit scoring", "Automated dunning", "Digital receipts", "Payment proof capture"],
+      },
+    };
+    const distributorMap: Record<string, { value: string; capabilities: string[] }> = {
+      "order-visibility": {
+        value: "End-to-end primary order visibility from PO to dispatch",
+        capabilities: ["Distributor Portal", "Live primary order status", "ASN & dispatch tracking", "PO approval workflow"],
+      },
+      inventory: {
+        value: "Always know what's on every distributor's shelf",
+        capabilities: ["Real-time distributor stock", "Low-stock alerts", "Auto-replenishment hints", "SKU-level ageing"],
+      },
+      claims: {
+        value: "Claims settled in days, not months — with full audit trail",
+        capabilities: ["Digital claims workflow", "Rules-based validation", "Document capture", "Settlement dashboard"],
+      },
+      communication: {
+        value: "One channel for every distributor conversation",
+        capabilities: ["Two-way portal messaging", "WhatsApp broadcasts", "Announcements & circulars", "Ticketing & SLAs"],
+      },
+      performance: {
+        value: "Distributor performance you can measure and coach",
+        capabilities: ["Distributor scorecards", "RoI dashboards", "Beat coverage analytics", "Target vs actual"],
+      },
+      onboarding: {
+        value: "Onboard a new distributor in days, not weeks",
+        capabilities: ["Self-serve onboarding", "KYC capture", "Price-book sync", "Role & permission templates"],
+      },
+    };
+    const institutionalMap: Record<string, { value: string; capabilities: string[] }> = {
+      "lead-tracking": {
+        value: "Every institutional lead captured, routed and followed up",
+        capabilities: ["Institutional CRM", "Lead capture forms", "Auto-assignment rules", "SLA reminders"],
+      },
+      pipeline: {
+        value: "Predictable B2B pipeline with no surprises at quarter-end",
+        capabilities: ["Visual sales pipeline", "Stage probability", "Forecast roll-up", "Win/loss analysis"],
+      },
+      quotes: {
+        value: "Quotes out in minutes with zero pricing errors",
+        capabilities: ["CPQ with templates", "Approval workflow", "One-click PDF quotations", "Version history"],
+      },
+      collections: {
+        value: "Institutional collections accelerated and automated",
+        capabilities: ["Account-level ageing", "Automated dunning", "Payment links", "Statement of accounts"],
+      },
+      contacts: {
+        value: "A complete Account 360 for every key customer",
+        capabilities: ["Stakeholder map", "Last-touch & engagement", "Activity timeline", "Document vault"],
+      },
+      pricing: {
+        value: "Account-specific pricing managed without spreadsheets",
+        capabilities: ["Custom price books", "Contracts & tiers", "Approval-bound discounts", "Margin guardrails"],
+      },
+    };
+
+    type ValueMapRow = {
+      area: string;
+      challengeLabel: string;
+      value: string;
+      capabilities: string[];
+    };
+    const rows: ValueMapRow[] = [];
+    answers.challenges.forEach((c) => {
+      const m = fieldMap[c];
+      const label = challengeOptions.find((o) => o.value === c)?.label || c;
+      if (m) rows.push({ area: "Field Sales", challengeLabel: label, value: m.value, capabilities: m.capabilities });
+    });
+    answers.distributorChallenges.forEach((c) => {
+      const m = distributorMap[c];
+      const label = distributorChallengeOptions.find((o) => o.value === c)?.label || c;
+      if (m) rows.push({ area: "Distributor / DMS", challengeLabel: label, value: m.value, capabilities: m.capabilities });
+    });
+    answers.institutionalChallenges.forEach((c) => {
+      const m = institutionalMap[c];
+      const label = institutionalChallengeOptions.find((o) => o.value === c)?.label || c;
+      if (m) rows.push({ area: "Institutional CRM", challengeLabel: label, value: m.value, capabilities: m.capabilities });
+    });
+    return rows;
+  };
+  const valueMap = generateValueMap();
+
   // Tailored business benefits derived from the user's responses
   const generateBenefits = () => {
     const benefits: { metric: string; value: string; rationale: string }[] = [];
@@ -700,6 +808,21 @@ export const ROICalculator = () => {
           startY: y, theme: "striped", styles: { fontSize: 10 }, headStyles: { fillColor: [217, 119, 6] },
           head: [["Area", "Challenge", "Business Impact"]],
           body: problems.map(p => [p.area, p.issue, p.impact]),
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 20;
+      }
+
+      // Value Map
+      if (valueMap.length) {
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        doc.setFontSize(14); doc.setTextColor(20);
+        doc.text("Value Map — Challenges → QuickApp.AI Value", margin, y); y += 10;
+        autoTable(doc, {
+          startY: y + 6, theme: "grid", styles: { fontSize: 9, valign: "top" }, headStyles: { fillColor: [37, 99, 235] },
+          head: [["Area", "Your Challenge", "QuickApp.AI Value", "Capabilities"]],
+          body: valueMap.map(r => [r.area, r.challengeLabel, r.value, r.capabilities.map(c => "• " + c).join("\n")]),
+          columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 110 }, 2: { cellWidth: 170 }, 3: { cellWidth: "auto" } },
           margin: { left: margin, right: margin },
         });
         y = (doc as any).lastAutoTable.finalY + 20;
@@ -1385,6 +1508,54 @@ export const ROICalculator = () => {
                 })}
               </div>
             </div>
+
+            {/* Value Map — challenges mapped to QuickApp.AI value propositions */}
+            {valueMap.length > 0 && (
+              <Card className="p-6 border-primary/20 bg-primary/5">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  <Handshake className="w-5 h-5 text-primary" />
+                  Value Map — Your Challenges → QuickApp.AI Value
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Each challenge you shared is directly addressed by a specific QuickApp.AI proposition and capabilities.
+                </p>
+                <div className="space-y-3">
+                  {valueMap.map((row, i) => (
+                    <div
+                      key={i}
+                      className="grid md:grid-cols-12 gap-3 p-4 rounded-lg bg-background/70 border"
+                    >
+                      <div className="md:col-span-4">
+                        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{row.area}</span>
+                        <div className="flex items-start gap-2 mt-1">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm font-medium">{row.challengeLabel}</p>
+                        </div>
+                      </div>
+                      <div className="hidden md:flex md:col-span-1 items-center justify-center text-primary">
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                      <div className="md:col-span-7">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm font-semibold text-foreground">{row.value}</p>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {row.capabilities.map((cap, k) => (
+                            <span
+                              key={k}
+                              className="text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full"
+                            >
+                              {cap}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             {/* Tailored Business Benefits */}
             {benefits.length > 0 && (
