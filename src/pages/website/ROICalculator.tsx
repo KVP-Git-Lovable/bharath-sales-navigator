@@ -732,6 +732,33 @@ export const ROICalculator = () => {
   const benefits = generateBenefits();
   const roadmap = generateRoadmap();
 
+  // Persist ROI questionnaire once when user reaches the results step.
+  const roiEntryIdRef = useRef<string | null>(null);
+  const roiCaptureSentRef = useRef(false);
+  useEffect(() => {
+    if (currentStep !== "results" || roiCaptureSentRef.current) return;
+    roiCaptureSentRef.current = true;
+    (async () => {
+      const { data } = await insertRoiEntry({
+        company_size: String(answers.teamSize),
+        submission_data: { answers },
+        calculated_results: {
+          score,
+          score_label: scoreLevel.label,
+          score_recommendation: scoreLevel.recommendation,
+          benefits,
+          roadmap,
+        },
+        roi_summary: {
+          situation,
+          value_map: valueMap,
+          next_steps: nextStepsList,
+        },
+      });
+      if (data?.id) roiEntryIdRef.current = data.id;
+    })();
+  }, [currentStep]);
+
   const nextStepsList = [
     "Book a 30-minute discovery call with a QuickApp solution expert",
     "Share this report internally with sales, ops and IT stakeholders",
