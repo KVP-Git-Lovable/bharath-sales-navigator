@@ -428,7 +428,10 @@ export default function ImplementationToolkitPage() {
             </TabsContent>
 
             <TabsContent value="roi" className="mt-0">
-              <ROITracker data={data} onUpdate={saveData} />
+              <ROITracker
+                value={data.roiMetrics}
+                onChange={(roiMetrics) => saveData({ ...data, roiMetrics })}
+              />
             </TabsContent>
 
             <TabsContent value="training" className="mt-0">
