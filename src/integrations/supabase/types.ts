@@ -13858,6 +13858,69 @@ export type Database = {
           },
         ]
       }
+      roi_calculator_entries: {
+        Row: {
+          calculated_results: Json
+          company: string | null
+          company_size: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          industry: string | null
+          location: string | null
+          phone: string | null
+          referrer: string | null
+          roi_summary: Json
+          source_page: string | null
+          submission_data: Json
+          updated_at: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          calculated_results?: Json
+          company?: string | null
+          company_size?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          industry?: string | null
+          location?: string | null
+          phone?: string | null
+          referrer?: string | null
+          roi_summary?: Json
+          source_page?: string | null
+          submission_data?: Json
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          calculated_results?: Json
+          company?: string | null
+          company_size?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          industry?: string | null
+          location?: string | null
+          phone?: string | null
+          referrer?: string | null
+          roi_summary?: Json
+          source_page?: string | null
+          submission_data?: Json
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: []
+      }
       role_definitions: {
         Row: {
           created_at: string
@@ -17506,6 +17569,81 @@ export type Database = {
           updated_at?: string
           user_id?: string
           visit_type?: string | null
+        }
+        Relationships: []
+      }
+      website_leads: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string
+          form_origin: string | null
+          full_name: string
+          id: string
+          industry: string | null
+          job_title: string | null
+          lead_sub_type: string | null
+          lead_type: string
+          location: string | null
+          message: string | null
+          metadata: Json
+          phone: string | null
+          referrer: string | null
+          source_page: string | null
+          status: string
+          team_size: string | null
+          updated_at: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email: string
+          form_origin?: string | null
+          full_name: string
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          lead_sub_type?: string | null
+          lead_type: string
+          location?: string | null
+          message?: string | null
+          metadata?: Json
+          phone?: string | null
+          referrer?: string | null
+          source_page?: string | null
+          status?: string
+          team_size?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string
+          form_origin?: string | null
+          full_name?: string
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          lead_sub_type?: string | null
+          lead_type?: string
+          location?: string | null
+          message?: string | null
+          metadata?: Json
+          phone?: string | null
+          referrer?: string | null
+          source_page?: string | null
+          status?: string
+          team_size?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
         }
         Relationships: []
       }
