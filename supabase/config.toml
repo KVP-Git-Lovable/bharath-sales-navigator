@@ -1,5 +1,8 @@
 project_id = "aoxdosjkwqyuvccuwhzc"
 
+[functions.roi-tracker-assessment]
+verify_jwt = false
+
 [functions.beat-health-insights]
 verify_jwt = false
 
