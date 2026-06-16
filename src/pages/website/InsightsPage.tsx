@@ -68,6 +68,16 @@ const insightCards = [
     gradient: "from-amber-500 to-orange-500",
   },
   {
+    id: "roi-tracker",
+    title: "ROI Tracker — Benchmark & AI Assessment",
+    description: "Track financials, coverage, field discipline and productivity baseline vs target vs actual. Get an AI assessment PDF you can share with your team.",
+    icon: Sparkles,
+    category: "Tools",
+    readTime: "Interactive",
+    href: "/insights/roi-tracker",
+    gradient: "from-rose-500 to-amber-500",
+  },
+  {
     id: "professional-services-roi",
     title: "Why Professional Services are Key to Field Sales Software Adoption & ROI",
     description: "Discover how professional services bridge the gap between technology and people, ensuring higher adoption, better data quality, and measurable ROI for your field sales software investment.",
