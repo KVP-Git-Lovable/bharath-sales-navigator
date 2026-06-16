@@ -813,6 +813,21 @@ export const ROICalculator = () => {
         y = (doc as any).lastAutoTable.finalY + 20;
       }
 
+      // Value Map
+      if (valueMap.length) {
+        if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
+        doc.setFontSize(14); doc.setTextColor(20);
+        doc.text("Value Map — Challenges → QuickApp.AI Value", margin, y); y += 10;
+        autoTable(doc, {
+          startY: y + 6, theme: "grid", styles: { fontSize: 9, valign: "top" }, headStyles: { fillColor: [37, 99, 235] },
+          head: [["Area", "Your Challenge", "QuickApp.AI Value", "Capabilities"]],
+          body: valueMap.map(r => [r.area, r.challengeLabel, r.value, r.capabilities.map(c => "• " + c).join("\n")]),
+          columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 110 }, 2: { cellWidth: 170 }, 3: { cellWidth: "auto" } },
+          margin: { left: margin, right: margin },
+        });
+        y = (doc as any).lastAutoTable.finalY + 20;
+      }
+
       // Benefits
       if (benefits.length) {
         if (y > pageH - 200) { doc.addPage(); drawHeader(); y = 80; }
