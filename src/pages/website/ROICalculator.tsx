@@ -494,6 +494,114 @@ export const ROICalculator = () => {
   const problems = generateProblemStatements();
   const recommendations = generateRecommendations();
 
+  // Value Map — link each challenge raised by the customer to QuickApp.AI's
+  // proposition that directly addresses it.
+  const generateValueMap = () => {
+    const fieldMap: Record<string, { value: string; capabilities: string[] }> = {
+      visibility: {
+        value: "Real-time field visibility across every rep and territory",
+        capabilities: ["Live GPS & route replay", "Geo-tagged check-ins", "Beat & visit telemetry", "Manager live dashboard"],
+      },
+      productivity: {
+        value: "Reps sell more, type less — admin work is automated away",
+        capabilities: ["Offline-first order capture", "AI Smart Basket", "Auto beat plans", "1-tap visit logging"],
+      },
+      accuracy: {
+        value: "Clean, trustworthy data by design — no manual reconciliation",
+        capabilities: ["Validated product catalog", "Scheme & price engine", "Structured order forms", "Auto stock sync"],
+      },
+      adoption: {
+        value: "Adoption that actually sticks across the field team",
+        capabilities: ["Gamification 2.0 & streaks", "Vernacular UI (6+ languages)", "Lightweight Android app", "In-app coaching nudges"],
+      },
+      insights: {
+        value: "Decisions in minutes, not spreadsheet cycles",
+        capabilities: ["Role-based dashboards", "AI-ready reports", "Voice analytics", "Proactive alerts"],
+      },
+      collections: {
+        value: "Faster cash with AI-driven credit & collections",
+        capabilities: ["AI credit scoring", "Automated dunning", "Digital receipts", "Payment proof capture"],
+      },
+    };
+    const distributorMap: Record<string, { value: string; capabilities: string[] }> = {
+      "order-visibility": {
+        value: "End-to-end primary order visibility from PO to dispatch",
+        capabilities: ["Distributor Portal", "Live primary order status", "ASN & dispatch tracking", "PO approval workflow"],
+      },
+      inventory: {
+        value: "Always know what's on every distributor's shelf",
+        capabilities: ["Real-time distributor stock", "Low-stock alerts", "Auto-replenishment hints", "SKU-level ageing"],
+      },
+      claims: {
+        value: "Claims settled in days, not months — with full audit trail",
+        capabilities: ["Digital claims workflow", "Rules-based validation", "Document capture", "Settlement dashboard"],
+      },
+      communication: {
+        value: "One channel for every distributor conversation",
+        capabilities: ["Two-way portal messaging", "WhatsApp broadcasts", "Announcements & circulars", "Ticketing & SLAs"],
+      },
+      performance: {
+        value: "Distributor performance you can measure and coach",
+        capabilities: ["Distributor scorecards", "RoI dashboards", "Beat coverage analytics", "Target vs actual"],
+      },
+      onboarding: {
+        value: "Onboard a new distributor in days, not weeks",
+        capabilities: ["Self-serve onboarding", "KYC capture", "Price-book sync", "Role & permission templates"],
+      },
+    };
+    const institutionalMap: Record<string, { value: string; capabilities: string[] }> = {
+      "lead-tracking": {
+        value: "Every institutional lead captured, routed and followed up",
+        capabilities: ["Institutional CRM", "Lead capture forms", "Auto-assignment rules", "SLA reminders"],
+      },
+      pipeline: {
+        value: "Predictable B2B pipeline with no surprises at quarter-end",
+        capabilities: ["Visual sales pipeline", "Stage probability", "Forecast roll-up", "Win/loss analysis"],
+      },
+      quotes: {
+        value: "Quotes out in minutes with zero pricing errors",
+        capabilities: ["CPQ with templates", "Approval workflow", "One-click PDF quotations", "Version history"],
+      },
+      collections: {
+        value: "Institutional collections accelerated and automated",
+        capabilities: ["Account-level ageing", "Automated dunning", "Payment links", "Statement of accounts"],
+      },
+      contacts: {
+        value: "A complete Account 360 for every key customer",
+        capabilities: ["Stakeholder map", "Last-touch & engagement", "Activity timeline", "Document vault"],
+      },
+      pricing: {
+        value: "Account-specific pricing managed without spreadsheets",
+        capabilities: ["Custom price books", "Contracts & tiers", "Approval-bound discounts", "Margin guardrails"],
+      },
+    };
+
+    type ValueMapRow = {
+      area: string;
+      challengeLabel: string;
+      value: string;
+      capabilities: string[];
+    };
+    const rows: ValueMapRow[] = [];
+    answers.challenges.forEach((c) => {
+      const m = fieldMap[c];
+      const label = challengeOptions.find((o) => o.value === c)?.label || c;
+      if (m) rows.push({ area: "Field Sales", challengeLabel: label, value: m.value, capabilities: m.capabilities });
+    });
+    answers.distributorChallenges.forEach((c) => {
+      const m = distributorMap[c];
+      const label = distributorChallengeOptions.find((o) => o.value === c)?.label || c;
+      if (m) rows.push({ area: "Distributor / DMS", challengeLabel: label, value: m.value, capabilities: m.capabilities });
+    });
+    answers.institutionalChallenges.forEach((c) => {
+      const m = institutionalMap[c];
+      const label = institutionalChallengeOptions.find((o) => o.value === c)?.label || c;
+      if (m) rows.push({ area: "Institutional CRM", challengeLabel: label, value: m.value, capabilities: m.capabilities });
+    });
+    return rows;
+  };
+  const valueMap = generateValueMap();
+
   // Tailored business benefits derived from the user's responses
   const generateBenefits = () => {
     const benefits: { metric: string; value: string; rationale: string }[] = [];
