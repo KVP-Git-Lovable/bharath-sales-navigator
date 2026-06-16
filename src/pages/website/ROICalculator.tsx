@@ -1419,11 +1419,20 @@ export const ROICalculator = () => {
               </div>
               <h2 className="text-2xl font-bold mb-2">Your Personalized Assessment</h2>
               <p className="text-muted-foreground">Based on your responses, here&apos;s our analysis</p>
-              <div className="mt-4 flex justify-center">
-                <Button onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <Button
+                  onClick={handleDownloadPdf}
+                  disabled={generatingPdf || !contact.name?.trim() || !contact.email?.trim()}
+                  className="gap-2"
+                >
                   <Download className="w-4 h-4" />
                   {generatingPdf ? "Preparing PDF..." : "Download Full Report (PDF)"}
                 </Button>
+                {(!contact.name?.trim() || !contact.email?.trim()) && (
+                  <p className="text-xs text-muted-foreground">
+                    Enter your name and work email in the "Talk to a QuickApp Expert" form below to unlock the PDF.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1736,7 +1745,13 @@ export const ROICalculator = () => {
                   <Textarea rows={3} value={contact.message} onChange={(e) => setContact({ ...contact, message: e.target.value })} placeholder="Tell us about your team, timelines or specific questions" />
                 </div>
                 <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3 justify-end">
-                  <Button type="button" variant="outline" onClick={handleDownloadPdf} disabled={generatingPdf} className="gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDownloadPdf}
+                    disabled={generatingPdf || !contact.name?.trim() || !contact.email?.trim()}
+                    className="gap-2"
+                  >
                     <Download className="w-4 h-4" /> Download Report
                   </Button>
                   <Button type="submit" disabled={submitting} className="gap-2">
