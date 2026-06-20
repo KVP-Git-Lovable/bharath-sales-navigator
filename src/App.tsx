@@ -361,6 +361,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/roi-calculator" element={<ROICalculator />} />
         <Route path="/insights/roi-tracker" element={<ROITrackerPage />} />
         <Route path="/insights" element={<InsightsPage />} />
+        <Route path="/connectors" element={<ConnectorsPage />} />
         <Route path="/insights/migration-plan" element={<MigrationPlanPage />} />
         <Route path="/insights/migration-checklist" element={<MigrationChecklistPage />} />
         <Route path="/insights/implementation-toolkit" element={<ImplementationToolkitPage />} />
