@@ -27,6 +27,7 @@ export const WebsiteHeader = () => {
     { label: "Technology", href: "/technology" },
     { label: "Industries", href: "#industries" },
     { label: "Insights", href: "/insights" },
+    { label: "Connectors", href: "/connectors" },
     { label: "Pricing", href: "/pricing" },
   ];
 
