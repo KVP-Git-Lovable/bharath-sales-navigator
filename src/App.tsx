@@ -38,6 +38,7 @@ import { ProfessionalServicesSolution } from "./pages/website/solutions/Professi
 import ROICalculator from "./pages/website/ROICalculator";
 import ROITrackerPage from "./pages/website/ROITrackerPage";
 import InsightsPage from "./pages/website/InsightsPage";
+import ConnectorsPage from "./pages/website/ConnectorsPage";
 import MigrationPlanPage from "./pages/website/MigrationPlanPage";
 import MigrationChecklistPage from "./pages/website/MigrationChecklistPage";
 import ImplementationToolkitPage from "./pages/website/ImplementationToolkitPage";
