@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { WebsiteHeader } from "@/components/website/WebsiteHeader";
 import { HeroSection } from "@/components/website/HeroSection";
 import { FeaturesSection } from "@/components/website/FeaturesSection";
-import { SolutionsSection } from "@/components/website/SolutionsSection";
 import { USPSection } from "@/components/website/USPSection";
 import { IndustriesSection } from "@/components/website/IndustriesSection";
 import { CTASection } from "@/components/website/CTASection";
