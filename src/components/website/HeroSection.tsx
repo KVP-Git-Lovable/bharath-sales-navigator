@@ -1,8 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { 
-  Sparkles,
   Calculator,
-  ArrowRight
+  ArrowRight,
+  HeartHandshake
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -52,20 +52,22 @@ export const HeroSection = () => {
         animate="visible"
       >
         {/* Badge */}
-        <motion.div variants={itemVariants} className="mb-10">
+        <motion.div variants={itemVariants} className="mb-8">
           <div className="inline-flex items-center gap-2 bg-amber-500/20 backdrop-blur-xl text-amber-400 px-6 py-3 rounded-full text-sm font-medium border border-amber-500/30">
-            <Sparkles className="h-4 w-4" />
-            AI-First Platform • Built to Guide, Not Just Collect Data
+            <HeartHandshake className="h-4 w-4" />
+            Impact for Retailer • Distributor • OEM • Field Team
           </div>
         </motion.div>
 
         {/* Main headline */}
-        <motion.div variants={itemVariants} className="text-center max-w-4xl mx-auto mb-6">
+        <motion.div variants={itemVariants} className="text-center max-w-5xl mx-auto mb-6">
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.1] tracking-tight">
-            <span className="text-white">One Price, Unlimited Users</span>
+            <span className="text-white">One Platform.</span>
+            <br />
+            <span className="text-white">Unlimited Users.</span>
             <br />
             <span className="bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 bg-clip-text text-transparent">
-              Success-Based Pricing
+              Impact for Everyone.
             </span>
           </h1>
         </motion.div>
@@ -88,9 +90,9 @@ export const HeroSection = () => {
         {/* Value proposition */}
         <motion.p 
           variants={itemVariants}
-          className="text-center text-lg md:text-xl text-amber-400/90 max-w-2xl mx-auto mb-10 leading-relaxed"
+          className="text-center text-lg md:text-xl text-amber-400/90 max-w-3xl mx-auto mb-10 leading-relaxed"
         >
-          Stop paying per user. Give everyone in your organization the power of digital and AI.
+          We connect every stakeholder in your go-to-market ecosystem — retailer, distributor, sales leader, rep, marketing, HR, and finance — and guide each one toward measurable outcomes. That's why our pricing is tied to your success, not seat count.
         </motion.p>
 
         {/* CTAs */}
