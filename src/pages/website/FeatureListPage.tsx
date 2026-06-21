@@ -312,6 +312,8 @@ const FeatureListPage = () => {
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
+                aria-label={`Go to ${category.shortTitle} category`}
+                aria-current={activeCategory === category.id ? "true" : undefined}
                 className={cn(
                   "h-1.5 rounded-full transition-all duration-300",
                   activeCategory === category.id 

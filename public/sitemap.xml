@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://quickapp.ai/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://quickapp.ai/features</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://quickapp.ai/technology</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://quickapp.ai/solutions/field-sales</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://quickapp.ai/solutions/distributor-portal</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://quickapp.ai/solutions/retailer-portal</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://quickapp.ai/solutions/van-sales</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://quickapp.ai/solutions/professional-services</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://quickapp.ai/pricing</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://quickapp.ai/roi-calculator</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://quickapp.ai/impact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://quickapp.ai/connectors</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://quickapp.ai/insights/roi-tracker</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/migration-plan</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/migration-checklist</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/implementation-toolkit</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/professional-services-roi</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/professional-services-checklist</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/why-quickapp</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/insights/bharath-beverages-case-study</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/request-demo</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://quickapp.ai/contact</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://quickapp.ai/privacy-policy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>
