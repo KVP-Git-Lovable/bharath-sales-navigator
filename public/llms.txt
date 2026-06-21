@@ -1,0 +1,41 @@
+# QuickApp.ai
+
+> AI-first commerce platform for Field Sales, Distributor Management, Retailer Portal, Van Sales, Store Operations, e-Commerce, Marketing, and Customer Service. One platform, unlimited users, success-based pricing.
+
+QuickApp.ai is an enterprise SaaS platform built for FMCG, beverages, pharma, and consumer durables companies in India and beyond. It guides field teams, distributors, and retailers with intelligent recommendations instead of just collecting data, and runs securely on AWS with offline-first mobile apps.
+
+## Pages
+
+- [Home](/): Overview of the AI-first commerce platform.
+- [Features](/features): 100+ Enterprise AI features across sales, distribution, technology, connectors, and data security.
+- [Technology](/technology): Architecture, AI stack, and platform technology.
+- [Pricing](/pricing): Success-based pricing with unlimited users.
+- [Impact](/impact): Measurable business outcomes for retailers, distributors, OEMs, and field teams.
+- [Connectors](/connectors): ERP, accounting, and third-party integrations.
+- [ROI Calculator](/roi-calculator): Estimate return on investment from deploying QuickApp.
+- [Request a Demo](/request-demo): Book a guided product walkthrough.
+- [Contact](/contact): Talk to sales or support.
+
+## Solutions
+
+- [Retailer Sales](/solutions/field-sales): AI-guided field sales execution for FMCG and consumer brands.
+- [Distributor Management](/solutions/distributor-portal): Primary orders, inventory, claims, and ledgers for distributors.
+- [Retailer Portal](/solutions/retailer-portal): Self-service ordering and engagement for retailers.
+- [Van Sales](/solutions/van-sales): Mobile van inventory and on-the-spot invoicing.
+- [Professional Services](/solutions/professional-services): Implementation, migration, and success services.
+
+## Insights
+
+- [Insights Hub](/insights): Articles, guides, and case studies on AI-driven commerce.
+- [ROI Tracker](/insights/roi-tracker): How customers track ROI on QuickApp deployments.
+- [Migration Plan](/insights/migration-plan): Plan to move from legacy DMS/SFA to QuickApp.
+- [Migration Checklist](/insights/migration-checklist): Step-by-step migration checklist.
+- [Implementation Toolkit](/insights/implementation-toolkit): Templates and tooling for rollout.
+- [Professional Services ROI](/insights/professional-services-roi): ROI from professional services engagements.
+- [Professional Services Checklist](/insights/professional-services-checklist): Pre-engagement checklist.
+- [Why QuickApp](/insights/why-quickapp): What makes the platform different.
+- [Bharath Beverages Case Study](/insights/bharath-beverages-case-study): Customer success story.
+
+## Optional
+
+- [Privacy Policy](/privacy-policy): Data handling and privacy practices.
