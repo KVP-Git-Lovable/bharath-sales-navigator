@@ -2,7 +2,19 @@
 
 > AI-first commerce platform for Field Sales, Distributor Management, Retailer Portal, Van Sales, Store Operations, e-Commerce, Marketing, and Customer Service. One platform, unlimited users, success-based pricing.
 
-QuickApp.ai is an enterprise SaaS platform built for FMCG, beverages, pharma, and consumer durables companies in India and beyond. It guides field teams, distributors, and retailers with intelligent recommendations instead of just collecting data, and runs securely on AWS with offline-first mobile apps.
+QuickApp.ai is an enterprise SaaS platform built for FMCG, beverages, pharma, and consumer durables companies in India and beyond. It guides field teams, distributors, and retailers with intelligent recommendations instead of just collecting data, and runs securely on AWS with offline-first mobile apps for Android and iOS.
+
+Key differentiators:
+- **AI that acts, not just records**: Smart Basket suggested orders, beat planning, scheme intelligence, retailer credit scoring, no-order reason analysis, and a conversational AI assistant (voice + chat) for field reps and managers.
+- **Unlimited users**: success-based pricing replaces per-user licensing — every employee, distributor, and retailer logs in.
+- **One platform, 100+ features**: Field Sales (SFA), DMS, Retailer Portal, Van Sales, Delivery, Invoicing & GST, Expenses, Attendance with face verification + GPS, Leave, Targets, Gamification, Analytics, Notifications.
+- **Offline-first**: orders, visits, attendance, and stock work without network and sync when back online.
+- **Open connectors**: SAP, Tally, Oracle, Salesforce, Zoho, custom ERPs, payment gateways, WhatsApp, Shopify.
+- **Secure by design**: Supabase RLS, role-based access, audit trails, India data residency on AWS.
+
+Primary buyers: FMCG / Beverages / Pharma / Consumer Durables sales heads, distribution heads, IT leaders, and CFOs evaluating modern alternatives to legacy DMS/SFA tools (Bizom, FieldAssist, BeatRoute, SAN eForce, Ivy Mobility, mSELL).
+
+Contact: sales@quickapp.ai • Website: https://quickapp.ai
 
 ## Pages
 
@@ -39,3 +51,5 @@ QuickApp.ai is an enterprise SaaS platform built for FMCG, beverages, pharma, an
 ## Optional
 
 - [Privacy Policy](/privacy-policy): Data handling and privacy practices.
+- [llms-full.txt](/llms-full.txt): Long-form, plain-text knowledge base covering every product area in depth.
+- [Sitemap (XML)](/sitemap.xml): Machine-readable list of all indexable URLs.
