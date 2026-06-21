@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { 
   Sparkles,
-  Calculator
+  Calculator,
+  ArrowRight
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
