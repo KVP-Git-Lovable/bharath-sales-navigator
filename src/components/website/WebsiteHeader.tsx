@@ -121,7 +121,7 @@ export const WebsiteHeader = () => {
               
               {/* Solutions Dropdown */}
               {item.hasDropdown && solutionsOpen && (
-                <div className="absolute top-full left-0 mt-2 w-56 rounded-lg shadow-lg bg-background border border-border z-50">
+                <div className="absolute top-full left-0 mt-2 w-56 rounded-lg shadow-lg bg-white border border-border z-50">
                   <div className="py-2">
                     {solutionLinks.map((solution) => (
                       <button
@@ -167,7 +167,7 @@ export const WebsiteHeader = () => {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-border/40 bg-background px-3 sm:px-4 py-4 space-y-4">
+        <div className="md:hidden border-t border-border/40 bg-white px-3 sm:px-4 py-4 space-y-4">
           {navItems.map((item) => (
             <div key={item.label}>
               {item.hasDropdown ? (
