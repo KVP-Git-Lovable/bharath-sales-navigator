@@ -6,11 +6,9 @@ import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 const solutionLinks = [
   { label: "Field Sales Automation", href: "/solutions/field-sales", external: false },
-  { label: "Distributor Portal", href: "/solutions/distributor-portal", external: false },
-  
-  { label: "Van Sales", href: "/solutions/van-sales", external: false },
+  { label: "Distributor Management System", href: "/solutions/distributor-portal", external: false },
+  { label: "Retailer Portal", href: "/solutions/retailer-portal", external: false },
   { label: "Store Operations", href: "https://storeops.quickapp.ai/", external: true },
-  { label: "Professional Services", href: "/solutions/professional-services", external: false },
 ];
 
 export const WebsiteHeader = () => {
@@ -25,7 +23,6 @@ export const WebsiteHeader = () => {
     { label: "Solutions", href: "#solutions", hasDropdown: true },
     { label: "Enterprise AI", href: "/features" },
     { label: "Technology", href: "/technology" },
-    { label: "Industries", href: "#industries" },
     { label: "Insights", href: "/insights" },
     { label: "Connectors", href: "/connectors" },
     { label: "Pricing", href: "/pricing" },
@@ -93,7 +90,7 @@ export const WebsiteHeader = () => {
   };
 
   return (
-    <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+    <header className="border-b border-border/40 bg-white sticky top-0 z-50 shadow-sm">
       <div className="container mx-auto px-3 sm:px-4 py-3 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate('/')}>
