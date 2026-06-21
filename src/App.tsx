@@ -40,6 +40,7 @@ import ROICalculator from "./pages/website/ROICalculator";
 import ROITrackerPage from "./pages/website/ROITrackerPage";
 import InsightsPage from "./pages/website/InsightsPage";
 import ConnectorsPage from "./pages/website/ConnectorsPage";
+import ImpactPage from "./pages/website/ImpactPage";
 import MigrationPlanPage from "./pages/website/MigrationPlanPage";
 import MigrationChecklistPage from "./pages/website/MigrationChecklistPage";
 import ImplementationToolkitPage from "./pages/website/ImplementationToolkitPage";
@@ -364,6 +365,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/insights/roi-tracker" element={<ROITrackerPage />} />
         <Route path="/insights" element={<InsightsPage />} />
         <Route path="/connectors" element={<ConnectorsPage />} />
+        <Route path="/impact" element={<ImpactPage />} />
         <Route path="/insights/migration-plan" element={<MigrationPlanPage />} />
         <Route path="/insights/migration-checklist" element={<MigrationChecklistPage />} />
         <Route path="/insights/implementation-toolkit" element={<ImplementationToolkitPage />} />
