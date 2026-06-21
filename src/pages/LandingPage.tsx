@@ -24,7 +24,6 @@ export const LandingPage = () => {
     <div className="min-h-screen bg-background standalone-page">
       <WebsiteHeader />
       <HeroSection />
-      <SolutionsSection />
       <FeaturesSection />
       <USPSection />
       <IndustriesSection />
