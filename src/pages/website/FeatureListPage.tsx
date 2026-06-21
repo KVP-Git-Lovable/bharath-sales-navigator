@@ -1,11 +1,26 @@
 import { useState, useEffect } from "react";
-import { Check, Sparkles, Target, Brain, BarChart3, Users, Trophy, Truck, Building2, Shield, Settings, ArrowRight, ChevronDown } from "lucide-react";
+import { Check, Sparkles, Target, Brain, BarChart3, Users, Trophy, Truck, Building2, Shield, Settings, ArrowRight, ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { WebsiteHeader } from "@/components/website/WebsiteHeader";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-const featureCategories = [
+type Feature = {
+  name: string;
+  description: string;
+  subFeatures?: { name: string; description: string }[];
+};
+
+const featureCategories: Array<{
+  id: string;
+  title: string;
+  shortTitle: string;
+  icon: any;
+  color: string;
+  tagline: string;
+  features: Feature[];
+}> = [
   {
     id: "sales",
     title: "Sales Execution",
@@ -23,6 +38,75 @@ const featureCategories = [
       { name: "No-Order Capture", description: "Record reasons for unproductive visits" },
       { name: "Visit Calendar", description: "Weekly and monthly visit planning view" },
       { name: "Joint Sales Visits", description: "Manager accompaniment tracking and feedback" },
+      { name: "External Database", description: "Load purchased retailer databases by territory to expand field-sales market coverage and discover untapped outlets" },
+    ]
+  },
+  {
+    id: "retailer",
+    title: "Retailer Management",
+    shortTitle: "Retailers",
+    icon: Users,
+    color: "from-green-500 to-emerald-500",
+    tagline: "Build lasting relationships",
+    features: [
+      { name: "Retailer Profiles", description: "Complete retailer information with photos and location" },
+      { name: "Loyalty Programs", description: "Points-based rewards and redemption system" },
+      { name: "Scheme Management", description: "Create and apply promotional schemes" },
+      { name: "Credit Management", description: "Credit limits, outstanding tracking, and alerts" },
+      { name: "Payment Collection", description: "Record payments with proof upload" },
+      { name: "Retailer Feedback", description: "Capture and track retailer feedback" },
+      { name: "Baseline Photos", description: "Store reference photos for each retailer" },
+      { name: "Order History", description: "Complete order history and trends per retailer" },
+      { name: "Bulk Import", description: "Import retailers from Excel files" },
+      { name: "Branding Requests", description: "Request and track branding materials at retailer outlets" },
+      {
+        name: "Retailer Portal",
+        description: "Self-service WhatsApp ordering plus a dedicated retailer app for orders, deliveries, invoices and schemes",
+        subFeatures: [
+          { name: "WhatsApp Self-Service Orders", description: "Retailers place orders directly via WhatsApp with conversational, catalog-driven flows" },
+          { name: "Secondary Order Placement", description: "In-app ordering with full product catalog, live pricing and applicable schemes" },
+          { name: "Order & Delivery Tracking", description: "Real-time order status and delivery tracking right from the retailer's phone" },
+          { name: "Invoices & Order History", description: "Access all invoices and complete past purchase history any time" },
+          { name: "Outstanding & Ledger View", description: "Live view of outstanding balances, due dates and payment history" },
+          { name: "Schemes & Offers", description: "Enable schemes directly to retailers and surface new and upcoming offers automatically" },
+          { name: "Feedback & Issues", description: "Raise feedback, complaints and product issues with built-in ticketing" },
+          { name: "In-App Promotions & Ads", description: "Promote new products and run targeted in-app campaigns to retailers" },
+        ],
+      },
+    ]
+  },
+  {
+    id: "distributor",
+    title: "Distributor Portal",
+    shortTitle: "Distributors",
+    icon: Building2,
+    color: "from-indigo-500 to-purple-500",
+    tagline: "Empower your distribution network",
+    features: [
+      { name: "Primary Orders", description: "Place and track orders to company" },
+      { name: "Inventory Management", description: "Track distributor stock levels" },
+      { name: "Claims Management", description: "Submit and track claims" },
+      { name: "Goods Receipt", description: "Receive and verify shipments" },
+      { name: "Secondary Sales", description: "Track sales to retailers" },
+      { name: "Business Planning", description: "Annual business plan and targets" },
+      { name: "Contact Management", description: "Manage distributor team contacts" },
+      { name: "Support Requests", description: "Raise and track support tickets" },
+      { name: "Idea Submission", description: "Submit product and market ideas" },
+      {
+        name: "Van Sales",
+        description: "Mobile commerce from the van — full inventory, sales, invoicing and reconciliation workflows",
+        subFeatures: [
+          { name: "Morning Inventory", description: "Load van stock at start of day" },
+          { name: "Stock Management", description: "Track van inventory in real-time" },
+          { name: "Route Sales", description: "Execute sales directly from van" },
+          { name: "Closing Stock", description: "End-of-day stock reconciliation" },
+          { name: "Return Stock", description: "Process and track returned items" },
+          { name: "Invoice Generation", description: "Generate invoices on-the-spot" },
+          { name: "Cash Collection", description: "Track cash and payment collection" },
+          { name: "Stock Transfer", description: "Transfer stock between vans" },
+          { name: "Route Analysis", description: "Analyze van route performance" },
+        ],
+      },
     ]
   },
   {
@@ -64,25 +148,6 @@ const featureCategories = [
     ]
   },
   {
-    id: "retailer",
-    title: "Retailer Management",
-    shortTitle: "Retailers",
-    icon: Users,
-    color: "from-green-500 to-emerald-500",
-    tagline: "Build lasting relationships",
-    features: [
-      { name: "Retailer Profiles", description: "Complete retailer information with photos and location" },
-      { name: "Loyalty Programs", description: "Points-based rewards and redemption system" },
-      { name: "Scheme Management", description: "Create and apply promotional schemes" },
-      { name: "Credit Management", description: "Credit limits, outstanding tracking, and alerts" },
-      { name: "Payment Collection", description: "Record payments with proof upload" },
-      { name: "Retailer Feedback", description: "Capture and track retailer feedback" },
-      { name: "Baseline Photos", description: "Store reference photos for each retailer" },
-      { name: "Order History", description: "Complete order history and trends per retailer" },
-      { name: "Bulk Import", description: "Import retailers from Excel files" },
-    ]
-  },
-  {
     id: "gamification",
     title: "Gamification",
     shortTitle: "Gamification",
@@ -102,44 +167,6 @@ const featureCategories = [
     ]
   },
   {
-    id: "van",
-    title: "Van Sales",
-    shortTitle: "Van Sales",
-    icon: Truck,
-    color: "from-orange-500 to-red-500",
-    tagline: "Mobile commerce made easy",
-    features: [
-      { name: "Morning Inventory", description: "Load van stock at start of day" },
-      { name: "Stock Management", description: "Track van inventory in real-time" },
-      { name: "Route Sales", description: "Execute sales directly from van" },
-      { name: "Closing Stock", description: "End-of-day stock reconciliation" },
-      { name: "Return Stock", description: "Process and track returned items" },
-      { name: "Invoice Generation", description: "Generate invoices on-the-spot" },
-      { name: "Cash Collection", description: "Track cash and payment collection" },
-      { name: "Stock Transfer", description: "Transfer stock between vans" },
-      { name: "Route Analysis", description: "Analyze van route performance" },
-    ]
-  },
-  {
-    id: "distributor",
-    title: "Distributor Portal",
-    shortTitle: "Distributors",
-    icon: Building2,
-    color: "from-indigo-500 to-purple-500",
-    tagline: "Empower your distribution network",
-    features: [
-      { name: "Primary Orders", description: "Place and track orders to company" },
-      { name: "Inventory Management", description: "Track distributor stock levels" },
-      { name: "Claims Management", description: "Submit and track claims" },
-      { name: "Goods Receipt", description: "Receive and verify shipments" },
-      { name: "Secondary Sales", description: "Track sales to retailers" },
-      { name: "Business Planning", description: "Annual business plan and targets" },
-      { name: "Contact Management", description: "Manage distributor team contacts" },
-      { name: "Support Requests", description: "Raise and track support tickets" },
-      { name: "Idea Submission", description: "Submit product and market ideas" },
-    ]
-  },
-  {
     id: "enterprise",
     title: "Enterprise Features",
     shortTitle: "Enterprise",
@@ -156,25 +183,20 @@ const featureCategories = [
       { name: "Approval Workflows", description: "Multi-level approval processes" },
       { name: "Audit Trail", description: "Track all system activities" },
       { name: "Data Export", description: "Export data for external analysis" },
+      { name: "WhatsApp Integration", description: "Send invoices and notifications via WhatsApp" },
+      { name: "SMS Notifications", description: "Configurable SMS alerts across the platform" },
     ]
   },
   {
     id: "integration",
-    title: "Integration & Support",
-    shortTitle: "Integrations",
+    title: "Connectors",
+    shortTitle: "Connectors",
     icon: Settings,
     color: "from-rose-500 to-pink-500",
-    tagline: "Connect everything",
+    tagline: "Connect QuickApp to your entire stack",
     features: [
-      { name: "WhatsApp Integration", description: "Send invoices and notifications via WhatsApp" },
-      { name: "SMS Notifications", description: "Configurable SMS alerts" },
-      { name: "Push Notifications", description: "Real-time app notifications" },
-      { name: "PWA Support", description: "Install as native app on any device" },
-      { name: "API Access", description: "REST APIs for integration" },
-      { name: "Supabase Backend", description: "Secure and scalable cloud backend" },
-      { name: "Real-time Sync", description: "Instant data synchronization" },
-      { name: "Branding Requests", description: "Request and track branding materials" },
-      { name: "Vendor Management", description: "Manage external vendors" },
+      { name: "Prebuilt Connectors", description: "30+ ready-to-use connectors across CRM, e-commerce, accounting, messaging, AI and data warehouses — explore the full catalog on the Connectors page" },
+      { name: "API Access", description: "REST APIs to integrate QuickApp with any external system" },
     ]
   }
 ];
@@ -182,6 +204,7 @@ const featureCategories = [
 const FeatureListPage = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState(featureCategories[0].id);
+  const [openFeature, setOpenFeature] = useState<Feature | null>(null);
   
   const currentCategory = featureCategories.find(c => c.id === activeCategory) || featureCategories[0];
   const currentIndex = featureCategories.findIndex(c => c.id === activeCategory);
@@ -297,7 +320,11 @@ const FeatureListPage = () => {
               {currentCategory.features.map((feature, index) => (
                 <div 
                   key={feature.name}
-                  className="bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] group animate-fade-in"
+                  onClick={() => feature.subFeatures && setOpenFeature(feature)}
+                  className={cn(
+                    "bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] group animate-fade-in",
+                    feature.subFeatures && "cursor-pointer ring-1 ring-amber-400/20"
+                  )}
                   style={{ animationDelay: `${index * 30}ms` }}
                 >
                   <div className="flex items-start gap-3">
@@ -307,9 +334,25 @@ const FeatureListPage = () => {
                     )}>
                       <Check className="w-4 h-4 text-white" />
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold mb-1 group-hover:text-amber-300 transition-colors">{feature.name}</h3>
+                    <div className="flex-1">
+                      <h3 className="text-white font-semibold mb-1 group-hover:text-amber-300 transition-colors flex items-center gap-2">
+                        {feature.name}
+                        {feature.subFeatures && (
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                            {feature.subFeatures.length} sub-features
+                            <ChevronRight className="w-3 h-3" />
+                          </span>
+                        )}
+                      </h3>
                       <p className="text-white/60 text-sm leading-relaxed">{feature.description}</p>
+                      {feature.name === "Prebuilt Connectors" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate('/connectors'); }}
+                          className="mt-2 text-amber-300 hover:text-amber-200 text-sm font-medium inline-flex items-center gap-1"
+                        >
+                          View all connectors <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -351,6 +394,31 @@ const FeatureListPage = () => {
           </div>
         </div>
       </section>
+
+      {/* Sub-features Dialog */}
+      <Dialog open={!!openFeature} onOpenChange={(o) => !o && setOpenFeature(null)}>
+        <DialogContent className="max-w-2xl bg-[#1A1F2C] border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-white">{openFeature?.name}</DialogTitle>
+            <DialogDescription className="text-white/60">{openFeature?.description}</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 max-h-[60vh] overflow-y-auto pr-1">
+            {openFeature?.subFeatures?.map((sf) => (
+              <div key={sf.name} className="bg-white/5 border border-white/10 rounded-lg p-4">
+                <div className="flex items-start gap-2">
+                  <div className={cn("w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 bg-gradient-to-br", currentCategory.color)}>
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-medium text-sm">{sf.name}</h4>
+                    <p className="text-white/60 text-xs mt-1 leading-relaxed">{sf.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* CTA Section */}
       <section className="py-16 px-3 sm:px-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-t border-white/10">
