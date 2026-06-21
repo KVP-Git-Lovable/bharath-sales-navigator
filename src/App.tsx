@@ -50,6 +50,7 @@ import { ProfessionalServicesROIBlog } from "./pages/website/blogs/ProfessionalS
 import { WhyQuickappBlog } from "./pages/website/blogs/WhyQuickappBlog";
 import { BharathBeveragesCaseStudy } from "./pages/website/blogs/BharathBeveragesCaseStudy";
 import { ProfessionalServicesChecklistBlog } from "./pages/website/blogs/ProfessionalServicesChecklistBlog";
+import ChoosingDMSGuideBlog from "./pages/website/blogs/ChoosingDMSGuideBlog";
 import { ContactPage } from "./pages/website/ContactPage";
 import PrivacyPolicyPage from "./pages/website/PrivacyPolicyPage";
 import DemoRequestPage from "./pages/website/DemoRequestPage";
