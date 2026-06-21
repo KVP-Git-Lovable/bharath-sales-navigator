@@ -23,7 +23,6 @@ export const WebsiteHeader = () => {
     { label: "Solutions", href: "#solutions", hasDropdown: true },
     { label: "Impact", href: "/impact" },
     { label: "Enterprise AI", href: "/features" },
-    { label: "Technology", href: "/technology" },
     { label: "Insights", href: "/insights" },
     { label: "Connectors", href: "/connectors" },
     { label: "Pricing", href: "/pricing" },
