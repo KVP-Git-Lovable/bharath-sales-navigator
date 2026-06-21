@@ -50,6 +50,7 @@ import { ProfessionalServicesROIBlog } from "./pages/website/blogs/ProfessionalS
 import { WhyQuickappBlog } from "./pages/website/blogs/WhyQuickappBlog";
 import { BharathBeveragesCaseStudy } from "./pages/website/blogs/BharathBeveragesCaseStudy";
 import { ProfessionalServicesChecklistBlog } from "./pages/website/blogs/ProfessionalServicesChecklistBlog";
+import ChoosingDMSGuideBlog from "./pages/website/blogs/ChoosingDMSGuideBlog";
 import { ContactPage } from "./pages/website/ContactPage";
 import PrivacyPolicyPage from "./pages/website/PrivacyPolicyPage";
 import DemoRequestPage from "./pages/website/DemoRequestPage";
@@ -378,6 +379,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/insights/professional-services-checklist" element={<ProfessionalServicesChecklistBlog />} />
         <Route path="/insights/why-quickapp" element={<WhyQuickappBlog />} />
         <Route path="/insights/bharath-beverages-case-study" element={<BharathBeveragesCaseStudy />} />
+        <Route path="/blog/choosing-a-dms-guide" element={<ChoosingDMSGuideBlog />} />
         <Route path="/request-demo" element={<DemoRequestPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />

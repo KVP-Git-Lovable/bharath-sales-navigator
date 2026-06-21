@@ -75,30 +75,30 @@ export const HeroSection = () => {
         {/* Feature list */}
         <motion.p 
           variants={itemVariants}
-          className="text-center text-lg md:text-xl text-white/70 max-w-3xl mx-auto mb-6 leading-relaxed"
+          className="text-center text-lg md:text-xl text-white/90 max-w-3xl mx-auto mb-6 leading-relaxed"
         >
           <span className="font-semibold text-white">Field Sales</span>
-          <span className="text-white/50"> • </span>
+          <span className="text-white/70"> • </span>
           <span className="font-semibold text-white">Distributor Management</span>
-          <span className="text-white/50"> • </span>
+          <span className="text-white/70"> • </span>
           <span className="font-semibold text-white">Retailer Portal</span>
-          <span className="text-white/50"> • </span>
+          <span className="text-white/70"> • </span>
           <span className="font-semibold text-white">Store Operations</span>
-          <span className="text-white/50"> • </span>
+          <span className="text-white/70"> • </span>
           <span className="font-semibold text-white">e-Commerce</span>
-          <span className="text-white/50"> • </span>
+          <span className="text-white/70"> • </span>
           <span className="font-semibold text-white">Marketing</span>
-          <span className="text-white/50"> • </span>
+          <span className="text-white/70"> • </span>
           <span className="font-semibold text-white">Customer Service</span>
-          <span className="text-white/70"> — one AI platform that </span>
+          <span className="text-white/90"> — one AI platform that </span>
           <span className="italic text-white/90">guides your team to act</span>
-          <span className="text-white/70">, not just to report.</span>
+          <span className="text-white/90">, not just to report.</span>
         </motion.p>
 
         {/* Value proposition */}
         <motion.p 
           variants={itemVariants}
-          className="text-center text-lg md:text-xl text-amber-400/90 max-w-3xl mx-auto mb-10 leading-relaxed"
+          className="text-center text-lg md:text-xl text-amber-300 max-w-3xl mx-auto mb-10 leading-relaxed"
         >
           We connect every stakeholder in your go-to-market ecosystem — retailer, distributor, sales leader, rep, marketing, HR, and finance — and guide each one toward measurable outcomes. That's why our pricing is tied to your success, not seat count.
         </motion.p>
