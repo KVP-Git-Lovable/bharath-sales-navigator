@@ -5,8 +5,8 @@ import { useState, useEffect, useRef } from "react";
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 const solutionLinks = [
-  { label: "Field Sales Automation", href: "/solutions/field-sales", external: false },
-  { label: "Distributor Management System", href: "/solutions/distributor-portal", external: false },
+  { label: "Retailer Sales", href: "/solutions/field-sales", external: false },
+  { label: "Distributor Management", href: "/solutions/distributor-portal", external: false },
   { label: "Retailer Portal", href: "/solutions/retailer-portal", external: false },
   { label: "Store Operations", href: "https://storeops.quickapp.ai/", external: true },
 ];
