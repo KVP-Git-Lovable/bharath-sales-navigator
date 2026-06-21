@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Check, Sparkles, Target, Brain, BarChart3, Users, Trophy, Truck, Building2, Shield, Settings, ArrowRight, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Check, Sparkles, Target, Brain, BarChart3, Users, Trophy, Truck, Building2, Shield, Settings, ArrowRight, ChevronDown, ChevronRight, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -197,6 +197,44 @@ const featureCategories: Array<{
     features: [
       { name: "Prebuilt Connectors", description: "30+ ready-to-use connectors across CRM, e-commerce, accounting, messaging, AI and data warehouses — explore the full catalog on the Connectors page" },
       { name: "API Access", description: "REST APIs to integrate QuickApp with any external system" },
+    ]
+  },
+  {
+    id: "technology",
+    title: "Technology",
+    shortTitle: "Technology",
+    icon: Brain,
+    color: "from-cyan-500 to-blue-500",
+    tagline: "AI-first architecture that powers every workflow",
+    features: [
+      { name: "Vision Intelligence", description: "AI-powered image recognition for shop boards, shelves, competition photos, and branding measurements" },
+      { name: "AI Sales Coach", description: "Real-time product recommendations, visit insights, and personalized scheme suggestions" },
+      { name: "Intelligent Chat Assistant", description: "Query sales data in plain language and get contextual, role-aware answers" },
+      { name: "Credit Scoring Engine", description: "AI-driven credit risk assessment based on payment history, order frequency, and tenure" },
+      { name: "Competition Intelligence", description: "Photo-based competitor detection, pricing extraction, and market positioning insights" },
+      { name: "Face Verification", description: "Selfie-based attendance verification that prevents proxy marking" },
+      { name: "Offline-First Architecture", description: "Full functionality without internet with intelligent sync and conflict resolution" },
+      { name: "GPS Journey Intelligence", description: "Real-time location tracking, geo-tagged check-ins, and journey analytics" },
+      { name: "Multi-Language Intelligence", description: "Support for English, Hindi, Telugu, Tamil, Kannada, and Gujarati with localized AI responses" },
+      { name: "AI Processing Layer", description: "Google Gemini + edge functions process photos, voice, text, and GPS into actionable guidance" },
+    ]
+  },
+  {
+    id: "data-security",
+    title: "Data Security",
+    shortTitle: "Security",
+    icon: ShieldCheck,
+    color: "from-emerald-500 to-teal-500",
+    tagline: "Built to protect your business data",
+    features: [
+      { name: "AWS Cloud Infrastructure", description: "Hosted on AWS with resilient, scalable compute, storage, and networking designed for enterprise workloads" },
+      { name: "Encryption in Transit & At Rest", description: "All data is protected with TLS for transmission and encrypted storage on AWS services" },
+      { name: "Role-Based Access Control", description: "Granular permissions ensure users access only the data and actions relevant to their role" },
+      { name: "Audit Trail & Activity Logs", description: "Track user actions, data changes, and system events for accountability and review" },
+      { name: "Automated Backups", description: "Regular, automated backups and point-in-time recovery options to protect against data loss" },
+      { name: "Secure API Access", description: "APIs use authentication and authorization controls to keep integrations safe" },
+      { name: "Data Isolation", description: "Customer environments are logically separated so your data stays within your organization" },
+      { name: "Privacy by Design", description: "We collect only what is needed, do not sell data, and support your data-retention requirements" },
     ]
   }
 ];
