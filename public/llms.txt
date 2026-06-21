@@ -48,6 +48,10 @@ Contact: sales@quickapp.ai • Website: https://quickapp.ai
 - [Why QuickApp](/insights/why-quickapp): What makes the platform different.
 - [Bharath Beverages Case Study](/insights/bharath-beverages-case-study): Customer success story.
 
+## Guides & Blog
+
+- [Choosing a DMS in 2026 — Buyer's Guide](/blog/choosing-a-dms-guide): How to evaluate Distributor Management Software — AI guidance, offline-first, unified visibility, compliance, unlimited users — plus a 5-step migration plan.
+
 ## Optional
 
 - [Privacy Policy](/privacy-policy): Data handling and privacy practices.
