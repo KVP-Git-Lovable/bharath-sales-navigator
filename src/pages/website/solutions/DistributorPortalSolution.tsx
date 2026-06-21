@@ -65,7 +65,8 @@ const relatedFeatures = [
   { title: "Primary Orders", link: "/features" },
   { title: "Inventory Tracking", link: "/features" },
   { title: "Claims Processing", link: "/features" },
-  { title: "Business Planning", link: "/features" }
+  { title: "Business Planning", link: "/features" },
+  { title: "Van Sales", link: "/solutions/van-sales" }
 ];
 
 export default function DistributorPortalSolution() {
@@ -86,11 +87,11 @@ export default function DistributorPortalSolution() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <span className="inline-block px-3 sm:px-4 py-2 bg-primary/20 text-primary rounded-full text-sm font-medium mb-6">
-                Distributor Portal
+                Distributor Management System
               </span>
               <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                Empower Distributors with{" "}
-                <span className="text-primary">Self-Service Portal</span>
+                The complete{" "}
+                <span className="text-primary">Distributor Management System</span>
               </h1>
               <p className="text-xl text-muted-foreground mb-8">
                 Give your distribution partners complete control over orders, inventory, 

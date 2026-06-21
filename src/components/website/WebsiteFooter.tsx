@@ -7,33 +7,33 @@ export const WebsiteFooter = () => {
 
   const footerLinks = {
     solutions: [
-      { label: "Field Sales", href: "#solutions" },
-      { label: "Distributor Portal", href: "#solutions" },
-      
-      { label: "Van Sales", href: "#solutions" },
+      { label: "Field Sales Automation", href: "/solutions/field-sales" },
+      { label: "Distributor Management System", href: "/solutions/distributor-portal" },
+      { label: "Retailer Portal", href: "/solutions/retailer-portal" },
+      { label: "Van Sales", href: "/solutions/van-sales" },
+      { label: "Professional Services", href: "/solutions/professional-services" },
     ],
     platform: [
-      { label: "AI Intelligence", href: "#platform" },
-      { label: "Analytics", href: "#platform" },
-      { label: "Gamification", href: "#platform" },
-      { label: "Offline Mode", href: "#platform" },
+      { label: "Enterprise AI", href: "/features" },
+      { label: "Technology", href: "/technology" },
+      { label: "Connectors", href: "/connectors" },
+      { label: "Pricing", href: "/pricing" },
     ],
-    industries: [
-      { label: "FMCG", href: "#industries" },
-      { label: "Beverages", href: "#industries" },
-      { label: "Pharma", href: "#industries" },
-      { label: "Consumer Durables", href: "#industries" },
+    resources: [
+      { label: "Insights", href: "/insights" },
+      { label: "ROI Calculator", href: "/roi-calculator" },
+      { label: "Migration Plan", href: "/migration-plan" },
+      { label: "Request Demo", href: "/request-demo" },
     ],
     company: [
-      { label: "About Us", href: "#" },
-      { label: "Careers", href: "#" },
+      { label: "About Us", href: "/" },
       { label: "Contact", href: "/contact" },
-      { label: "Blog", href: "#" },
+      { label: "Privacy Policy", href: "/privacy-policy" },
     ]
   };
 
   return (
-    <footer className="border-t border-border/40 bg-background">
+    <footer className="bg-slate-900 text-slate-200">
       {/* Main Footer */}
       <div className="container mx-auto px-3 sm:px-4 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
@@ -46,15 +46,15 @@ export const WebsiteFooter = () => {
                 className="h-10 w-10 rounded-lg"
               />
             <div>
-                <h3 className="text-lg font-bold text-foreground">QuickApp<span className="text-accent-gold">.ai</span></h3>
-                <p className="text-xs text-muted-foreground">AI-Powered Field Sales Platform</p>
+                <h3 className="text-lg font-bold text-white">QuickApp<span className="text-accent-gold">.ai</span></h3>
+                <p className="text-xs text-slate-400">AI-Powered Field Sales Platform</p>
               </div>
             </div>
-            <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
+            <p className="text-slate-400 text-sm mb-6 leading-relaxed">
               Empowering field sales teams with AI-driven insights, intelligent route planning, 
               and comprehensive performance analytics — even offline.
             </p>
-            <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-2 text-sm text-slate-300">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 <span>hello@quickapp.ai</span>
@@ -72,13 +72,13 @@ export const WebsiteFooter = () => {
 
           {/* Solutions */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Solutions</h4>
+            <h4 className="font-semibold text-white mb-4">Solutions</h4>
             <ul className="space-y-2">
               {footerLinks.solutions.map((link, index) => (
                 <li key={index}>
                   <a 
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
                   >
                     {link.label}
                   </a>
@@ -89,13 +89,13 @@ export const WebsiteFooter = () => {
 
           {/* Platform */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Platform</h4>
+            <h4 className="font-semibold text-white mb-4">Platform</h4>
             <ul className="space-y-2">
               {footerLinks.platform.map((link, index) => (
                 <li key={index}>
                   <a 
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
                   >
                     {link.label}
                   </a>
@@ -104,15 +104,15 @@ export const WebsiteFooter = () => {
             </ul>
           </div>
 
-          {/* Industries */}
+          {/* Resources */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Industries</h4>
+            <h4 className="font-semibold text-white mb-4">Resources</h4>
             <ul className="space-y-2">
-              {footerLinks.industries.map((link, index) => (
+              {footerLinks.resources.map((link, index) => (
                 <li key={index}>
                   <a 
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
                   >
                     {link.label}
                   </a>
@@ -123,13 +123,13 @@ export const WebsiteFooter = () => {
 
           {/* Company */}
           <div>
-            <h4 className="font-semibold text-foreground mb-4">Company</h4>
+            <h4 className="font-semibold text-white mb-4">Company</h4>
             <ul className="space-y-2">
               {footerLinks.company.map((link, index) => (
                 <li key={index}>
                   <a 
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
                   >
                     {link.label}
                   </a>
@@ -141,9 +141,9 @@ export const WebsiteFooter = () => {
       </div>
 
       {/* Trust Badges */}
-      <div className="border-t border-border/40">
+      <div className="border-t border-slate-800">
         <div className="container mx-auto px-3 sm:px-4 py-6">
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-slate-400">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-accent-gold" />
               <span>Salesforce Certified Partner</span>
@@ -161,14 +161,13 @@ export const WebsiteFooter = () => {
       </div>
 
       {/* Copyright */}
-      <div className="border-t border-border/40 bg-muted/30">
+      <div className="border-t border-slate-800 bg-slate-950">
         <div className="container mx-auto px-3 sm:px-4 py-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-            <p>© 2024 QuickApp.AI. All rights reserved.</p>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
+            <p>© 2026 QuickApp.AI. All rights reserved.</p>
             <div className="flex items-center gap-6">
-              <a href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-foreground transition-colors">Cookie Policy</a>
+              <a href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</a>
+              <a href="/contact" className="hover:text-white transition-colors">Contact</a>
             </div>
           </div>
         </div>
