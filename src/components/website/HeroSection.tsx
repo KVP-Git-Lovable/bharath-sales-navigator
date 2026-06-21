@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { 
   Sparkles,
-  Calculator
+  Calculator,
+  ArrowRight
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -79,9 +80,9 @@ export const HeroSection = () => {
           <span className="font-semibold text-white">Distributor Management</span>
           <span className="text-white/50"> • </span>
           <span className="font-semibold text-white">Van Sales</span>
-          <span className="text-white/70"> — all powered by AI that </span>
-          <span className="italic text-white/90">guides</span>
-          <span className="text-white/70"> your team, not just collects data.</span>
+          <span className="text-white/70"> — one AI platform that </span>
+          <span className="italic text-white/90">guides your team to act</span>
+          <span className="text-white/70">, not just to report.</span>
         </motion.p>
 
         {/* Value proposition */}
@@ -99,10 +100,11 @@ export const HeroSection = () => {
         >
           <Button
             size="lg"
-            onClick={() => navigate("/auth")}
+            onClick={() => { navigate("/features"); window.scrollTo({ top: 0, left: 0, behavior: 'instant' }); }}
             className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-900 font-semibold px-10 py-6 text-lg rounded-lg shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 transition-all duration-300"
           >
-            Get Started
+            View all 100+ Features
+            <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
           <Button
             size="lg"
