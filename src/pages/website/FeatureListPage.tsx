@@ -397,6 +397,23 @@ const FeatureListPage = () => {
               ))}
             </div>
 
+            {/* Deep-dive CTA for specific categories */}
+            {activeCategory === 'technology' && (
+              <div className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-white/10 text-center">
+                <h3 className="text-xl font-bold text-white mb-2">Explore the full technology architecture</h3>
+                <p className="text-white/60 mb-4 max-w-2xl mx-auto">
+                  See how our AI modules, offline-first infrastructure, and multi-language intelligence work together to power every sales workflow.
+                </p>
+                <Button
+                  onClick={() => navigate('/technology')}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                >
+                  View Technology Page
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            )}
+
             {/* Navigation between categories */}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/10">
               <button
