@@ -62,20 +62,6 @@ export const SolutionsSection = () => {
   return (
     <section id="solutions" className="py-20 px-3 sm:px-4 bg-muted/30">
       <div className="container mx-auto">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-accent-gold/10 text-accent-gold px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-4">
-            <Briefcase className="h-4 w-4" />
-            One Price • Unlimited Users • All Solutions
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Give Your Entire Team the Power of AI
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-            With our success-based pricing, everyone in your organization gets access to all solutions — 
-            Field Sales, Distributor Portal, and Van Sales. <strong>No per-user fees, no limits.</strong>
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {solutions.map((solution, index) => (
             <Card 

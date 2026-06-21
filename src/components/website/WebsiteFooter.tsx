@@ -22,7 +22,7 @@ export const WebsiteFooter = () => {
     resources: [
       { label: "Insights", href: "/insights" },
       { label: "ROI Calculator", href: "/roi-calculator" },
-      { label: "Migration Plan", href: "/migration-plan" },
+      { label: "Migration Plan", href: "/insights/migration-plan" },
       { label: "Request Demo", href: "/request-demo" },
     ],
     company: [

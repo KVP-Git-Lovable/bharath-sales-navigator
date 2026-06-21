@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { WebsiteHeader } from "@/components/website/WebsiteHeader";
+import { WebsiteFooter } from "@/components/website/WebsiteFooter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type Feature = {
@@ -504,12 +505,7 @@ const FeatureListPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 px-3 sm:px-4 border-t border-white/10">
-        <div className="container mx-auto text-center text-white/40 text-sm">
-          © 2024 QuickApp.AI. All rights reserved.
-        </div>
-      </footer>
+      <WebsiteFooter />
     </div>
   );
 };
