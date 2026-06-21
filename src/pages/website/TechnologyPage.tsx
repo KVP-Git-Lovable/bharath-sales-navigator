@@ -162,9 +162,9 @@ const TechnologyPage = () => {
       <WebsiteHeader />
       
       {/* Hero Section */}
-      <section className="relative pt-24 pb-16 md:pt-32 md:pb-24 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-background to-background" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(var(--accent-gold)/0.15),transparent_50%)]" />
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden bg-gradient-to-br from-primary/20 via-background to-accent-gold/10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,hsl(var(--primary)/0.25),transparent_55%),radial-gradient(circle_at_80%_20%,hsl(var(--accent-gold)/0.22),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.08)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.08)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
         
         <div className="container mx-auto px-3 sm:px-4 relative z-10">
           <div className="text-center max-w-4xl mx-auto">
