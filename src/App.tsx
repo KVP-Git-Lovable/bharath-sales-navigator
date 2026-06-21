@@ -379,6 +379,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/insights/professional-services-checklist" element={<ProfessionalServicesChecklistBlog />} />
         <Route path="/insights/why-quickapp" element={<WhyQuickappBlog />} />
         <Route path="/insights/bharath-beverages-case-study" element={<BharathBeveragesCaseStudy />} />
+        <Route path="/blog/choosing-a-dms-guide" element={<ChoosingDMSGuideBlog />} />
         <Route path="/request-demo" element={<DemoRequestPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
