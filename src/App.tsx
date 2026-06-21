@@ -1,6 +1,8 @@
 import { Suspense, useEffect, useState } from "react";
 import { I18nextProvider } from 'react-i18next';
 import i18n from '@/i18n/config';
+import { HelmetProvider } from "react-helmet-async";
+import { RouteSEO } from "@/components/SEO/RouteSEO";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { PricingPage } from "@/pages/website/PricingPage";
@@ -292,11 +294,13 @@ const App = () => {
 
   return (
     <I18nextProvider i18n={i18n}>
+      <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <NetworkProvider>
           <AuthProvider>
             <TooltipProvider>
               <BrowserRouter>
+                <RouteSEO />
                 <ScrollToTop />
                 <SlowConnectionBanner />
                 <SchemaHealthBanner />
@@ -306,6 +310,7 @@ const App = () => {
           </AuthProvider>
         </NetworkProvider>
       </QueryClientProvider>
+      </HelmetProvider>
     </I18nextProvider>
   );
 };
