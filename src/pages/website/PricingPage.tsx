@@ -112,8 +112,9 @@ export const PricingPage = () => {
       <WebsiteHeader />
       
       {/* Hero Section */}
-      <section className="pt-32 pb-16 px-3 sm:px-4">
-        <div className="w-full mx-auto text-center max-w-4xl">
+      <section className="relative pt-32 pb-20 px-3 sm:px-4 overflow-hidden bg-gradient-to-br from-primary/15 via-background to-accent-gold/10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,hsl(var(--primary)/0.18),transparent_55%),radial-gradient(circle_at_80%_20%,hsl(var(--accent-gold)/0.15),transparent_55%)]" />
+        <div className="relative w-full mx-auto text-center max-w-4xl">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-6">
             <Zap className="w-4 h-4" />
             One Price • Unlimited Users • Success-Based
