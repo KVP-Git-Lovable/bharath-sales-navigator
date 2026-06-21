@@ -153,8 +153,9 @@ export default function ConnectorsPage() {
       <WebsiteHeader />
 
       {/* Hero */}
-      <section className="border-b border-border/40 bg-gradient-to-br from-background via-background to-muted/30">
-        <div className="container mx-auto px-4 py-16 md:py-20 max-w-5xl text-center">
+      <section className="relative overflow-hidden border-b border-border/40 bg-gradient-to-br from-primary/15 via-background to-accent-gold/10">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_25%,hsl(var(--primary)/0.18),transparent_55%),radial-gradient(circle_at_85%_20%,hsl(var(--accent-gold)/0.18),transparent_55%)]" />
+        <div className="relative container mx-auto px-4 py-20 md:py-28 max-w-5xl text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-gold/10 border border-accent-gold/30 text-accent-gold text-xs font-medium mb-4">
             <Cloud className="h-3.5 w-3.5" /> {total}+ prebuilt connectors
           </div>
