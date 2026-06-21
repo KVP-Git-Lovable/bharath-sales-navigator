@@ -80,9 +80,9 @@ export const HeroSection = () => {
           <span className="font-semibold text-white">Distributor Management</span>
           <span className="text-white/50"> • </span>
           <span className="font-semibold text-white">Van Sales</span>
-          <span className="text-white/70"> — all powered by AI that </span>
-          <span className="italic text-white/90">guides</span>
-          <span className="text-white/70"> your team, not just collects data.</span>
+          <span className="text-white/70"> — one AI platform that </span>
+          <span className="italic text-white/90">guides your team to act</span>
+          <span className="text-white/70">, not just to report.</span>
         </motion.p>
 
         {/* Value proposition */}
