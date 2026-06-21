@@ -21,6 +21,7 @@ export const WebsiteHeader = () => {
 
   const navItems = [
     { label: "Solutions", href: "#solutions", hasDropdown: true },
+    { label: "Impact", href: "/impact" },
     { label: "Enterprise AI", href: "/features" },
     { label: "Technology", href: "/technology" },
     { label: "Insights", href: "/insights" },
