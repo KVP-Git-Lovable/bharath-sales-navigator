@@ -18062,6 +18062,12 @@ export type Database = {
         }[]
       }
       get_estimated_memory_usage: { Args: never; Returns: number }
+      get_invoice_filenames_q1_2026: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
       get_leave_date_constraints: {
         Args: { p_leave_type_id: string; p_user_id: string }
         Returns: Json
