@@ -254,142 +254,115 @@ const FeatureListPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1A1F2C] via-[#1A1F2C] to-[#0F1218]">
+    <div className="min-h-screen bg-[#0B0F1A]">
       {/* Website Header */}
       <WebsiteHeader />
 
-      {/* Hero Section - Compact */}
-      <section className="pt-8 pb-6 px-3 sm:px-4">
-        <div className="container mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 sm:px-4 py-2 mb-4">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span className="text-amber-400 text-sm font-medium">AI-First • Unlimited Users • 100+ Features</span>
+      {/* Intro */}
+      <section className="pt-10 pb-4 px-4">
+        <div className="container mx-auto max-w-6xl text-center">
+          <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-full px-3 py-1.5 mb-5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-amber-400 text-xs font-medium tracking-wide">AI-First • Unlimited Users • 100+ Features</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+          <h1 className="text-3xl md:text-5xl font-bold text-white tracking-tight mb-3">
             Intelligent Tools That Guide Your Team
           </h1>
-          <p className="text-white/70 max-w-2xl mx-auto mb-2">
-            Built on AI-first architecture — our platform doesn't just collect data, it <strong className="text-white/90">guides your sales team</strong> to success.
-          </p>
-          <p className="text-white/60 max-w-xl mx-auto flex items-center justify-center gap-2">
-            <span>Select a category below</span>
-            <ChevronDown className="w-4 h-4 animate-bounce" />
+          <p className="text-white/60 max-w-2xl mx-auto font-light text-base md:text-lg">
+            Built on AI-first architecture — our platform doesn't just collect data, it <span className="text-white/90">guides your sales team</span> to success.
           </p>
         </div>
       </section>
 
-      {/* Category Tabs - Prominent and Clear */}
-      <section className="px-4 pb-4 sticky top-[60px] z-40 bg-gradient-to-b from-[#1A1F2C] to-[#1A1F2C]/95 backdrop-blur-sm">
-        <div className="container mx-auto">
-          {/* Scrollable tabs */}
-          <div className="overflow-x-auto pb-2 -mx-4 px-3 sm:px-4 scrollbar-hide">
-            <div className="flex gap-2 min-w-max">
-              {featureCategories.map((category, idx) => {
-                const isActive = activeCategory === category.id;
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => setActiveCategory(category.id)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 sm:px-4 py-3 rounded-xl transition-all duration-300 whitespace-nowrap font-medium",
-                      isActive 
-                        ? `bg-gradient-to-r ${category.color} text-white shadow-lg scale-105` 
-                        : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10"
-                    )}
-                  >
-                    <category.icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{category.shortTitle}</span>
-                    <span className="sm:hidden">{category.shortTitle}</span>
-                  </button>
-                );
-              })}
+      {/* Editorial category nav */}
+      <section className="px-4 pt-6 sticky top-[60px] z-40 bg-[#0B0F1A]/95 backdrop-blur-md">
+        <div className="container mx-auto max-w-6xl">
+          <nav className="flex overflow-x-auto scrollbar-hide gap-x-8 gap-y-3 border-b border-slate-800/60 pb-5 justify-start md:justify-center">
+            {featureCategories.map((category) => {
+              const isActive = activeCategory === category.id;
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => setActiveCategory(category.id)}
+                  className={cn(
+                    "relative whitespace-nowrap text-sm font-semibold tracking-wide transition-colors pb-1",
+                    isActive ? "text-amber-500" : "text-slate-500 hover:text-slate-200"
+                  )}
+                >
+                  {category.shortTitle}
+                  {isActive && (
+                    <span className="absolute -bottom-[21px] left-0 right-0 h-[2px] bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.6)]" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </section>
+
+      {/* Editorial content */}
+      <section className="px-4 pt-16 pb-20">
+        <div className="container mx-auto max-w-6xl" key={activeCategory}>
+          {/* Hero category header */}
+          <div className="relative animate-fade-in mb-16">
+            <div
+              aria-hidden
+              className="absolute -top-10 md:-top-16 -left-2 md:-left-6 text-[6rem] md:text-[11rem] font-bold text-slate-700/[0.07] select-none pointer-events-none uppercase tracking-tighter leading-none"
+            >
+              {currentCategory.shortTitle}
             </div>
-          </div>
-          
-          {/* Progress indicator */}
-          <div className="flex gap-1 mt-3 justify-center">
-            {featureCategories.map((category, idx) => (
-              <button
-                key={category.id}
-                onClick={() => setActiveCategory(category.id)}
-                aria-label={`Go to ${category.shortTitle} category`}
-                aria-current={activeCategory === category.id ? "true" : undefined}
-                className={cn(
-                  "h-1.5 rounded-full transition-all duration-300",
-                  activeCategory === category.id 
-                    ? "w-8 bg-gradient-to-r from-amber-500 to-orange-500" 
-                    : "w-1.5 bg-white/20 hover:bg-white/40"
-                )}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Content - Clear visual connection */}
-      <section className="px-4 pb-20">
-        <div className="container mx-auto">
-          {/* Category Header Card */}
-          <div 
-            key={activeCategory}
-            className="animate-fade-in"
-          >
-            <div className={cn(
-              "rounded-2xl p-6 md:p-8 mb-6 bg-gradient-to-br border",
-              `${currentCategory.color.replace('from-', 'from-').replace(' to-', '/20 to-')}/10 border-white/10`
-            )}>
-              <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-                <div className={cn(
-                  "w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br",
-                  currentCategory.color
-                )}>
-                  <currentCategory.icon className="w-8 h-8 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-2xl md:text-3xl font-bold text-white mb-1">{currentCategory.title}</h2>
-                  <p className="text-white/60 text-lg">{currentCategory.tagline}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-4xl font-bold text-white">{currentCategory.features.length}</span>
-                  <p className="text-white/40 text-sm">features</p>
-                </div>
+            <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <p className="text-amber-500 text-xs font-bold tracking-[0.25em] uppercase mb-3 flex items-center gap-2">
+                  <currentCategory.icon className="w-3.5 h-3.5" />
+                  Category {String(currentIndex + 1).padStart(2, '0')}
+                </p>
+                <h2 className="text-4xl md:text-6xl font-bold text-white tracking-tight">{currentCategory.title}</h2>
+                <p className="text-slate-400 text-base md:text-xl mt-3 max-w-xl font-light">{currentCategory.tagline}</p>
+              </div>
+              <div className="flex flex-col items-start md:items-end">
+                <span className="text-6xl md:text-7xl font-light text-slate-700 leading-none">
+                  {String(currentCategory.features.length).padStart(2, '0')}
+                </span>
+                <span className="text-slate-500 uppercase tracking-widest text-[10px] font-bold mt-1">Total Features</span>
               </div>
             </div>
+          </div>
 
-            {/* Features Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentCategory.features.map((feature, index) => (
-                <div 
+          {/* Feature flow list */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-12 animate-fade-in">
+            {currentCategory.features.map((feature, index) => {
+              const interactive = !!feature.subFeatures;
+              return (
+                <div
                   key={feature.name}
-                  onClick={() => feature.subFeatures && setOpenFeature(feature)}
+                  onClick={() => interactive && setOpenFeature(feature)}
                   className={cn(
-                    "bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] group animate-fade-in",
-                    feature.subFeatures && "cursor-pointer ring-1 ring-amber-400/20"
+                    "group relative animate-fade-in",
+                    interactive && "cursor-pointer"
                   )}
                   style={{ animationDelay: `${index * 30}ms` }}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 bg-gradient-to-br",
-                      currentCategory.color
-                    )}>
-                      <Check className="w-4 h-4 text-white" />
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1 h-10 w-10 shrink-0 flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-black transition-all duration-500 shadow-[0_0_20px_rgba(245,158,11,0.05)]">
+                      <currentCategory.icon className="w-5 h-5" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-white font-semibold mb-1 group-hover:text-amber-300 transition-colors flex items-center gap-2">
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-white group-hover:text-amber-500 transition-colors flex flex-wrap items-center gap-2">
                         {feature.name}
                         {feature.subFeatures && (
-                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                            {feature.subFeatures.length} sub-features
+                          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-400/20 font-normal">
+                            {feature.subFeatures.length} sub
                             <ChevronRight className="w-3 h-3" />
                           </span>
                         )}
                       </h3>
-                      <p className="text-white/60 text-sm leading-relaxed">{feature.description}</p>
+                      <p className="text-slate-400 leading-relaxed font-light text-sm">{feature.description}</p>
+                      <div className="w-0 group-hover:w-full h-px bg-gradient-to-r from-amber-500 to-transparent transition-all duration-700 opacity-60" />
                       {feature.name === "Prebuilt Connectors" && (
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate('/connectors'); }}
-                          className="mt-2 text-amber-300 hover:text-amber-200 text-sm font-medium inline-flex items-center gap-1"
+                          className="mt-1 text-amber-400 hover:text-amber-300 text-sm font-medium inline-flex items-center gap-1"
                         >
                           View all connectors <ArrowRight className="w-3.5 h-3.5" />
                         </button>
@@ -397,79 +370,74 @@ const FeatureListPage = () => {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            {/* Deep-dive CTA for specific categories */}
-            {activeCategory === 'technology' && (
-              <div className="mt-8 p-6 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-white/10 text-center">
-                <h3 className="text-xl font-bold text-white mb-2">Explore the full technology architecture</h3>
-                <p className="text-white/60 mb-4 max-w-2xl mx-auto">
-                  See how our AI modules, offline-first infrastructure, and multi-language intelligence work together to power every sales workflow.
-                </p>
-                <Button
-                  onClick={() => navigate('/technology')}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
-                >
-                  View Technology Page
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            )}
-
-            {/* Navigation between categories */}
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/10">
+          {/* Technology deep-dive */}
+          {activeCategory === 'technology' && (
+            <div className="mt-16 text-center">
               <button
-                onClick={() => {
-                  const prevIdx = currentIndex === 0 ? featureCategories.length - 1 : currentIndex - 1;
-                  setActiveCategory(featureCategories[prevIdx].id);
-                }}
-                className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                onClick={() => navigate('/technology')}
+                className="px-8 py-3 rounded-full border border-slate-700 text-slate-300 hover:text-white hover:border-amber-500 transition-all duration-300 inline-flex items-center gap-2 group"
               >
-                <ArrowRight className="w-4 h-4 rotate-180" />
-                <span className="text-sm">Previous: {featureCategories[currentIndex === 0 ? featureCategories.length - 1 : currentIndex - 1].shortTitle}</span>
-              </button>
-              
-              <Button 
-                className={cn("bg-gradient-to-r text-white", currentCategory.color)}
-                onClick={() => navigate("/request-demo")}
-              >
-                Try {currentCategory.shortTitle}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-              
-              <button
-                onClick={() => {
-                  const nextIdx = currentIndex === featureCategories.length - 1 ? 0 : currentIndex + 1;
-                  setActiveCategory(featureCategories[nextIdx].id);
-                }}
-                className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
-              >
-                <span className="text-sm">Next: {featureCategories[currentIndex === featureCategories.length - 1 ? 0 : currentIndex + 1].shortTitle}</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Explore the full technology architecture</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
+          )}
+
+          {/* Footer navigation */}
+          <div className="flex items-center justify-between mt-20 pt-8 border-t border-slate-800/60 gap-4">
+            <button
+              onClick={() => {
+                const prevIdx = currentIndex === 0 ? featureCategories.length - 1 : currentIndex - 1;
+                setActiveCategory(featureCategories[prevIdx].id);
+              }}
+              className="flex items-center gap-2 text-slate-500 hover:text-amber-500 transition-colors text-sm group min-w-0"
+            >
+              <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform shrink-0" />
+              <span className="truncate">Prev · {featureCategories[currentIndex === 0 ? featureCategories.length - 1 : currentIndex - 1].shortTitle}</span>
+            </button>
+
+            <button
+              onClick={() => navigate("/request-demo")}
+              className="px-6 py-2.5 rounded-full bg-amber-500 text-black font-semibold hover:bg-amber-400 transition-colors text-sm whitespace-nowrap shadow-[0_0_25px_rgba(245,158,11,0.25)]"
+            >
+              Try {currentCategory.shortTitle}
+            </button>
+
+            <button
+              onClick={() => {
+                const nextIdx = currentIndex === featureCategories.length - 1 ? 0 : currentIndex + 1;
+                setActiveCategory(featureCategories[nextIdx].id);
+              }}
+              className="flex items-center gap-2 text-slate-500 hover:text-amber-500 transition-colors text-sm group min-w-0"
+            >
+              <span className="truncate">Next · {featureCategories[currentIndex === featureCategories.length - 1 ? 0 : currentIndex + 1].shortTitle}</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform shrink-0" />
+            </button>
           </div>
         </div>
       </section>
 
       {/* Sub-features Dialog */}
       <Dialog open={!!openFeature} onOpenChange={(o) => !o && setOpenFeature(null)}>
-        <DialogContent className="max-w-2xl bg-[#1A1F2C] border-white/10 text-white">
+        <DialogContent className="max-w-2xl bg-[#0B0F1A] border-slate-800 text-white">
           <DialogHeader>
             <DialogTitle className="text-2xl text-white">{openFeature?.name}</DialogTitle>
-            <DialogDescription className="text-white/60">{openFeature?.description}</DialogDescription>
+            <DialogDescription className="text-slate-400 font-light">{openFeature?.description}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 max-h-[60vh] overflow-y-auto pr-1">
             {openFeature?.subFeatures?.map((sf) => (
-              <div key={sf.name} className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <div className={cn("w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 bg-gradient-to-br", currentCategory.color)}>
-                    <Check className="w-3.5 h-3.5 text-white" />
+              <div key={sf.name} className="group">
+                <div className="flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 bg-amber-500/10 text-amber-500 group-hover:bg-amber-500 group-hover:text-black transition-colors">
+                    <Check className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <h4 className="text-white font-medium text-sm">{sf.name}</h4>
-                    <p className="text-white/60 text-xs mt-1 leading-relaxed">{sf.description}</p>
+                    <h4 className="text-white font-semibold text-sm group-hover:text-amber-400 transition-colors">{sf.name}</h4>
+                    <p className="text-slate-400 text-xs mt-1 leading-relaxed font-light">{sf.description}</p>
                   </div>
                 </div>
               </div>
@@ -479,18 +447,19 @@ const FeatureListPage = () => {
       </Dialog>
 
       {/* CTA Section */}
-      <section className="py-16 px-3 sm:px-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-t border-white/10">
+      <section className="py-20 px-4 border-t border-slate-800/60 relative overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-amber-500/10 blur-[120px] rounded-full pointer-events-none" />
         <div className="container mx-auto text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight relative">
             Ready to Experience All Features?
           </h2>
-          <p className="text-lg text-white/60 mb-6 max-w-xl mx-auto">
+          <p className="text-base md:text-lg text-slate-400 mb-8 max-w-xl mx-auto font-light relative">
             Start your free trial and explore every feature with your team.
           </p>
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-4 relative">
             <Button 
               size="lg"
-              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-8"
+              className="bg-amber-500 hover:bg-amber-400 text-black font-semibold px-8 rounded-full shadow-[0_0_30px_rgba(245,158,11,0.3)]"
               onClick={() => navigate("/request-demo")}
             >
               Request Demo
@@ -498,7 +467,7 @@ const FeatureListPage = () => {
             <Button 
               size="lg"
               variant="outline"
-              className="border-white/20 text-white hover:bg-white/10 px-8"
+              className="border-slate-700 text-slate-300 hover:bg-white/5 hover:text-white hover:border-amber-500 px-8 rounded-full bg-transparent"
               onClick={() => navigate("/roi-calculator")}
             >
               Calculate ROI
