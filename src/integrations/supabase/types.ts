@@ -18062,6 +18062,18 @@ export type Database = {
         }[]
       }
       get_estimated_memory_usage: { Args: never; Returns: number }
+      get_invoice_filenames_apr_2026: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
+      get_invoice_filenames_may_2026: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
       get_invoice_filenames_q1_2026: {
         Args: never
         Returns: {
