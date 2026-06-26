@@ -1,4 +1,4 @@
-import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy } from "lucide-react";
+import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -270,6 +270,7 @@ export const PricingPage = () => {
 
       {/* Enterprise Plus Section */}
       <section className="py-16 px-3 sm:px-4">
+        {/* Inserted before by patch: Quick Locate pricing */}
         <div className="w-full mx-auto max-w-4xl">
           <Card className="p-8 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex flex-col md:flex-row items-center gap-8">
