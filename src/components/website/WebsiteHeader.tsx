@@ -9,6 +9,7 @@ const solutionLinks = [
   { label: "Distributor Management", href: "/solutions/distributor-portal", external: false },
   { label: "Retailer Portal", href: "/solutions/retailer-portal", external: false },
   { label: "Store Operations", href: "https://storeops.quickapp.ai/", external: true },
+  { label: "Quick Locate", href: "/solutions/quick-locate", external: false },
 ];
 
 export const WebsiteHeader = () => {

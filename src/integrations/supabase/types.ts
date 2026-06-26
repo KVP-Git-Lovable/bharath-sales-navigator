@@ -18181,6 +18181,12 @@ export type Database = {
           state: string
         }[]
       }
+      get_retailer_photos_dec25_jan26: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
       get_retailer_unsorted_cities: {
         Args: { selected_district: string; selected_state: string }
         Returns: {
