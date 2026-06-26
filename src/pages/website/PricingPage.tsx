@@ -91,7 +91,7 @@ const pricingTiers = [
     ],
     features: [
       "All features in Professional, plus:",
-      "Institutional sales - B2B full cycle CRM with CPQ (quote management)",
+      "Institution sales - HORECA and associates for larger orders",
       "Sales coach",
       "Gamification",
       "Retailer loyalty program",
@@ -287,11 +287,10 @@ export const PricingPage = () => {
                 description: "Try Quick Locate with a small team.", icon: Zap, featured: false,
                 highlights: ["Up to 5 users", "1 GB storage"],
                 features: [
-                  "Photo attendance with live location",
-                  "Leave management (apply & approve)",
+                  "Photo attendance",
+                  "Leave management (apply only)",
                   "Activity & visit planning",
                   "Site check-in with photos",
-                  "Basic expense tracking",
                 ],
                 cta: "Get Started Free",
               },
