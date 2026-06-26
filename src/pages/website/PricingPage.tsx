@@ -1,5 +1,6 @@
 import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -109,7 +110,7 @@ export const PricingPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") === "quick-locate" ? "quick-locate" : "field-sales";
-  const [activeTab, setActiveTabState] = (require("react") as typeof import("react")).useState(initialTab);
+  const [activeTab, setActiveTabState] = useState(initialTab);
   const setActiveTab = (val: string) => {
     setActiveTabState(val);
     const next = new URLSearchParams(searchParams);
