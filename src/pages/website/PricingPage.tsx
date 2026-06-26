@@ -268,9 +268,151 @@ export const PricingPage = () => {
         </div>
       </section>
 
+      {/* ============ QUICK LOCATE PRICING ============ */}
+      <section className="py-8 px-3 sm:px-4 border-t border-border/50">
+        <div className="mx-auto w-full max-w-7xl">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-3">
+              <MapPin className="w-4 h-4" />
+              Quick Locate
+            </div>
+            <h3 className="text-xl md:text-2xl font-semibold">Quick Locate — Attendance, Activities & Site Procurement</h3>
+            <p className="text-sm text-muted-foreground mt-1">For distributed teams managing attendance, projects, expenses and vendors across multiple sites.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            {[
+              {
+                name: "Free", price: "₹0", period: "forever",
+                description: "Try Quick Locate with a small team.", icon: Zap, featured: false,
+                highlights: ["Up to 5 users", "1 GB storage"],
+                features: [
+                  "Photo attendance with live location",
+                  "Leave management (apply & approve)",
+                  "Activity & visit planning",
+                  "Site check-in with photos",
+                  "Basic expense tracking",
+                ],
+                cta: "Get Started Free",
+              },
+              {
+                name: "Starter", price: "₹4,000", period: "/month",
+                description: "For growing field teams.", icon: Rocket, featured: false,
+                highlights: ["Unlimited users", "2 GB storage"],
+                features: [
+                  "Everything in Free, plus:",
+                  "Multi-step leave approvals",
+                  "Weekly activity planner",
+                  "Visit duration & status tracking",
+                  "Expense submission with receipts",
+                  "Monthly expense reports",
+                ],
+                cta: "Start Free Trial",
+              },
+              {
+                name: "Professional", price: "₹8,000", period: "/month",
+                description: "For project-driven teams.", icon: Building2, featured: true,
+                highlights: ["Unlimited users", "5 GB storage"],
+                features: [
+                  "All features in Starter, plus:",
+                  "Projects & sites with milestones",
+                  "Real-time milestone progress",
+                  "Effort recording & time-sheet centre",
+                  "Advanced expense approvals",
+                  "Site-wise activity dashboards",
+                ],
+                cta: "Start Free Trial",
+              },
+              {
+                name: "Enterprise", price: "₹10,000", period: "/month",
+                description: "For end-to-end site procurement.", icon: Crown, featured: false,
+                highlights: ["Unlimited users", "10 GB storage"],
+                features: [
+                  "All features in Professional, plus:",
+                  "Site procurement — requisition to PO",
+                  "Goods receipt & invoice approval",
+                  "Vendor onboarding & Vendor 360",
+                  "Vendor payments & feedback",
+                  "Priority support",
+                ],
+                cta: "Contact Sales",
+              },
+            ].map((tier) => {
+              const Icon = tier.icon;
+              return (
+                <Card key={tier.name} className={`relative p-6 flex flex-col ${tier.featured ? "border-primary bg-primary/5 scale-105 shadow-xl shadow-primary/10" : "border-border bg-card"}`}>
+                  {tier.featured && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">Most Popular</span>
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-bold">{tier.name}</h3>
+                  </div>
+                  <div className="mb-4">
+                    <span className="text-3xl font-bold">{tier.price}</span>
+                    <span className="text-muted-foreground">{tier.period}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">{tier.description}</p>
+                  {tier.highlights && (
+                    <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-primary mb-2">Plan capacity</div>
+                      <ul className="space-y-1.5">
+                        {tier.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm font-medium">
+                            <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <span>{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <ul className="space-y-3 mb-8 flex-grow">
+                    {tier.features.map((feature, idx) => (
+                      feature.endsWith("plus:") ? (
+                        <li key={idx} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-1">{feature}</li>
+                      ) : (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      )
+                    ))}
+                  </ul>
+                  <Button className={`w-full ${tier.featured ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-foreground hover:bg-muted/80 border border-border"}`} onClick={() => navigate("/request-demo")}>
+                    {tier.cta}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-8">
+            <Card className="p-5 border-border bg-muted/20">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <PackagePlus className="w-4 h-4 text-primary" />
+                    Extend Your Quick Locate Plan — Additional Storage
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">Add storage anytime on top of your plan. Simple, predictable pricing.</p>
+                </div>
+                <div className="text-xs md:min-w-[280px]">
+                  <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
+                    <p className="font-semibold text-sm">Storage Pack</p>
+                    <p className="text-muted-foreground">₹1,000 per 1 GB / month</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Enterprise Plus Section */}
       <section className="py-16 px-3 sm:px-4">
-        {/* Inserted before by patch: Quick Locate pricing */}
         <div className="w-full mx-auto max-w-4xl">
           <Card className="p-8 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
             <div className="flex flex-col md:flex-row items-center gap-8">
