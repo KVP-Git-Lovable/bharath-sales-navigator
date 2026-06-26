@@ -1,6 +1,7 @@
 import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { WebsiteHeader, WebsiteFooter } from "@/components/website";
 
@@ -90,7 +91,7 @@ const pricingTiers = [
     ],
     features: [
       "All features in Professional, plus:",
-      "Institutional sales - B2B full cycle CRM with CPQ (quote management)",
+      "Institution sales - HORECA and associates for larger orders",
       "Sales coach",
       "Gamification",
       "Retailer loyalty program",
@@ -149,8 +150,17 @@ export const PricingPage = () => {
         </div>
       </section>
 
-      {/* Field Sales Platform */}
-      <section className="py-8 px-3 sm:px-4">
+      {/* Tabbed: Field Sales Platform & Quick Locate */}
+      <section className="py-4 px-3 sm:px-4">
+        <div className="mx-auto w-full max-w-7xl">
+          <Tabs defaultValue="field-sales" className="w-full">
+            <TabsList className="mx-auto grid w-full max-w-md grid-cols-2 mb-8">
+              <TabsTrigger value="field-sales">Field Sales Platform</TabsTrigger>
+              <TabsTrigger value="quick-locate">Quick Locate</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="field-sales">
+      <section className="pt-2 pb-4 px-0">
         <div className="mx-auto w-full max-w-7xl">
           <div className="text-center mb-8">
             <h3 className="text-xl md:text-2xl font-semibold">Field Sales Platform</h3>
@@ -187,6 +197,9 @@ export const PricingPage = () => {
                   <div className="mb-4">
                     <span className="text-3xl font-bold">{tier.price}</span>
                     <span className="text-muted-foreground">{tier.period}</span>
+                    {tier.name !== "Free" && (
+                      <p className="text-xs text-muted-foreground mt-1">Paid Annually (Annual plan only)</p>
+                    )}
                   </div>
 
                   <p className="text-sm text-muted-foreground mb-6">
@@ -244,7 +257,7 @@ export const PricingPage = () => {
 
       {/* Retailer Portal */}
       {/* Capacity Packs — compact strip under Field Sales tiers */}
-      <section className="pt-2 pb-8 px-3 sm:px-4">
+      <section className="pt-2 pb-8 px-0">
         <div className="w-full mx-auto max-w-7xl">
           <Card className="p-5 border-border bg-muted/20">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -267,9 +280,11 @@ export const PricingPage = () => {
           </Card>
         </div>
       </section>
+            </TabsContent>
 
+            <TabsContent value="quick-locate">
       {/* ============ QUICK LOCATE PRICING ============ */}
-      <section className="py-8 px-3 sm:px-4 border-t border-border/50">
+      <section className="pt-2 pb-4 px-0">
         <div className="mx-auto w-full max-w-7xl">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-3">
@@ -286,11 +301,10 @@ export const PricingPage = () => {
                 description: "Try Quick Locate with a small team.", icon: Zap, featured: false,
                 highlights: ["Up to 5 users", "1 GB storage"],
                 features: [
-                  "Photo attendance with live location",
-                  "Leave management (apply & approve)",
+                  "Photo attendance",
+                  "Leave management (apply only)",
                   "Activity & visit planning",
                   "Site check-in with photos",
-                  "Basic expense tracking",
                 ],
                 cta: "Get Started Free",
               },
@@ -354,6 +368,9 @@ export const PricingPage = () => {
                   <div className="mb-4">
                     <span className="text-3xl font-bold">{tier.price}</span>
                     <span className="text-muted-foreground">{tier.period}</span>
+                    {tier.name !== "Free" && (
+                      <p className="text-xs text-muted-foreground mt-1">Paid Annually (Annual plan only)</p>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground mb-6">{tier.description}</p>
                   {tier.highlights && (
@@ -408,6 +425,10 @@ export const PricingPage = () => {
               </div>
             </Card>
           </div>
+        </div>
+      </section>
+            </TabsContent>
+          </Tabs>
         </div>
       </section>
 
