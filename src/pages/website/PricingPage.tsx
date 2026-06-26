@@ -574,6 +574,9 @@ export const PricingPage = () => {
               >
                 Activate Pack
               </Button>
+              <div className="mt-3 text-xs text-muted-foreground border-t border-border pt-3">
+                <span className="font-semibold text-foreground">Disclaimer:</span> Advertisement costs are not included. Ad spend will be paid directly to the respective platform based on your marketing plan and budget.
+              </div>
             </Card>
 
             {/* Retailer Portal */}
