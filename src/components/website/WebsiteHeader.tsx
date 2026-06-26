@@ -5,10 +5,10 @@ import { useState, useEffect, useRef } from "react";
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 const solutionLinks = [
-  { label: "Retailer Sales", href: "/solutions/field-sales", external: false },
-  { label: "Distributor Management", href: "/solutions/distributor-portal", external: false },
-  { label: "Retailer Portal", href: "/solutions/retailer-portal", external: false },
-  { label: "Store Operations", href: "https://storeops.quickapp.ai/", external: true },
+  { label: "Quick Field Sales", href: "/solutions/field-sales", external: false },
+  { label: "Quick Channel Hub", href: "/solutions/distributor-portal", external: false },
+  { label: "Quick Retailer Hub", href: "/solutions/retailer-portal", external: false },
+  { label: "Quick Store Ops", href: "https://storeops.quickapp.ai/", external: true },
   { label: "Quick Locate", href: "/solutions/quick-locate", external: false },
 ];
 

@@ -53,7 +53,7 @@ export default function QuickLocateSolution() {
                 <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => navigate("/request-demo")}>
                   Request Demo
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate("/pricing")}>
+                <Button size="lg" variant="outline" onClick={() => navigate("/pricing?tab=quick-locate")}>
                   View Pricing
                 </Button>
               </div>
@@ -150,7 +150,7 @@ export default function QuickLocateSolution() {
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => navigate("/request-demo")}>
               Schedule Free Demo
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate("/pricing")}>
+            <Button size="lg" variant="outline" onClick={() => navigate("/pricing?tab=quick-locate")}>
               See Pricing
             </Button>
           </div>

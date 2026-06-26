@@ -111,6 +111,13 @@ export default function FieldSalesSolution() {
                 >
                   View All Features
                 </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate('/pricing?tab=field-sales')}
+                >
+                  View Pricing
+                </Button>
               </div>
             </div>
             <div className="relative">
