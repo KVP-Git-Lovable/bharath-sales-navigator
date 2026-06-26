@@ -1,8 +1,9 @@
 import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { WebsiteHeader, WebsiteFooter } from "@/components/website";
 
 const pricingTiers = [
@@ -107,6 +108,15 @@ const pricingTiers = [
 
 export const PricingPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") === "quick-locate" ? "quick-locate" : "field-sales";
+  const [activeTab, setActiveTabState] = useState(initialTab);
+  const setActiveTab = (val: string) => {
+    setActiveTabState(val);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", val);
+    setSearchParams(next, { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,7 +163,7 @@ export const PricingPage = () => {
       {/* Tabbed: Field Sales Platform & Quick Locate */}
       <section className="py-4 px-3 sm:px-4">
         <div className="mx-auto w-full max-w-7xl">
-          <Tabs defaultValue="field-sales" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mx-auto grid w-full max-w-md grid-cols-2 mb-8">
               <TabsTrigger value="field-sales">Field Sales Platform</TabsTrigger>
               <TabsTrigger value="quick-locate">Quick Locate</TabsTrigger>
