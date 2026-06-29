@@ -9172,7 +9172,7 @@ export type Database = {
           order_id: string | null
           original_rate: number | null
           product_id: string | null
-          product_name: string
+          product_name: string | null
           quantity: number
           rate: number
           sgst_amount: number | null
@@ -9190,9 +9190,9 @@ export type Database = {
           order_id?: string | null
           original_rate?: number | null
           product_id?: string | null
-          product_name: string
+          product_name?: string | null
           quantity: number
-          rate: number
+          rate?: number
           sgst_amount?: number | null
           total: number
           unit: string
@@ -9208,7 +9208,7 @@ export type Database = {
           order_id?: string | null
           original_rate?: number | null
           product_id?: string | null
-          product_name?: string
+          product_name?: string | null
           quantity?: number
           rate?: number
           sgst_amount?: number | null
@@ -11820,7 +11820,7 @@ export type Database = {
           sku: string
           stock_quantity: number
           updated_at: string
-          variant_name: string
+          variant_name: string | null
         }
         Insert: {
           barcode?: string | null
@@ -11843,7 +11843,7 @@ export type Database = {
           sku: string
           stock_quantity?: number
           updated_at?: string
-          variant_name: string
+          variant_name?: string | null
         }
         Update: {
           barcode?: string | null
@@ -11866,7 +11866,7 @@ export type Database = {
           sku?: string
           stock_quantity?: number
           updated_at?: string
-          variant_name?: string
+          variant_name?: string | null
         }
         Relationships: [
           {
@@ -11903,6 +11903,7 @@ export type Database = {
           rate: number
           sku: string
           sku_image_url: string | null
+          unit: string
           updated_at: string
         }
         Insert: {
@@ -11929,6 +11930,7 @@ export type Database = {
           rate?: number
           sku: string
           sku_image_url?: string | null
+          unit?: string
           updated_at?: string
         }
         Update: {
@@ -11955,6 +11957,7 @@ export type Database = {
           rate?: number
           sku?: string
           sku_image_url?: string | null
+          unit?: string
           updated_at?: string
         }
         Relationships: [
@@ -12165,15 +12168,7 @@ export type Database = {
           username?: string
           work_location?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "role_definitions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       push_content_execution_log: {
         Row: {
@@ -13862,6 +13857,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      roi_calculator_entries: {
+        Row: {
+          calculated_results: Json
+          company: string | null
+          company_size: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          industry: string | null
+          location: string | null
+          phone: string | null
+          referrer: string | null
+          roi_summary: Json
+          source_page: string | null
+          submission_data: Json
+          updated_at: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          calculated_results?: Json
+          company?: string | null
+          company_size?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          industry?: string | null
+          location?: string | null
+          phone?: string | null
+          referrer?: string | null
+          roi_summary?: Json
+          source_page?: string | null
+          submission_data?: Json
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          calculated_results?: Json
+          company?: string | null
+          company_size?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          industry?: string | null
+          location?: string | null
+          phone?: string | null
+          referrer?: string | null
+          roi_summary?: Json
+          source_page?: string | null
+          submission_data?: Json
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: []
       }
       role_definitions: {
         Row: {
@@ -16379,15 +16437,7 @@ export type Database = {
           profile_id?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_profiles_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "security_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_push_content_subscriptions: {
         Row: {
@@ -17522,6 +17572,81 @@ export type Database = {
         }
         Relationships: []
       }
+      website_leads: {
+        Row: {
+          company: string | null
+          created_at: string
+          email: string
+          form_origin: string | null
+          full_name: string
+          id: string
+          industry: string | null
+          job_title: string | null
+          lead_sub_type: string | null
+          lead_type: string
+          location: string | null
+          message: string | null
+          metadata: Json
+          phone: string | null
+          referrer: string | null
+          source_page: string | null
+          status: string
+          team_size: string | null
+          updated_at: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          email: string
+          form_origin?: string | null
+          full_name: string
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          lead_sub_type?: string | null
+          lead_type: string
+          location?: string | null
+          message?: string | null
+          metadata?: Json
+          phone?: string | null
+          referrer?: string | null
+          source_page?: string | null
+          status?: string
+          team_size?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          email?: string
+          form_origin?: string | null
+          full_name?: string
+          id?: string
+          industry?: string | null
+          job_title?: string | null
+          lead_sub_type?: string | null
+          lead_type?: string
+          location?: string | null
+          message?: string | null
+          metadata?: Json
+          phone?: string | null
+          referrer?: string | null
+          source_page?: string | null
+          status?: string
+          team_size?: string | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: []
+      }
       week_off_config: {
         Row: {
           alternate_pattern: string | null
@@ -17937,6 +18062,24 @@ export type Database = {
         }[]
       }
       get_estimated_memory_usage: { Args: never; Returns: number }
+      get_invoice_filenames_apr_2026: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
+      get_invoice_filenames_may_2026: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
+      get_invoice_filenames_q1_2026: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
+      }
       get_leave_date_constraints: {
         Args: { p_leave_type_id: string; p_user_id: string }
         Returns: Json
@@ -18036,6 +18179,12 @@ export type Database = {
         Args: never
         Returns: {
           state: string
+        }[]
+      }
+      get_retailer_photos_dec25_jan26: {
+        Args: never
+        Returns: {
+          name: string
         }[]
       }
       get_retailer_unsorted_cities: {
