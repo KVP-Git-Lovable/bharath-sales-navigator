@@ -160,12 +160,12 @@ export const PricingPage = () => {
         </div>
       </section>
 
-      {/* Tabbed: Field Sales Platform & Quick Locate */}
+      {/* Tabbed: Quick Field Sales & Quick Locate */}
       <section className="py-4 px-3 sm:px-4">
         <div className="mx-auto w-full max-w-7xl">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="mx-auto grid w-full max-w-md grid-cols-2 mb-8">
-              <TabsTrigger value="field-sales">Field Sales Platform</TabsTrigger>
+              <TabsTrigger value="field-sales">Quick Field Sales</TabsTrigger>
               <TabsTrigger value="quick-locate">Quick Locate</TabsTrigger>
             </TabsList>
 
@@ -173,7 +173,7 @@ export const PricingPage = () => {
       <section className="pt-2 pb-4 px-0">
         <div className="mx-auto w-full max-w-7xl">
           <div className="text-center mb-8">
-            <h3 className="text-xl md:text-2xl font-semibold">Field Sales Platform</h3>
+            <h3 className="text-xl md:text-2xl font-semibold">Quick Field Sales</h3>
             <p className="text-sm text-muted-foreground mt-1">For your field reps, distributors, and sales operations.</p>
           </div>
         <div className="w-full">
@@ -312,12 +312,11 @@ export const PricingPage = () => {
                 highlights: ["Up to 5 users", "1 GB storage", "3-month free trial"],
                 features: [
                   "Photo attendance",
-                  "Live location tracking",
-                  "Visit update — visit type, duration, status and progress",
+                  "Leave management",
                   "Apply leave",
-                  "1 GB storage",
-                  "30-day data retention",
-                  "Standard reports",
+                  "Leave approval workflow",
+                  "Leave inventory tracking",
+                  "1 GB",
                 ],
                 cta: "Start 3-Month Trial",
               },
