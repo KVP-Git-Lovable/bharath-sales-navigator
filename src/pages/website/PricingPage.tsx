@@ -160,7 +160,7 @@ export const PricingPage = () => {
         </div>
       </section>
 
-      {/* Tabbed: Field Sales Platform & Quick Locate */}
+      {/* Tabbed: Quick Field Sales & Quick Locate */}
       <section className="py-4 px-3 sm:px-4">
         <div className="mx-auto w-full max-w-7xl">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
