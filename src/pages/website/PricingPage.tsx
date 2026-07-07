@@ -304,12 +304,25 @@ export const PricingPage = () => {
             <h3 className="text-xl md:text-2xl font-semibold">Quick Locate — Attendance, Activities & Site Procurement</h3>
             <p className="text-sm text-muted-foreground mt-1">For distributed teams managing attendance, projects, expenses and vendors across multiple sites.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full">
             {[
               {
                 name: "Starter", price: "₹0", period: "for 3 months",
                 description: "Try Quick Locate free for 3 months.", icon: Zap, featured: false, isTrial: true,
                 highlights: ["Up to 5 users", "1 GB storage", "3-month free trial"],
+                features: [
+                  "Photo attendance",
+                  "Apply leave",
+                  "1 GB storage",
+                  "30-day data retention",
+                  "Standard reports",
+                ],
+                cta: "Start 3-Month Trial",
+              },
+              {
+                name: "Professional", price: "₹4,000", period: "/month",
+                description: "For growing field teams with full activity, visit and leave workflows.", icon: Rocket, featured: true,
+                highlights: ["Unlimited users", "2 GB storage"],
                 features: [
                   "Photo attendance",
                   "Live location tracking",
@@ -322,14 +335,23 @@ export const PricingPage = () => {
                   "Visit update — visit type, duration, status and progress",
                   "Site photo",
                 ],
-                cta: "Start 3-Month Trial",
+                cta: "Start Free Trial",
               },
               {
-                name: "Professional", price: "₹4,000", period: "/month",
-                description: "For growing field teams that need full expense control.", icon: Rocket, featured: true,
-                highlights: ["Unlimited users", "2 GB storage"],
+                name: "Enterprise", price: "₹8,000", period: "/month",
+                description: "For project-driven teams that need full expense control.", icon: Building2, featured: false,
+                highlights: ["Unlimited users", "5 GB storage"],
                 features: [
-                  "Everything in Starter, plus:",
+                  "Photo attendance",
+                  "Live location tracking",
+                  "Leave management",
+                  "Apply leave",
+                  "Leave approval workflow",
+                  "Leave inventory tracking",
+                  "Plan activity for the day / week",
+                  "Visit check-in (at site)",
+                  "Visit update — visit type, duration, status and progress",
+                  "Site photo",
                   "Expense submission",
                   "Receipt / bill upload",
                   "Pending / Approved / Rejected tracking",
@@ -337,19 +359,6 @@ export const PricingPage = () => {
                   "Monthly expense reports",
                   "Effort recording & time-sheet centre",
                   "Advanced expense approvals",
-                ],
-                cta: "Start Free Trial",
-              },
-              {
-                name: "Enterprise", price: "₹8,000", period: "/month",
-                description: "For project-driven teams.", icon: Building2, featured: false,
-                highlights: ["Unlimited users", "5 GB storage"],
-                features: [
-                  "All features in Professional, plus:",
-                  "Projects & sites with milestones",
-                  "Real-time milestone progress",
-                  "Site-wise activity dashboards",
-                  "Priority support",
                 ],
                 cta: "Contact Sales",
               },
