@@ -13674,7 +13674,6 @@ export type Database = {
           bank_account: string | null
           bank_name: string | null
           beat_id: string
-          beat_name: string | null
           category: string | null
           competitors: string[] | null
           contact_name: string | null
@@ -13730,7 +13729,6 @@ export type Database = {
           bank_account?: string | null
           bank_name?: string | null
           beat_id: string
-          beat_name?: string | null
           category?: string | null
           competitors?: string[] | null
           contact_name?: string | null
@@ -13786,7 +13784,6 @@ export type Database = {
           bank_account?: string | null
           bank_name?: string | null
           beat_id?: string
-          beat_name?: string | null
           category?: string | null
           competitors?: string[] | null
           contact_name?: string | null

@@ -10,7 +10,7 @@ const pricingTiers = [
   {
     name: "Free",
     price: "₹0",
-    period: "forever",
+    period: "for 3 months",
     description: "Perfect for trying out the platform",
     icon: Zap,
     featured: false,
@@ -312,6 +312,8 @@ export const PricingPage = () => {
                 highlights: ["Up to 5 users", "1 GB storage", "3-month free trial"],
                 features: [
                   "Photo attendance",
+                  "Live location tracking",
+                  "Visit update — visit type, duration, status and progress",
                   "Apply leave",
                   "1 GB storage",
                   "30-day data retention",
