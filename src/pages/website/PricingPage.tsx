@@ -327,7 +327,6 @@ export const PricingPage = () => {
                 highlights: ["Unlimited users", "2 GB storage"],
                 features: [
                   "Photo attendance",
-                  "Live location tracking",
                   "Leave management",
                   "Apply leave",
                   "Leave approval workflow",
@@ -335,7 +334,6 @@ export const PricingPage = () => {
                   "Plan activity for the day / week",
                   "Visit check-in (at site)",
                   "Visit update — visit type, duration, status and progress",
-                  "Site photo",
                 ],
                 cta: "Start Free Trial",
               },
@@ -352,8 +350,8 @@ export const PricingPage = () => {
                   "Leave inventory tracking",
                   "Plan activity for the day / week",
                   "Visit check-in (at site)",
-                  "Visit update — visit type, duration, status and progress",
                   "Site photo",
+                  "Visit update — visit type, duration, status and progress",
                   "Expense submission",
                   "Receipt / bill upload",
                   "Pending / Approved / Rejected tracking",
@@ -426,7 +424,7 @@ export const PricingPage = () => {
                 <PackagePlus className="w-5 h-5 text-primary" />
                 Extend Quick Locate — Add-on Packs
               </h4>
-              <p className="text-xs text-muted-foreground mt-1">Bolt on CRM, project or procurement capabilities. Unlimited users on every pack.</p>
+              <p className="text-xs text-muted-foreground mt-1">Bolt on CRM, project or procurement capabilities. Unlimited users on every pack. Add-on packs run on one of the Quick Locate editions and consume the same storage as that edition.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
@@ -454,7 +452,6 @@ export const PricingPage = () => {
                     "Project photos",
                     "Project risk reporting",
                     "Project site visit — check-in and check-out",
-                    "Project visit expenses — travel and visit",
                   ],
                 },
                 {
@@ -587,6 +584,9 @@ export const PricingPage = () => {
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Add new channels and customer-facing apps. Predictable, prepaid pricing — no per-transaction penalties.
             </p>
+            <p className="text-xs text-muted-foreground max-w-2xl mx-auto mt-2">
+              Storage is as per the edition you choose. Add-ons run on one of the editions.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-8">
@@ -674,13 +674,13 @@ export const PricingPage = () => {
               </div>
             </Card>
 
-            {/* Retailer Portal */}
+            {/* Customer Portal */}
             <Card className="p-6 flex flex-col border-border hover:border-primary/50 transition-colors">
               <div className="mb-4">
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                   <Store className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold">Retailer Portal</h3>
+                <h3 className="text-xl font-bold">Customer Portal</h3>
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold">₹10,000</span>
@@ -691,7 +691,7 @@ export const PricingPage = () => {
               </p>
               <ul className="space-y-3 mb-6 flex-grow">
                 {[
-                  "Unlimited retailer logins",
+                  "Customer logins",
                   "iOS & Android apps (Play Store + App Store)",
                   "Storage as per the edition you choose",
                   "WhatsApp AI conversational order-taking",
