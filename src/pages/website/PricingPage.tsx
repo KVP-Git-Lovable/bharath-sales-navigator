@@ -307,55 +307,48 @@ export const PricingPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {[
               {
-                name: "Free", price: "₹0", period: "forever",
-                description: "Try Quick Locate with a small team.", icon: Zap, featured: false,
-                highlights: ["Up to 5 users", "1 GB storage"],
+                name: "Starter", price: "₹0", period: "for 3 months",
+                description: "Try Quick Locate free for 3 months.", icon: Zap, featured: false, isTrial: true,
+                highlights: ["Up to 5 users", "1 GB storage", "3-month free trial"],
                 features: [
                   "Photo attendance",
-                  "Leave management (apply only)",
-                  "Activity & visit planning",
-                  "Site check-in with photos",
+                  "Live location tracking",
+                  "Leave management",
+                  "Apply leave",
+                  "Leave approval workflow",
+                  "Leave inventory tracking",
+                  "Plan activity for the day / week",
+                  "Visit check-in (at site)",
+                  "Visit update — visit type, duration, status and progress",
+                  "Site photo",
                 ],
-                cta: "Get Started Free",
+                cta: "Start 3-Month Trial",
               },
               {
-                name: "Starter", price: "₹4,000", period: "/month",
-                description: "For growing field teams.", icon: Rocket, featured: false,
+                name: "Professional", price: "₹4,000", period: "/month",
+                description: "For growing field teams that need full expense control.", icon: Rocket, featured: true,
                 highlights: ["Unlimited users", "2 GB storage"],
                 features: [
-                  "Everything in Free, plus:",
-                  "Multi-step leave approvals",
-                  "Weekly activity planner",
-                  "Visit duration & status tracking",
-                  "Expense submission with receipts",
+                  "Everything in Starter, plus:",
+                  "Expense submission",
+                  "Receipt / bill upload",
+                  "Pending / Approved / Rejected tracking",
+                  "User-wise expense summary",
                   "Monthly expense reports",
-                ],
-                cta: "Start Free Trial",
-              },
-              {
-                name: "Professional", price: "₹8,000", period: "/month",
-                description: "For project-driven teams.", icon: Building2, featured: true,
-                highlights: ["Unlimited users", "5 GB storage"],
-                features: [
-                  "All features in Starter, plus:",
-                  "Projects & sites with milestones",
-                  "Real-time milestone progress",
                   "Effort recording & time-sheet centre",
                   "Advanced expense approvals",
-                  "Site-wise activity dashboards",
                 ],
                 cta: "Start Free Trial",
               },
               {
-                name: "Enterprise", price: "₹10,000", period: "/month",
-                description: "For end-to-end site procurement.", icon: Crown, featured: false,
-                highlights: ["Unlimited users", "10 GB storage"],
+                name: "Enterprise", price: "₹8,000", period: "/month",
+                description: "For project-driven teams.", icon: Building2, featured: false,
+                highlights: ["Unlimited users", "5 GB storage"],
                 features: [
                   "All features in Professional, plus:",
-                  "Site procurement — requisition to PO",
-                  "Goods receipt & invoice approval",
-                  "Vendor onboarding & Vendor 360",
-                  "Vendor payments & feedback",
+                  "Projects & sites with milestones",
+                  "Real-time milestone progress",
+                  "Site-wise activity dashboards",
                   "Priority support",
                 ],
                 cta: "Contact Sales",
@@ -378,7 +371,7 @@ export const PricingPage = () => {
                   <div className="mb-4">
                     <span className="text-3xl font-bold">{tier.price}</span>
                     <span className="text-muted-foreground">{tier.period}</span>
-                    {tier.name !== "Free" && (
+                    {!tier.isTrial && (
                       <p className="text-xs text-muted-foreground mt-1">Paid Annually (Annual plan only)</p>
                     )}
                   </div>
@@ -416,8 +409,89 @@ export const PricingPage = () => {
             })}
           </div>
 
-          <div className="mt-8">
-            <Card className="p-5 border-border bg-muted/20">
+          <div className="mt-10">
+            <div className="text-center mb-6">
+              <h4 className="text-lg md:text-xl font-semibold flex items-center gap-2 justify-center">
+                <PackagePlus className="w-5 h-5 text-primary" />
+                Extend Quick Locate — Add-on Packs
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">Bolt on CRM, project or procurement capabilities. Unlimited users on every pack.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                {
+                  name: "Quick CRM Lite",
+                  price: "₹3,000 / month",
+                  note: "Unlimited users",
+                  items: [
+                    "Sales team can create opportunities linked to a customer record",
+                    "Track opportunity pipeline by team member — status, value and expected close date (PO)",
+                    "Revenue planning — payment milestones and revenue forecasting",
+                    "Planned vs actual billing date and value comparison",
+                    "Map decision makers and multiple contacts (procurement, supporter)",
+                    "Upload quotes and customer purchase orders / sign-offs",
+                  ],
+                },
+                {
+                  name: "Quick Project Lite",
+                  price: "₹3,000 / month",
+                  note: "Unlimited users",
+                  items: [
+                    "Creation of project",
+                    "Project milestones",
+                    "Progress recording of each milestone",
+                    "Project photos",
+                    "Project risk reporting",
+                    "Project site visit — check-in and check-out",
+                    "Project visit expenses — travel and visit",
+                  ],
+                },
+                {
+                  name: "Quick Procure Lite",
+                  price: "₹3,000 / month",
+                  note: "Unlimited users",
+                  items: [
+                    "Procurement",
+                    "Site procurement",
+                    "Vendor registrations",
+                    "Requisitions from site",
+                    "Vendor short-list",
+                    "Goods receipt and inspection",
+                    "Vendor invoice approval",
+                    "Vendor payment status",
+                    "Vendor 360",
+                    "Vendor onboarding",
+                    "All POs by vendor",
+                    "Vendor payment",
+                    "Vendor feedback",
+                  ],
+                },
+              ].map((pack) => (
+                <Card key={pack.name} className="p-5 border-border bg-card flex flex-col">
+                  <div className="mb-3">
+                    <h5 className="text-base font-semibold">{pack.name}</h5>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-primary">{pack.price}</span>
+                      <span className="text-xs text-muted-foreground">{pack.note}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">Paid Annually (Annual plan only)</p>
+                  </div>
+                  <ul className="space-y-2 mb-4 flex-grow">
+                    {pack.items.map((it, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs">
+                        <Check className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                        <span>{it}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/request-demo")}>
+                    Add Pack
+                  </Button>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="mt-6 p-5 border-border bg-muted/20">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <h4 className="text-sm font-semibold flex items-center gap-2">
