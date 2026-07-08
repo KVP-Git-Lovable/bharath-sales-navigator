@@ -34,6 +34,7 @@ const pricingTiers = [
     featured: false,
     highlights: [
       "5,000 orders/month",
+      "5 GB storage",
       "AI-powered insights — 2,500 AI requests/month",
     ],
     features: [
@@ -59,6 +60,7 @@ const pricingTiers = [
     featured: true,
     highlights: [
       "10,000 orders/month",
+      "10 GB storage",
       "25 distributor portals",
       "AI-powered insights — 5,000 AI requests/month",
     ],
@@ -84,6 +86,7 @@ const pricingTiers = [
     featured: false,
     highlights: [
       "20,000 orders/month",
+      "20 GB storage",
       "200 distributor portals",
       "AI-powered insights — 10,000 AI requests/month",
     ],
