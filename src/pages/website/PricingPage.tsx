@@ -240,10 +240,29 @@ export const PricingPage = () => {
                           {feature}
                         </li>
                       ) : (
-                        <li key={idx} className="flex items-start gap-2 text-sm">
-                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </li>
+                        (() => {
+                          const [text, linkPart] = feature.split("|link:");
+                          return (
+                            <li key={idx} className="flex items-start gap-2 text-sm">
+                              <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                              <span>
+                                {text}
+                                {linkPart && (
+                                  <>
+                                    {" "}
+                                    <a
+                                      href={linkPart}
+                                      onClick={(e) => { e.preventDefault(); navigate(linkPart); }}
+                                      className="text-primary underline"
+                                    >
+                                      View catalog
+                                    </a>
+                                  </>
+                                )}
+                              </span>
+                            </li>
+                          );
+                        })()
                       )
                     ))}
                   </ul>
