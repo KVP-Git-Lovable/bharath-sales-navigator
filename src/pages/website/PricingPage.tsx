@@ -903,7 +903,7 @@ export const PricingPage = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>Mobile app usage and 'how-to' queries</span>
+                  <span>App usage and 'how-to' queries</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
@@ -915,11 +915,11 @@ export const PricingPage = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>The post go-live adoption support covers dedicated project manager (on call), platform updates, and access to our help portal.</span>
+                  <span>Platform updates, and access to our help portal.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>The support also covers a monthly usage report and a quarterly training programs to effectively use the application. Any new change request is not covered in the support.</span>
+                  <span>Any new change request and integration request is not covered in the support.</span>
                 </li>
               </ul>
               <div className="border-t border-border pt-4">
