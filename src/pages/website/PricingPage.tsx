@@ -95,6 +95,7 @@ const pricingTiers = [
       "Retailer loyalty program",
       "Event ROI track and counter sales",
       "Access to 33 pre-built connectors|link:/connectors",
+      "API for Integration",
       "Retailer Portal (unlimited retailer logins) (add-on ₹)",
       "Marketing Pack (unlimited campaigns) (add-on ₹)",
       "Microsoft Power BI connector (add-on ₹)",
