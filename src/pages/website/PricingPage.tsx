@@ -290,6 +290,38 @@ export const PricingPage = () => {
           </Card>
         </div>
       </section>
+
+      {/* Add-on Order Packs */}
+      <section className="pb-8 px-0">
+        <div className="w-full mx-auto max-w-7xl">
+          <Card className="p-5 border-border bg-muted/20">
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <PackagePlus className="w-4 h-4 text-primary" />
+                Add-on Order Packs
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Extend your monthly order limit with flexible order packs.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { orders: "500 orders", price: "₹3,500" },
+                { orders: "1,000 orders", price: "₹6,500" },
+                { orders: "2,000 orders", price: "₹12,000" },
+              ].map((pack, i) => (
+                <div
+                  key={i}
+                  className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center"
+                >
+                  <p className="font-semibold text-sm">{pack.orders}</p>
+                  <p className="text-muted-foreground">{pack.price}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </section>
             </TabsContent>
 
             <TabsContent value="quick-locate">
