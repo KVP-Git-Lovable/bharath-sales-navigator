@@ -629,53 +629,6 @@ export const PricingPage = () => {
         </div>
       </section>
 
-      {/* Enterprise Plus Section */}
-      <section className="py-16 px-3 sm:px-4">
-        <div className="w-full mx-auto max-w-4xl">
-          <Card className="p-8 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-            <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold mb-2">Enterprise Plus</h2>
-                <p className="text-muted-foreground mb-4">
-                  For large enterprises with large field reps and multi-region operations
-                </p>
-                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    Unlimited everything
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    White-label options
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    Custom integrations
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    Dedicated success manager
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    SLA guarantees
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-primary" />
-                    On-premise deployment
-                  </li>
-                </ul>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-2">Custom pricing</p>
-                <Button size="lg" onClick={() => navigate("/request-demo")}>
-                  Contact Sales
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </section>
 
       {/* ============ ADD-ONS ============ */}
       <section id="addons" className="py-16 px-3 sm:px-4">
