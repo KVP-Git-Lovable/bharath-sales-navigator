@@ -286,7 +286,7 @@ export const PricingPage = () => {
       </section>
 
       {/* Implementation & Support */}
-      <section className="pt-2 pb-8 px-0">
+      <section className="pt-12 md:pt-16 pb-8 px-0">
         <div className="w-full mx-auto max-w-7xl">
           <Card className="p-6 border-border bg-muted/30">
             <h4 className="text-base font-semibold mb-4">
