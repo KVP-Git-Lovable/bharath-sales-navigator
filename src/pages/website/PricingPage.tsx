@@ -33,6 +33,7 @@ const pricingTiers = [
     icon: Rocket,
     featured: false,
     highlights: [
+      "Unlimited users",
       "5,000 orders/month",
       "5 GB storage",
       "AI-powered insights — 2,500 AI requests/month",
@@ -59,6 +60,7 @@ const pricingTiers = [
     icon: Building2,
     featured: true,
     highlights: [
+      "Unlimited users",
       "10,000 orders/month",
       "10 GB storage",
       "25 distributor portals",
@@ -85,6 +87,7 @@ const pricingTiers = [
     icon: Crown,
     featured: false,
     highlights: [
+      "Unlimited users",
       "20,000 orders/month",
       "20 GB storage",
       "200 distributor portals",
