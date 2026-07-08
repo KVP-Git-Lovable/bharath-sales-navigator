@@ -86,7 +86,7 @@ const pricingTiers = [
     icon: Crown,
     featured: false,
     highlights: [
-      "15 GB storage",
+      "20,000 orders/month",
       "200 distributor portals",
       "AI-powered insights — 10,000 AI requests/month",
     ],
