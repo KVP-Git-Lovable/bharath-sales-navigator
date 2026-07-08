@@ -33,7 +33,7 @@ const pricingTiers = [
     icon: Rocket,
     featured: false,
     highlights: [
-      "5 GB storage",
+      "5,000 orders/month",
       "AI-powered insights — 2,500 AI requests/month",
     ],
     features: [
