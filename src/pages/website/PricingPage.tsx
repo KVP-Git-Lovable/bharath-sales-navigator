@@ -33,7 +33,7 @@ const pricingTiers = [
     icon: Rocket,
     featured: false,
     highlights: [
-      "5 GB storage",
+      "5,000 orders/month",
       "AI-powered insights — 2,500 AI requests/month",
     ],
     features: [
@@ -59,7 +59,7 @@ const pricingTiers = [
     icon: Building2,
     featured: true,
     highlights: [
-      "10 GB storage",
+      "10,000 orders/month",
       "25 distributor portals",
       "AI-powered insights — 5,000 AI requests/month",
     ],
@@ -86,7 +86,7 @@ const pricingTiers = [
     icon: Crown,
     featured: false,
     highlights: [
-      "15 GB storage",
+      "20,000 orders/month",
       "200 distributor portals",
       "AI-powered insights — 10,000 AI requests/month",
     ],
@@ -283,7 +283,7 @@ export const PricingPage = () => {
               <div className="text-xs md:min-w-[280px]">
                 <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
                   <p className="font-semibold text-sm">Storage Pack</p>
-                  <p className="text-muted-foreground">₹1,000 per 1 GB / month</p>
+                  <p className="text-muted-foreground">₹500 for 2 GB / month</p>
                 </div>
               </div>
             </div>
