@@ -283,7 +283,7 @@ export const PricingPage = () => {
               <div className="text-xs md:min-w-[280px]">
                 <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
                   <p className="font-semibold text-sm">Storage Pack</p>
-                  <p className="text-muted-foreground">₹1,000 per 1 GB / month</p>
+                  <p className="text-muted-foreground">₹500 for 2 GB / month</p>
                 </div>
               </div>
             </div>
