@@ -37,7 +37,7 @@ export const ProfessionalServicesSolution = () => {
       features: [
         "First point of contact for all end-users",
         "Login/access, navigation, daily workflows support",
-        "Mobile app usage and 'how-to' queries",
+        "App usage and 'how-to' queries",
         "Troubleshooting data visibility & sync errors",
         "Proactive monitoring of app usage and data quality",
         "Scheduled and proactive user training sessions",
@@ -46,8 +46,8 @@ export const ProfessionalServicesSolution = () => {
         "Quarterly ROI analysis & business impact reports",
         "Dedicated Customer Success Manager (CSM)",
         "Documentation and escalation to L2",
-        "The post go-live adoption support covers dedicated project manager (on call), platform updates, and access to our help portal.",
-        "The support also covers a monthly usage report and a quarterly training programs to effectively use the application. Any new change request is not covered in the support."
+        "Platform updates, and access to our help portal.",
+        "Any new change request and integration request is not covered in the support."
       ],
       supportHours: "9 AM to 7 PM IST, Monday to Friday",
       pricing: "20% of annual contract value of overall subscription (edition and add-ons)",

@@ -68,13 +68,12 @@ const pricingTiers = [
       "Distributor management system",
       "Primary sales management",
       "Distributor Inventory Management",
-      "Field sales app for distributor sales team",
-      "Product bundles",
-      "Event ROI track and counter sales",
-      "GPS tracking",
+      "Van sales and next day delivery and packing list",
+      "Distribution invoicing and collection process automation",
+      "Distributor target vs. actual",
+      "Integration to Zoho Books for distributor",
       "API for Integration",
       "Advanced reporting",
-      "Marketing Pack & Retailer Portal available as add-ons (₹)",
     ],
     cta: "Start Free Trial",
   },
@@ -96,8 +95,10 @@ const pricingTiers = [
       "Sales coach",
       "Gamification",
       "Retailer loyalty program",
-      "Retailer Portal (unlimited retailer logins)",
-      "Marketing Pack (unlimited campaigns)",
+      "Event ROI track and counter sales",
+      "Access to 33 pre-built connectors|link:/connectors",
+      "Retailer Portal (unlimited retailer logins) (add-on ₹)",
+      "Marketing Pack (unlimited campaigns) (add-on ₹)",
       "Microsoft Power BI connector (add-on ₹)",
       "Dedicated Customer Success Manager",
       "Priority support",
@@ -239,10 +240,29 @@ export const PricingPage = () => {
                           {feature}
                         </li>
                       ) : (
-                        <li key={idx} className="flex items-start gap-2 text-sm">
-                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                          <span>{feature}</span>
-                        </li>
+                        (() => {
+                          const [text, linkPart] = feature.split("|link:");
+                          return (
+                            <li key={idx} className="flex items-start gap-2 text-sm">
+                              <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                              <span>
+                                {text}
+                                {linkPart && (
+                                  <>
+                                    {" "}
+                                    <a
+                                      href={linkPart}
+                                      onClick={(e) => { e.preventDefault(); navigate(linkPart); }}
+                                      className="text-primary underline"
+                                    >
+                                      View catalog
+                                    </a>
+                                  </>
+                                )}
+                              </span>
+                            </li>
+                          );
+                        })()
                       )
                     ))}
                   </ul>
@@ -266,7 +286,7 @@ export const PricingPage = () => {
       </section>
 
       {/* Implementation & Support */}
-      <section className="pt-2 pb-8 px-0">
+      <section className="pt-12 md:pt-16 pb-8 px-0">
         <div className="w-full mx-auto max-w-7xl">
           <Card className="p-6 border-border bg-muted/30">
             <h4 className="text-base font-semibold mb-4">
@@ -883,7 +903,7 @@ export const PricingPage = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>Mobile app usage and 'how-to' queries</span>
+                  <span>App usage and 'how-to' queries</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
@@ -895,11 +915,11 @@ export const PricingPage = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>The post go-live adoption support covers dedicated project manager (on call), platform updates, and access to our help portal.</span>
+                  <span>Platform updates, and access to our help portal.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span>The support also covers a monthly usage report and a quarterly training programs to effectively use the application. Any new change request is not covered in the support.</span>
+                  <span>Any new change request and integration request is not covered in the support.</span>
                 </li>
               </ul>
               <div className="border-t border-border pt-4">
