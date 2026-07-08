@@ -34,6 +34,7 @@ const pricingTiers = [
     featured: false,
     highlights: [
       "5,000 orders/month",
+      "5 GB storage",
       "AI-powered insights — 2,500 AI requests/month",
     ],
     features: [
@@ -59,6 +60,7 @@ const pricingTiers = [
     featured: true,
     highlights: [
       "10,000 orders/month",
+      "10 GB storage",
       "25 distributor portals",
       "AI-powered insights — 5,000 AI requests/month",
     ],
@@ -84,6 +86,7 @@ const pricingTiers = [
     featured: false,
     highlights: [
       "20,000 orders/month",
+      "20 GB storage",
       "200 distributor portals",
       "AI-powered insights — 10,000 AI requests/month",
     ],
@@ -351,7 +354,7 @@ export const PricingPage = () => {
               <div className="text-xs md:min-w-[280px]">
                 <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
                   <p className="font-semibold text-sm">Storage Pack</p>
-                  <p className="text-muted-foreground">₹500 for 2 GB / month</p>
+                  <p className="text-muted-foreground">Rs. 500 per month for 2 GB</p>
                 </div>
               </div>
             </div>
@@ -369,7 +372,7 @@ export const PricingPage = () => {
                 Add-on Order Packs
               </h4>
               <p className="text-xs text-muted-foreground mt-1">
-                Extend your monthly order limit with flexible order packs.
+                Extend your order limit with flexible order packs.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -699,7 +702,7 @@ export const PricingPage = () => {
                 </div>
                 <div className="mb-4">
                   <span className="text-3xl font-bold">₹5,000</span>
-                  <span className="text-muted-foreground">/Pack</span>
+                  <span className="text-muted-foreground">/pack</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-6">
                   For dedicated, high-volume WhatsApp communication.
