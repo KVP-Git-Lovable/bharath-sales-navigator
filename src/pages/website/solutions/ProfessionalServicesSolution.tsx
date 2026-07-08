@@ -45,11 +45,13 @@ export const ProfessionalServicesSolution = () => {
         "Monthly usage summary reports",
         "Quarterly ROI analysis & business impact reports",
         "Dedicated Customer Success Manager (CSM)",
-        "Documentation and escalation to L2"
+        "Documentation and escalation to L2",
+        "The post go-live adoption support covers dedicated project manager (on call), platform updates, and access to our help portal.",
+        "The support also covers a monthly usage report and a quarterly training programs to effectively use the application. Any new change request is not covered in the support."
       ],
       supportHours: "9 AM to 7 PM IST, Monday to Friday",
-      pricing: "25% of annual subscription (Year 1), 20% from Year 2 onwards",
-      fairUsage: "Max 50 hours/month. Additional support budget may be requested for significant increase in requests."
+      pricing: "20% of annual contract value of overall subscription (edition and add-ons)",
+      fairUsage: "Max 50 hours/year. Additional support budget may be requested for significant increase in requests."
     },
     {
       level: "L2",
@@ -110,6 +112,7 @@ export const ProfessionalServicesSolution = () => {
 
   useEffect(() => {
     document.title = "Professional Services | QuickApp.ai";
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
   }, []);
 
   return (
@@ -363,10 +366,9 @@ export const ProfessionalServicesSolution = () => {
                   <div className="grid md:grid-cols-3 gap-8">
                     <div className="text-center p-6 rounded-xl bg-background border border-border/50">
                       <Badge className="mb-4 bg-blue-500">L1 Support</Badge>
-                      <p className="text-2xl font-bold text-foreground mb-1">25% (Year 1)</p>
-                      <p className="text-xl font-bold text-foreground mb-2">20% (Year 2+)</p>
-                      <p className="text-sm text-muted-foreground">of annual subscription</p>
-                      <p className="text-xs text-muted-foreground mt-2">Fair usage: Max 50 hrs/month</p>
+                      <p className="text-2xl font-bold text-foreground mb-2">20%</p>
+                      <p className="text-sm text-muted-foreground">of annual contract value of overall subscription (edition and add-ons)</p>
+                      <p className="text-xs text-muted-foreground mt-2">Fair usage: Max 50 hrs/year</p>
                     </div>
                     <div className="text-center p-6 rounded-xl bg-background border border-border/50">
                       <Badge className="mb-4 bg-purple-500">L2 Support</Badge>

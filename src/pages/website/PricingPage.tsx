@@ -270,7 +270,7 @@ export const PricingPage = () => {
         <div className="w-full mx-auto max-w-7xl">
           <Card className="p-6 border-border bg-muted/30">
             <h4 className="text-base font-semibold mb-4">
-              A One-time implementation cost of 30% of the Annual Contract Value (ACV) is applicable, along with a post-go live continuous support
+              A One-time implementation cost of 30% of the Annual Contract Value (ACV) is applicable
             </h4>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
@@ -279,11 +279,35 @@ export const PricingPage = () => {
               </li>
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <span>The post go-live adoption support covers dedicated project manager (on call), platform updates, and access to our help portal.</span>
+                <span>Detailed process documentation</span>
               </li>
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                <span>The support also covers a monthly usage report and a quarterly training programs to effectively use the application. Any new change request is not covered in the support.</span>
+                <span>Testing & Quality Assurance (QA)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>UAT testing process</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>Enabling key reports</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>User training and admin training with training documents for future reference</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>Any integration and customisation of new features are not covered.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>Post go-live support is not covered in implementation plan</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <span>ACV is rate for the edition and add-ons combined</span>
               </li>
             </ul>
           </Card>
@@ -869,13 +893,20 @@ export const PricingPage = () => {
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <span>Dedicated Customer Success Manager</span>
                 </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>The post go-live adoption support covers dedicated project manager (on call), platform updates, and access to our help portal.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span>The support also covers a monthly usage report and a quarterly training programs to effectively use the application. Any new change request is not covered in the support.</span>
+                </li>
               </ul>
               <div className="border-t border-border pt-4">
                 <p className="text-xs text-muted-foreground mb-1">9 AM to 7 PM IST, Mon-Fri</p>
-                <p className="text-sm font-semibold">25% of annual subscription (Year 1)</p>
-                <p className="text-sm font-semibold">20% from Year 2 onwards</p>
+                <p className="text-sm font-semibold">20% of annual contract value of overall subscription (edition and add-ons)</p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Fair usage: Max 50 hours/month. Additional support budget may be requested for significant increase in requests.
+                  Fair usage: Max 50 hours/year. Additional support budget may be requested for significant increase in requests.
                 </p>
               </div>
             </Card>
