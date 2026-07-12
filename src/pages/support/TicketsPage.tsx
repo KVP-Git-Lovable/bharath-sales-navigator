@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,29 +10,45 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Plus, Paperclip, Send, X } from "lucide-react";
+import { LifeBuoy, Plus, Paperclip, X } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-const statusColors: Record<string, string> = {
-  open: "bg-blue-100 text-blue-800",
+export const TICKET_STATUSES = [
+  { value: "created", label: "Created" },
+  { value: "acknowledged", label: "Acknowledged" },
+  { value: "in_progress", label: "Work in progress" },
+  { value: "closed", label: "Closed" },
+  { value: "deferred", label: "Deferred" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export const statusColors: Record<string, string> = {
+  created: "bg-blue-100 text-blue-800",
+  acknowledged: "bg-indigo-100 text-indigo-800",
   in_progress: "bg-yellow-100 text-yellow-800",
-  waiting: "bg-orange-100 text-orange-800",
+  closed: "bg-emerald-100 text-emerald-800",
+  deferred: "bg-orange-100 text-orange-800",
+  cancelled: "bg-gray-200 text-gray-800",
+  // legacy fallbacks
+  open: "bg-blue-100 text-blue-800",
   resolved: "bg-emerald-100 text-emerald-800",
-  closed: "bg-gray-200 text-gray-800",
 };
-const impactColors: Record<string, string> = {
+
+export const impactColors: Record<string, string> = {
   low: "bg-slate-100 text-slate-800",
   medium: "bg-blue-100 text-blue-800",
   high: "bg-orange-100 text-orange-800",
   critical: "bg-red-100 text-red-800",
 };
 
+export const statusLabel = (v: string) =>
+  TICKET_STATUSES.find((s) => s.value === v)?.label ?? (v || "").replace("_", " ");
+
 export default function TicketsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
   const [form, setForm] = useState({
     subject: "", description: "", company_name: "", category: "question", impact: "medium",
   });
@@ -57,7 +74,7 @@ export default function TicketsPage() {
       const { data: ticket, error } = await supabase.from("support_tickets").insert({
         subject: form.subject, description: form.description,
         company_name: form.company_name || null, category: form.category, impact: form.impact,
-        created_by: user.id,
+        created_by: user.id, status: "created",
       }).select().single();
       if (error) throw error;
 
@@ -72,7 +89,9 @@ export default function TicketsPage() {
         }
       }
       toast.success(`Ticket ${ticket.ticket_number} created`);
-      setOpen(false); setForm({ subject: "", description: "", company_name: "", category: "question", impact: "medium" }); setFiles([]);
+      setOpen(false);
+      setForm({ subject: "", description: "", company_name: "", category: "question", impact: "medium" });
+      setFiles([]);
       qc.invalidateQueries({ queryKey: ["support_tickets"] });
     } catch (e: any) {
       toast.error(e.message || "Failed to create ticket");
@@ -80,10 +99,6 @@ export default function TicketsPage() {
       setSubmitting(false);
     }
   };
-
-  if (selected) {
-    return <TicketDetail id={selected} onBack={() => setSelected(null)} />;
-  }
 
   return (
     <div className="space-y-4">
@@ -149,122 +164,34 @@ export default function TicketsPage() {
       ) : (
         <div className="space-y-2">
           {tickets.map((t: any) => (
-            <Card key={t.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelected(t.id)}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
+            <Link key={t.id} to={`/support/tickets/${t.id}`}>
+              <Card className="cursor-pointer hover:border-primary/50 transition-colors">
+                <CardContent className="p-4">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-mono text-muted-foreground">{t.ticket_number}</span>
-                      <Badge className={`text-[10px] capitalize ${statusColors[t.status]}`}>{t.status.replace("_", " ")}</Badge>
-                      <Badge className={`text-[10px] capitalize ${impactColors[t.impact]}`}>{t.impact}</Badge>
+                      <Badge className={`text-[10px] capitalize ${statusColors[t.status] || ""}`}>{statusLabel(t.status)}</Badge>
+                      <Badge className={`text-[10px] capitalize ${impactColors[t.impact] || ""}`}>{t.impact}</Badge>
                     </div>
                     <h3 className="font-medium truncate">{t.subject}</h3>
                     <div className="text-xs text-muted-foreground mt-1">
                       {t.company_name && <span>{t.company_name} · </span>}
                       <span className="capitalize">{t.category}</span> · {format(new Date(t.created_at), "MMM d, yyyy")}
                     </div>
+                    {t.owner_name && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Owner: <span className="text-foreground">{t.owner_name}</span>
+                        {t.owner_phone && <> · {t.owner_phone}</>}
+                        {t.owner_email && <> · {t.owner_email}</>}
+                      </div>
+                    )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function TicketDetail({ id, onBack }: { id: string; onBack: () => void }) {
-  const { user } = useAuth();
-  const qc = useQueryClient();
-  const [comment, setComment] = useState("");
-
-  const { data: ticket } = useQuery({
-    queryKey: ["support_ticket", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("support_tickets").select("*").eq("id", id).single();
-      if (error) throw error;
-      return data;
-    },
-  });
-  const { data: attachments = [] } = useQuery({
-    queryKey: ["ticket_attachments", id],
-    queryFn: async () => {
-      const { data } = await supabase.from("support_ticket_attachments").select("*").eq("ticket_id", id);
-      return data ?? [];
-    },
-  });
-  const { data: comments = [] } = useQuery({
-    queryKey: ["ticket_comments", id],
-    queryFn: async () => {
-      const { data } = await supabase.from("support_ticket_comments").select("*").eq("ticket_id", id).order("created_at", { ascending: true });
-      return data ?? [];
-    },
-  });
-
-  const addComment = useMutation({
-    mutationFn: async () => {
-      if (!user) return;
-      const { error } = await supabase.from("support_ticket_comments").insert({ ticket_id: id, user_id: user.id, body: comment });
-      if (error) throw error;
-    },
-    onSuccess: () => { setComment(""); qc.invalidateQueries({ queryKey: ["ticket_comments", id] }); },
-  });
-
-  const openAttachment = async (path: string) => {
-    const { data } = await supabase.storage.from("support-attachments").createSignedUrl(path, 300);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-  };
-
-  if (!ticket) return <div>Loading...</div>;
-
-  return (
-    <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={onBack}>← Back to tickets</Button>
-      <Card>
-        <CardContent className="p-6 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-muted-foreground">{ticket.ticket_number}</span>
-            <Badge className={`text-[10px] capitalize ${statusColors[ticket.status]}`}>{ticket.status.replace("_", " ")}</Badge>
-            <Badge className={`text-[10px] capitalize ${impactColors[ticket.impact]}`}>{ticket.impact}</Badge>
-          </div>
-          <h2 className="text-xl font-semibold">{ticket.subject}</h2>
-          <div className="text-sm text-muted-foreground">
-            {ticket.company_name && <>{ticket.company_name} · </>}
-            <span className="capitalize">{ticket.category}</span> · {format(new Date(ticket.created_at), "MMM d, yyyy HH:mm")}
-          </div>
-          <p className="whitespace-pre-wrap text-sm border-t pt-3">{ticket.description}</p>
-          {attachments.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">Attachments</div>
-              {attachments.map((a: any) => (
-                <button key={a.id} onClick={() => openAttachment(a.file_path)} className="flex items-center gap-2 text-sm text-primary hover:underline">
-                  <Paperclip className="h-3 w-3" /> {a.file_name}
-                </button>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="font-medium">Conversation</h3>
-          {comments.length === 0 && <p className="text-sm text-muted-foreground">No replies yet.</p>}
-          {comments.map((c: any) => (
-            <div key={c.id} className="text-sm bg-muted/50 rounded-md px-3 py-2">
-              <div className="whitespace-pre-wrap">{c.body}</div>
-              <div className="text-[10px] text-muted-foreground mt-1">{format(new Date(c.created_at), "MMM d, HH:mm")}</div>
-            </div>
-          ))}
-          <div className="flex gap-2">
-            <Textarea placeholder="Add a reply..." rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
-            <Button size="icon" disabled={!comment.trim() || addComment.isPending} onClick={() => addComment.mutate()}>
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

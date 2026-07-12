@@ -146,7 +146,7 @@ const helpCategories: HelpCategory[] = [
   },
 ];
 
-export default function HelpCenter() {
+export default function HelpCenter({ hideHeader = false }: { hideHeader?: boolean } = {}) {
   const connectivityStatus = useConnectivity();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -178,7 +178,8 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* QuickApp Header - Same as main app */}
+      {/* QuickApp Header - hidden when embedded in Support hub */}
+      {!hideHeader && (
       <nav className="sticky top-0 z-50 bg-gradient-primary text-primary-foreground" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 py-2">
           <div className="flex items-center justify-between">
@@ -220,6 +221,7 @@ export default function HelpCenter() {
           </div>
         </div>
       </nav>
+      )}
 
       {/* Search Section */}
       <div className="bg-primary/5 border-b">
