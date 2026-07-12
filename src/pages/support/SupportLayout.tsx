@@ -1,7 +1,6 @@
 import { ReactNode } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { WebsiteHeader } from "@/components/website/WebsiteHeader";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { cn } from "@/lib/utils";
 import { Lightbulb, LifeBuoy, Rocket, BookOpen } from "lucide-react";
 
@@ -50,9 +49,6 @@ export function SupportShell({ children }: { children?: ReactNode }) {
 }
 
 export default function SupportLayout() {
-  return (
-    <ProtectedRoute>
-      <SupportShell />
-    </ProtectedRoute>
-  );
+  // Auth gating temporarily disabled — will be re-enabled later.
+  return <SupportShell />;
 }
