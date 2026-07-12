@@ -162,6 +162,12 @@ import PrimaryOrders from "./pages/PrimaryOrders";
 import ResetPassword from "./pages/ResetPassword";
 import HelpCenter from "./pages/HelpCenter";
 import HelpArticle from "./pages/HelpArticle";
+import SupportLayout from "./pages/support/SupportLayout";
+import SupportIdeasPage from "./pages/support/IdeasPage";
+import SupportTicketsPage from "./pages/support/TicketsPage";
+import SupportReleasesPage from "./pages/support/ReleasesPage";
+import SupportReleaseDetailPage from "./pages/support/ReleaseDetailPage";
+import SupportHelpMirror from "./pages/support/HelpMirror";
 import ChangePassword from "./pages/ChangePassword";
 import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
@@ -503,6 +509,16 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/my-deliveries" element={<ProtectedRoute><MyDeliveriesPage /></ProtectedRoute>} />
         <Route path="/help-center" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
         <Route path="/help-center/:articleId" element={<ProtectedRoute><HelpArticle /></ProtectedRoute>} />
+
+        {/* Support hub — Ideas, Tickets, Releases, Help Center */}
+        <Route path="/support" element={<SupportLayout />}>
+          <Route index element={<Navigate to="/support/releases" replace />} />
+          <Route path="ideas" element={<SupportIdeasPage />} />
+          <Route path="tickets" element={<SupportTicketsPage />} />
+          <Route path="releases" element={<SupportReleasesPage />} />
+          <Route path="releases/:slug" element={<SupportReleaseDetailPage />} />
+          <Route path="help" element={<SupportHelpMirror />} />
+        </Route>
 
         {/* Distributor Portal Routes */}
         <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
