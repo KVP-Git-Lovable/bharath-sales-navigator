@@ -50,7 +50,8 @@ export default function TicketsPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
-    subject: "", description: "", company_name: "", category: "question", impact: "medium",
+    description: "", company_name: "", category: "question", impact: "medium",
+    contact_name: "", contact_phone: "", contact_email: "",
   });
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -66,16 +67,23 @@ export default function TicketsPage() {
 
   const submit = async () => {
     if (!user) return;
-    if (!form.subject.trim() || !form.description.trim()) {
-      toast.error("Subject and description are required"); return;
+    if (!form.description.trim()) {
+      toast.error("Description is required"); return;
+    }
+    if (!form.contact_name.trim()) {
+      toast.error("Contact name is required"); return;
     }
     setSubmitting(true);
     try {
+      const derivedSubject = form.description.split("\n")[0].slice(0, 120);
       const { data: ticket, error } = await supabase.from("support_tickets").insert({
-        subject: form.subject, description: form.description,
+        subject: derivedSubject, description: form.description,
         company_name: form.company_name || null, category: form.category, impact: form.impact,
+        contact_name: form.contact_name || null,
+        contact_phone: form.contact_phone || null,
+        contact_email: form.contact_email || null,
         created_by: user.id, status: "created",
-      }).select().single();
+      } as any).select().single();
       if (error) throw error;
 
       for (const f of files) {
@@ -90,7 +98,8 @@ export default function TicketsPage() {
       }
       toast.success(`Ticket ${ticket.ticket_number} created`);
       setOpen(false);
-      setForm({ subject: "", description: "", company_name: "", category: "question", impact: "medium" });
+      setForm({ description: "", company_name: "", category: "question", impact: "medium",
+        contact_name: "", contact_phone: "", contact_email: "" });
       setFiles([]);
       qc.invalidateQueries({ queryKey: ["support_tickets"] });
     } catch (e: any) {
@@ -112,9 +121,13 @@ export default function TicketsPage() {
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Raise a ticket</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
               <Textarea placeholder="Describe the issue or request in detail..." rows={5} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <Input placeholder="Company name" value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Contact name" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
+                <Input placeholder="Contact phone" value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
+              </div>
+              <Input type="email" placeholder="Contact email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
               <div className="grid grid-cols-2 gap-3">
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
@@ -173,11 +186,18 @@ export default function TicketsPage() {
                       <Badge className={`text-[10px] capitalize ${statusColors[t.status] || ""}`}>{statusLabel(t.status)}</Badge>
                       <Badge className={`text-[10px] capitalize ${impactColors[t.impact] || ""}`}>{t.impact}</Badge>
                     </div>
-                    <h3 className="font-medium truncate">{t.subject}</h3>
+                    <h3 className="font-medium line-clamp-2">{t.description || t.subject}</h3>
                     <div className="text-xs text-muted-foreground mt-1">
                       {t.company_name && <span>{t.company_name} · </span>}
                       <span className="capitalize">{t.category}</span> · {format(new Date(t.created_at), "MMM d, yyyy")}
                     </div>
+                    {(t.contact_name || t.contact_phone || t.contact_email) && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Contact: <span className="text-foreground">{t.contact_name}</span>
+                        {t.contact_phone && <> · {t.contact_phone}</>}
+                        {t.contact_email && <> · {t.contact_email}</>}
+                      </div>
+                    )}
                     {t.owner_name && (
                       <div className="text-xs text-muted-foreground mt-1">
                         Owner: <span className="text-foreground">{t.owner_name}</span>

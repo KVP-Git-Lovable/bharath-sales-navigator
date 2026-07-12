@@ -31,7 +31,6 @@ export default function IdeasPage() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
   const [ideaType, setIdeaType] = useState<string>("Feature");
   const [impact, setImpact] = useState<string>("Medium");
 
@@ -65,7 +64,7 @@ export default function IdeasPage() {
     mutationFn: async () => {
       if (!user) throw new Error("Not authenticated");
       const { error } = await supabase.from("support_ideas").insert({
-        title, description, category: category || null,
+        title, description,
         idea_type: ideaType, impact,
         created_by: user.id,
       } as any);
@@ -73,7 +72,7 @@ export default function IdeasPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["support_ideas"] });
-      setOpen(false); setTitle(""); setDescription(""); setCategory(""); setIdeaType("Feature"); setImpact("Medium");
+      setOpen(false); setTitle(""); setDescription(""); setIdeaType("Feature"); setImpact("Medium");
       toast.success("Idea submitted");
     },
     onError: (e: any) => toast.error(e.message || "Failed to submit"),
@@ -109,7 +108,6 @@ export default function IdeasPage() {
             <div className="space-y-3">
               <Input placeholder="Short title" value={title} onChange={(e) => setTitle(e.target.value)} />
               <Textarea placeholder="What problem does it solve? How should it work?" rows={5} value={description} onChange={(e) => setDescription(e.target.value)} />
-              <Input placeholder="Category (optional)" value={category} onChange={(e) => setCategory(e.target.value)} />
               <div className="grid grid-cols-2 gap-3">
                 <Select value={ideaType} onValueChange={setIdeaType}>
                   <SelectTrigger><SelectValue placeholder="Idea type" /></SelectTrigger>
@@ -156,7 +154,6 @@ export default function IdeasPage() {
                       <Badge className={`text-[10px] capitalize ${statusColors[idea.status] || ""}`}>{idea.status.replace("_", " ")}</Badge>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap mt-3 text-xs text-muted-foreground">
-                      {idea.category && <span className="px-2 py-0.5 rounded bg-muted">{idea.category}</span>}
                       {idea.idea_type && <span className="px-2 py-0.5 rounded bg-primary/10 text-primary">{idea.idea_type}</span>}
                       {idea.impact && <span className="px-2 py-0.5 rounded bg-accent-gold/10 text-foreground border border-accent-gold/30">Impact: {idea.impact}</span>}
                       <span>{format(new Date(idea.created_at), "MMM d, yyyy")}</span>
