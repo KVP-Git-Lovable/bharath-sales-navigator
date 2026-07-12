@@ -168,6 +168,8 @@ import SupportTicketsPage from "./pages/support/TicketsPage";
 import SupportReleasesPage from "./pages/support/ReleasesPage";
 import SupportReleaseDetailPage from "./pages/support/ReleaseDetailPage";
 import SupportHelpMirror from "./pages/support/HelpMirror";
+import SupportIdeaDetailPage from "./pages/support/IdeaDetailPage";
+import SupportTicketDetailPage from "./pages/support/TicketDetailPage";
 import ChangePassword from "./pages/ChangePassword";
 import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
@@ -514,7 +516,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/support" element={<SupportLayout />}>
           <Route index element={<Navigate to="/support/releases" replace />} />
           <Route path="ideas" element={<SupportIdeasPage />} />
+          <Route path="ideas/:id" element={<SupportIdeaDetailPage />} />
           <Route path="tickets" element={<SupportTicketsPage />} />
+          <Route path="tickets/:id" element={<SupportTicketDetailPage />} />
           <Route path="releases" element={<SupportReleasesPage />} />
           <Route path="releases/:slug" element={<SupportReleaseDetailPage />} />
           <Route path="help" element={<SupportHelpMirror />} />
