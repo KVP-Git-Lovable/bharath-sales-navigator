@@ -14866,6 +14866,8 @@ export type Database = {
           created_by: string
           description: string | null
           id: string
+          idea_type: string | null
+          impact: string | null
           status: string
           title: string
           updated_at: string
@@ -14876,6 +14878,8 @@ export type Database = {
           created_by: string
           description?: string | null
           id?: string
+          idea_type?: string | null
+          impact?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -14886,6 +14890,8 @@ export type Database = {
           created_by?: string
           description?: string | null
           id?: string
+          idea_type?: string | null
+          impact?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -15026,6 +15032,9 @@ export type Database = {
           description: string
           id: string
           impact: string
+          owner_email: string | null
+          owner_name: string | null
+          owner_phone: string | null
           status: string
           subject: string
           ticket_number: string | null
@@ -15040,6 +15049,9 @@ export type Database = {
           description: string
           id?: string
           impact?: string
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
           status?: string
           subject: string
           ticket_number?: string | null
@@ -15054,6 +15066,9 @@ export type Database = {
           description?: string
           id?: string
           impact?: string
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
           status?: string
           subject?: string
           ticket_number?: string | null
