@@ -12562,6 +12562,144 @@ export type Database = {
         }
         Relationships: []
       }
+      release_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          release_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          release_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          release_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_comments_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      release_likes: {
+        Row: {
+          created_at: string
+          release_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          release_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          release_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_likes_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      release_sections: {
+        Row: {
+          created_at: string
+          features: Json
+          id: string
+          position: number
+          release_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          features?: Json
+          id?: string
+          position?: number
+          release_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          features?: Json
+          id?: string
+          position?: number
+          release_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_sections_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      releases: {
+        Row: {
+          body_md: string | null
+          created_at: string
+          created_by: string | null
+          highlights: Json
+          id: string
+          release_date: string
+          slug: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          body_md?: string | null
+          created_at?: string
+          created_by?: string | null
+          highlights?: Json
+          id?: string
+          release_date: string
+          slug: string
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          body_md?: string | null
+          created_at?: string
+          created_by?: string | null
+          highlights?: Json
+          id?: string
+          release_date?: string
+          slug?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       retailer_credit_scores: {
         Row: {
           avg_dso: number | null
@@ -14660,6 +14798,100 @@ export type Database = {
           },
         ]
       }
+      support_idea_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          idea_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_idea_comments_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "support_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_idea_votes: {
+        Row: {
+          created_at: string
+          idea_id: string
+          user_id: string
+          vote: number
+        }
+        Insert: {
+          created_at?: string
+          idea_id: string
+          user_id: string
+          vote?: number
+        }
+        Update: {
+          created_at?: string
+          idea_id?: string
+          user_id?: string
+          vote?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_idea_votes_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "support_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ideas: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_requests: {
         Row: {
           created_at: string
@@ -14705,6 +14937,127 @@ export type Database = {
           target_date?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      support_ticket_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          ticket_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          ticket_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          ticket_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ticket_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          company_name: string | null
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          impact: string
+          status: string
+          subject: string
+          ticket_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string
+          company_name?: string | null
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          impact?: string
+          status?: string
+          subject: string
+          ticket_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          company_name?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          impact?: string
+          status?: string
+          subject?: string
+          ticket_number?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
