@@ -14993,6 +14993,8 @@ export type Database = {
           created_at: string
           id: string
           is_internal: boolean
+          status_from: string | null
+          status_to: string | null
           ticket_id: string
           user_id: string
         }
@@ -15001,6 +15003,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_internal?: boolean
+          status_from?: string | null
+          status_to?: string | null
           ticket_id: string
           user_id: string
         }
@@ -15009,6 +15013,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_internal?: boolean
+          status_from?: string | null
+          status_to?: string | null
           ticket_id?: string
           user_id?: string
         }
@@ -15027,6 +15033,9 @@ export type Database = {
           assigned_to: string | null
           category: string
           company_name: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
           created_at: string
           created_by: string
           description: string
@@ -15044,6 +15053,9 @@ export type Database = {
           assigned_to?: string | null
           category?: string
           company_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           created_by: string
           description: string
@@ -15061,6 +15073,9 @@ export type Database = {
           assigned_to?: string | null
           category?: string
           company_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
           created_at?: string
           created_by?: string
           description?: string
