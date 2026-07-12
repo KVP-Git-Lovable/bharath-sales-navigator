@@ -73,12 +73,25 @@ export default function TicketDetailPage() {
 
   const updateStatus = useMutation({
     mutationFn: async (status: string) => {
+      const prev = ticket?.status;
+      if (prev === status) return;
       const { error } = await supabase.from("support_tickets").update({ status }).eq("id", id);
       if (error) throw error;
+      if (user) {
+        await supabase.from("support_ticket_comments").insert({
+          ticket_id: id,
+          user_id: user.id,
+          body: `Status changed from ${statusLabel(prev || "")} to ${statusLabel(status)}`,
+          is_internal: false,
+          status_from: prev,
+          status_to: status,
+        } as any);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["support_ticket", id] });
       qc.invalidateQueries({ queryKey: ["support_tickets"] });
+      qc.invalidateQueries({ queryKey: ["ticket_comments", id] });
       toast.success("Status updated");
     },
     onError: (e: any) => toast.error(e.message || "Failed"),
@@ -115,6 +128,7 @@ export default function TicketDetailPage() {
   if (isLoading || !ticket) return <div className="text-sm text-muted-foreground">Loading...</div>;
   const canDelete = !!user && (hasAdminAccess || ticket.created_by === user.id);
   const canEditOwnerAndStatus = hasAdminAccess;
+  const canChangeStatus = hasAdminAccess || ticket.created_by === user?.id;
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -133,15 +147,31 @@ export default function TicketDetailPage() {
         <CardContent className="p-6 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-mono text-muted-foreground">{ticket.ticket_number}</span>
-            <Badge className={`text-[10px] capitalize ${statusColors[ticket.status] || ""}`}>{statusLabel(ticket.status)}</Badge>
             <Badge className={`text-[10px] capitalize ${impactColors[ticket.impact] || ""}`}>{ticket.impact}</Badge>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</span>
+              <Select value={ticket.status} onValueChange={(v) => updateStatus.mutate(v)} disabled={!canChangeStatus}>
+                <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TICKET_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <h2 className="text-xl font-semibold">{ticket.subject}</h2>
+          <h2 className="text-xl font-semibold whitespace-pre-wrap">{ticket.description}</h2>
           <div className="text-sm text-muted-foreground">
             {ticket.company_name && <>{ticket.company_name} · </>}
             <span className="capitalize">{ticket.category}</span> · {format(new Date(ticket.created_at), "MMM d, yyyy HH:mm")}
           </div>
-          <p className="whitespace-pre-wrap text-sm border-t pt-3">{ticket.description}</p>
+          {(ticket.contact_name || ticket.contact_phone || ticket.contact_email) && (
+            <div className="text-sm border-t pt-3">
+              <div className="text-xs font-medium text-muted-foreground mb-1">Reporter contact</div>
+              <div>{ticket.contact_name}
+                {ticket.contact_phone && <> · {ticket.contact_phone}</>}
+                {ticket.contact_email && <> · {ticket.contact_email}</>}
+              </div>
+            </div>
+          )}
           {attachments.length > 0 && (
             <div className="space-y-1">
               <div className="text-xs font-medium text-muted-foreground">Attachments</div>
@@ -160,15 +190,6 @@ export default function TicketDetailPage() {
           <h3 className="font-medium">QuickApp Team</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div>
-              <label className="text-xs text-muted-foreground">Status</label>
-              <Select value={ticket.status} onValueChange={(v) => updateStatus.mutate(v)} disabled={!canEditOwnerAndStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TICKET_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <label className="text-xs text-muted-foreground">Owner name</label>
               <Input value={owner.owner_name} disabled={!canEditOwnerAndStatus}
                 onChange={(e) => { setOwner({ ...owner, owner_name: e.target.value }); setOwnerDirty(true); }} />
@@ -178,7 +199,7 @@ export default function TicketDetailPage() {
               <Input value={owner.owner_phone} disabled={!canEditOwnerAndStatus}
                 onChange={(e) => { setOwner({ ...owner, owner_phone: e.target.value }); setOwnerDirty(true); }} />
             </div>
-            <div className="md:col-span-3">
+            <div>
               <label className="text-xs text-muted-foreground">Owner email</label>
               <Input type="email" value={owner.owner_email} disabled={!canEditOwnerAndStatus}
                 onChange={(e) => { setOwner({ ...owner, owner_email: e.target.value }); setOwnerDirty(true); }} />
@@ -199,15 +220,29 @@ export default function TicketDetailPage() {
         <CardContent className="p-4 space-y-3">
           <h3 className="font-medium">Conversation</h3>
           {comments.length === 0 && <p className="text-sm text-muted-foreground">No replies yet.</p>}
-          {comments.map((c: any) => (
-            <div key={c.id} className={`text-sm rounded-md px-3 py-2 ${c.user_id === ticket.created_by ? "bg-muted/50" : "bg-primary/5 border border-primary/20"}`}>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                {c.user_id === ticket.created_by ? "You" : "QuickApp team"}
+          {comments.map((c: any) => {
+            const isStatus = !!c.status_to;
+            if (isStatus) {
+              return (
+                <div key={c.id} className="text-xs rounded-md px-3 py-2 bg-muted/40 border border-dashed flex items-center gap-2 flex-wrap">
+                  <span className="uppercase tracking-wide text-muted-foreground">Status change</span>
+                  {c.status_from && <Badge className={`text-[10px] capitalize ${statusColors[c.status_from] || ""}`}>{statusLabel(c.status_from)}</Badge>}
+                  <span>→</span>
+                  <Badge className={`text-[10px] capitalize ${statusColors[c.status_to] || ""}`}>{statusLabel(c.status_to)}</Badge>
+                  <span className="text-muted-foreground">· {format(new Date(c.created_at), "MMM d, HH:mm")}</span>
+                </div>
+              );
+            }
+            return (
+              <div key={c.id} className={`text-sm rounded-md px-3 py-2 ${c.user_id === ticket.created_by ? "bg-muted/50" : "bg-primary/5 border border-primary/20"}`}>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  {c.user_id === ticket.created_by ? "You" : "QuickApp team"}
+                </div>
+                <div className="whitespace-pre-wrap">{c.body}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">{format(new Date(c.created_at), "MMM d, HH:mm")}</div>
               </div>
-              <div className="whitespace-pre-wrap">{c.body}</div>
-              <div className="text-[10px] text-muted-foreground mt-1">{format(new Date(c.created_at), "MMM d, HH:mm")}</div>
-            </div>
-          ))}
+            );
+          })}
           <div className="flex gap-2">
             <Textarea placeholder="Add a reply..." rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
             <Button size="icon" disabled={!comment.trim() || addComment.isPending} onClick={() => addComment.mutate()}>
