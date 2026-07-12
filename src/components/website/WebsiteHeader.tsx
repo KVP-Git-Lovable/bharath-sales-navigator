@@ -27,6 +27,7 @@ export const WebsiteHeader = () => {
     { label: "Insights", href: "/insights" },
     { label: "Connectors", href: "/connectors" },
     { label: "Pricing", href: "/pricing" },
+    { label: "Support", href: "/support" },
   ];
 
   // Handle hash navigation after page load
