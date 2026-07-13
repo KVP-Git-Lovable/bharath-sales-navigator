@@ -630,6 +630,285 @@ export const PricingPage = () => {
         </div>
       </section>
             </TabsContent>
+
+            <TabsContent value="quick-marketing">
+      {/* ============ QUICK MARKETING PRICING ============ */}
+      <section className="pt-2 pb-4 px-0">
+        <div className="mx-auto w-full max-w-7xl">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 sm:px-4 py-2 rounded-full text-sm font-medium mb-3">
+              <Megaphone className="w-4 h-4" />
+              Quick Marketing
+            </div>
+            <h3 className="text-xl md:text-2xl font-semibold">Quick Marketing — Commerce, Amplify & 360°</h3>
+            <p className="text-sm text-muted-foreground mt-1">A three-tier marketing platform — from storefront to omnichannel journeys, ads and ROI.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full">
+            {[
+              {
+                name: "QuickCommerce", price: "₹15,000", period: "/month", icon: Store, featured: false,
+                description: "Launch a high-conversion storefront and start selling online — fast.",
+                highlights: ["Unlimited users", "1 branded storefront", "5 GB storage"],
+                features: [
+                  "Branded storefront (web + mobile-optimized)",
+                  "Product catalog with variants, pricing & inventory sync",
+                  "Cart, checkout & order management",
+                  "Payment gateway integration (Razorpay / Stripe ready)",
+                  "Shipping & delivery zone configuration",
+                  "Customer accounts, order history & re-order",
+                  "Coupons, discounts & basic promotions",
+                  "SEO-ready pages & meta management",
+                  "Basic storefront analytics (traffic, orders, conversion)",
+                  "WhatsApp & email order notifications",
+                  "Standard support (business hours)",
+                ],
+                cta: "Start Free Trial",
+              },
+              {
+                name: "MarketingAmplify", price: "₹30,000", period: "/month", icon: Megaphone, featured: true,
+                description: "Add multi-channel campaigns, journeys and ad management on top of commerce.",
+                highlights: ["Everything in QuickCommerce", "Unlimited campaigns", "10 GB storage"],
+                features: [
+                  "All QuickCommerce features, plus:",
+                  "Multi-channel campaigns — Email, SMS, WhatsApp & Push",
+                  "Journey Builder with triggers & automations",
+                  "Customer segmentation & lookalike audiences",
+                  "Meta (Facebook & Instagram) ad campaign management",
+                  "Google Ads campaign management (search & shopping)",
+                  "Landing page builder for campaigns",
+                  "Content planning calendar",
+                  "A/B testing for creatives, subject lines & CTAs",
+                  "Lead capture forms & CRM sync",
+                  "Unified campaign analytics across channels",
+                  "Basic ROI dashboards",
+                ],
+                cta: "Start Free Trial",
+              },
+              {
+                name: "Marketing360", price: "₹55,000", period: "/month", icon: Crown, featured: false,
+                description: "Full-stack marketing — commerce, campaigns, ROI intelligence & customer retention.",
+                highlights: ["Everything in MarketingAmplify", "Advanced ROI tracker", "25 GB storage"],
+                features: [
+                  "All MarketingAmplify features, plus:",
+                  "Campaign ROI Tracker — spend, CAC, LTV, ROAS",
+                  "Retention & loyalty program builder",
+                  "Referral program with tracking & payouts",
+                  "Advanced customer segmentation (RFM, cohorts)",
+                  "Competitor monitoring (mentions, ads, pricing signals)",
+                  "Social listening & sentiment tracking",
+                  "Influencer / affiliate tracking",
+                  "Attribution modeling (first-touch, last-touch, multi-touch)",
+                  "Custom dashboards & exec reporting",
+                  "Predictive insights (churn risk, next-best-offer)",
+                  "Priority support with dedicated marketing success lead",
+                ],
+                cta: "Contact Sales",
+              },
+            ].map((tier) => {
+              const Icon = tier.icon;
+              return (
+                <Card key={tier.name} className={`relative p-6 flex flex-col ${tier.featured ? "border-primary bg-primary/5 scale-105 shadow-xl shadow-primary/10" : "border-border bg-card"}`}>
+                  {tier.featured && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">Most Popular</span>
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-bold">{tier.name}</h3>
+                  </div>
+                  <div className="mb-4">
+                    <span className="text-3xl font-bold">{tier.price}</span>
+                    <span className="text-muted-foreground">{tier.period}</span>
+                    <p className="text-xs text-muted-foreground mt-1">Paid Annually (Annual plan only)</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-6">{tier.description}</p>
+                  {tier.highlights && (
+                    <div className="mb-5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <div className="text-[10px] uppercase tracking-wider font-semibold text-primary mb-2">Plan capacity</div>
+                      <ul className="space-y-1.5">
+                        {tier.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm font-medium">
+                            <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                            <span>{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <ul className="space-y-3 mb-8 flex-grow">
+                    {tier.features.map((feature, idx) => (
+                      feature.endsWith("plus:") ? (
+                        <li key={idx} className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-1">{feature}</li>
+                      ) : (
+                        <li key={idx} className="flex items-start gap-2 text-sm">
+                          <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                          <span>{feature}</span>
+                        </li>
+                      )
+                    ))}
+                  </ul>
+                  <Button className={`w-full ${tier.featured ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-foreground hover:bg-muted/80 border border-border"}`} onClick={() => navigate("/request-demo")}>
+                    {tier.cta}
+                  </Button>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Professional Services (Quick Marketing) */}
+          <div className="mt-10">
+            <div className="text-center mb-6">
+              <h4 className="text-lg md:text-xl font-semibold flex items-center gap-2 justify-center">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Professional Services — Done-For-You Marketing
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1 max-w-3xl mx-auto">
+                Buy the software and let our marketing specialists run it. All professional services are quoted as <strong>custom pricing</strong> based on scope, channels and monthly retainer.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                {
+                  name: "Turnkey Implementation",
+                  price: "Custom pricing",
+                  items: [
+                    "Storefront setup, theming & branding",
+                    "Product catalog upload & taxonomy",
+                    "Payment, shipping & tax configuration",
+                    "Domain, SEO & analytics setup",
+                    "Team training & go-live support",
+                  ],
+                },
+                {
+                  name: "Customer Journey Mapping",
+                  price: "Custom pricing",
+                  items: [
+                    "Persona & funnel workshops",
+                    "Lifecycle journey design (acquisition → retention)",
+                    "Journey Builder automation setup",
+                    "Message & creative frameworks",
+                    "KPI definition & measurement plan",
+                  ],
+                },
+                {
+                  name: "Managed Social Media & Ad Ops",
+                  price: "Custom pricing",
+                  items: [
+                    "Content planning & calendar management",
+                    "Post scheduling across Meta, LinkedIn, YouTube",
+                    "Meta & Google ad campaign setup and optimisation",
+                    "Creative production coordination",
+                    "Competitor monitoring & monthly reporting",
+                  ],
+                },
+                {
+                  name: "ROI Performance Consulting",
+                  price: "Custom pricing",
+                  items: [
+                    "Monthly Campaign ROI deep-dive",
+                    "CAC, LTV and ROAS optimisation",
+                    "Budget re-allocation across channels",
+                    "Retention & loyalty strategy tuning",
+                    "Executive dashboards & QBRs",
+                  ],
+                },
+                {
+                  name: "SEO & Content Services",
+                  price: "Custom pricing",
+                  items: [
+                    "Technical SEO audit & fixes",
+                    "Keyword strategy & content calendar",
+                    "Blog & landing page copywriting",
+                    "Backlink and outreach programs",
+                    "Monthly organic performance reporting",
+                  ],
+                },
+                {
+                  name: "WhatsApp & CRM Enablement",
+                  price: "Custom pricing",
+                  items: [
+                    "WhatsApp Business API onboarding",
+                    "Template design & approvals",
+                    "Broadcast & drip campaign setup",
+                    "CRM data hygiene & segmentation",
+                    "Chatbot flow design",
+                  ],
+                },
+              ].map((svc) => (
+                <Card key={svc.name} className="p-5 border-border bg-card flex flex-col">
+                  <div className="mb-3">
+                    <h5 className="text-base font-semibold">{svc.name}</h5>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-primary">{svc.price}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">Scoped monthly or per-project</p>
+                  </div>
+                  <ul className="space-y-2 mb-4 flex-grow">
+                    {svc.items.map((it, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs">
+                        <Check className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                        <span>{it}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate("/request-demo")}>
+                    Request Quote
+                  </Button>
+                </Card>
+              ))}
+            </div>
+
+            {/* Disclaimers */}
+            <Card className="mt-6 p-5 border-amber-300 bg-amber-50/60 dark:bg-amber-950/20">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                What is not included
+              </h4>
+              <ul className="space-y-1.5 text-xs text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <Check className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                  <span><strong className="text-foreground">Ad spend is not covered.</strong> Advertising budgets for Meta, Google, LinkedIn or any other platform are paid directly by you to the respective platform.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                  <span><strong className="text-foreground">Third-party app costs are not covered.</strong> Licenses or usage fees for tools such as WhatsApp Business API, email/SMS gateways, payment gateways, CRM, design tools and analytics platforms are billed directly by the provider.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                  <span>Creative production costs (video shoots, influencer fees, premium stock, translations) are quoted separately when required.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                  <span>Taxes (GST) applicable as per government rules at the time of purchase.</span>
+                </li>
+              </ul>
+            </Card>
+
+            {/* Storage add-on */}
+            <Card className="mt-4 p-5 border-border bg-muted/20">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <PackagePlus className="w-4 h-4 text-primary" />
+                    Extend Your Quick Marketing Plan — Additional Storage
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">Add storage anytime on top of your plan for creatives, product images and campaign assets.</p>
+                </div>
+                <div className="text-xs md:min-w-[280px]">
+                  <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary text-center">
+                    <p className="font-semibold text-sm">Storage Pack</p>
+                    <p className="text-muted-foreground">₹1,000 per 5 GB / month</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+            </TabsContent>
           </Tabs>
         </div>
       </section>
