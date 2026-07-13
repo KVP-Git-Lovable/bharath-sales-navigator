@@ -115,7 +115,11 @@ const pricingTiers = [
 export const PricingPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get("tab") === "quick-locate" ? "quick-locate" : "field-sales";
+  const tabParam = searchParams.get("tab");
+  const initialTab =
+    tabParam === "quick-locate" ? "quick-locate" :
+    tabParam === "quick-marketing" ? "quick-marketing" :
+    "field-sales";
   const [activeTab, setActiveTabState] = useState(initialTab);
   const setActiveTab = (val: string) => {
     setActiveTabState(val);
@@ -170,9 +174,10 @@ export const PricingPage = () => {
       <section className="py-4 px-3 sm:px-4">
         <div className="mx-auto w-full max-w-7xl">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="mx-auto grid w-full max-w-md grid-cols-2 mb-8">
+            <TabsList className="mx-auto grid w-full max-w-2xl grid-cols-3 mb-8">
               <TabsTrigger value="field-sales">Quick Field Sales</TabsTrigger>
               <TabsTrigger value="quick-locate">Quick Locate</TabsTrigger>
+              <TabsTrigger value="quick-marketing">Quick Marketing</TabsTrigger>
             </TabsList>
 
             <TabsContent value="field-sales">
