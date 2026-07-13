@@ -41,6 +41,7 @@ import RetailerPortalSolution from "./pages/website/solutions/RetailerPortalSolu
 import QuickLocateSolution from "./pages/website/solutions/QuickLocateSolution";
 import QuickInfluenceSolution from "./pages/website/solutions/QuickInfluenceSolution";
 import QuickMarketingSolution from "./pages/website/solutions/QuickMarketingSolution";
+import QuickServiceSolution from "./pages/website/solutions/QuickServiceSolution";
 import ROICalculator from "./pages/website/ROICalculator";
 import ROITrackerPage from "./pages/website/ROITrackerPage";
 import InsightsPage from "./pages/website/InsightsPage";
