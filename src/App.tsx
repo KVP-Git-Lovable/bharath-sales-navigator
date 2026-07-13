@@ -41,6 +41,7 @@ import RetailerPortalSolution from "./pages/website/solutions/RetailerPortalSolu
 import QuickLocateSolution from "./pages/website/solutions/QuickLocateSolution";
 import QuickInfluenceSolution from "./pages/website/solutions/QuickInfluenceSolution";
 import QuickMarketingSolution from "./pages/website/solutions/QuickMarketingSolution";
+import QuickServiceSolution from "./pages/website/solutions/QuickServiceSolution";
 import ROICalculator from "./pages/website/ROICalculator";
 import ROITrackerPage from "./pages/website/ROITrackerPage";
 import InsightsPage from "./pages/website/InsightsPage";
@@ -377,6 +378,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/solutions/quick-locate" element={<QuickLocateSolution />} />
         <Route path="/solutions/quick-influence" element={<QuickInfluenceSolution />} />
         <Route path="/solutions/quick-marketing" element={<QuickMarketingSolution />} />
+        <Route path="/solutions/quick-service" element={<QuickServiceSolution />} />
         
         <Route path="/solutions/van-sales" element={<VanSalesSolution />} />
         <Route path="/solutions/professional-services" element={<ProfessionalServicesSolution />} />

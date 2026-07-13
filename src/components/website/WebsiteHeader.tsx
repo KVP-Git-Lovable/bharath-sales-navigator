@@ -12,6 +12,7 @@ const solutionLinks = [
   { label: "Quick Locate", href: "/solutions/quick-locate", external: false },
   { label: "Quick Influence", href: "/solutions/quick-influence", external: false },
   { label: "Quick Marketing", href: "/solutions/quick-marketing", external: false },
+  { label: "Quick Service", href: "/solutions/quick-service", external: false },
 ];
 
 export const WebsiteHeader = () => {
