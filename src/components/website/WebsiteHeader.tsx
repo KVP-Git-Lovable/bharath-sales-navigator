@@ -11,6 +11,7 @@ const solutionLinks = [
   { label: "Quick Store Ops", href: "https://storeops.quickapp.ai/", external: true },
   { label: "Quick Locate", href: "/solutions/quick-locate", external: false },
   { label: "Quick Influence", href: "/solutions/quick-influence", external: false },
+  { label: "Quick Marketing", href: "/solutions/quick-marketing", external: false },
 ];
 
 export const WebsiteHeader = () => {
