@@ -377,30 +377,30 @@ export function TrainingTracker({ data, onUpdate }: TrainingTrackerProps) {
       </Card>
 
       {/* Training Model Diagram */}
-      <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/30">
+      <Card className="bg-slate-900/70 border-purple-500/40">
         <CardHeader>
-          <CardTitle className="text-purple-400">Train-the-Trainer Cascade Model</CardTitle>
+          <CardTitle className="text-white">Train-the-Trainer Cascade Model</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center gap-4 py-4">
-            <div className="px-6 py-3 bg-purple-500/20 rounded-lg border border-purple-500/30 text-center">
-              <p className="text-purple-400 font-medium">Level 1: Core Team Training</p>
-              <p className="text-white/60 text-xs">Quickapp Team → Customer Core Team</p>
+            <div className="px-6 py-3 bg-purple-600/40 rounded-lg border border-purple-400/60 text-center">
+              <p className="text-white font-semibold">Level 1: Core Team Training</p>
+              <p className="text-white/80 text-xs">Quickapp Team → Customer Core Team</p>
             </div>
             <div className="h-6 w-0.5 bg-purple-500/30" />
-            <div className="px-6 py-3 bg-pink-500/20 rounded-lg border border-pink-500/30 text-center">
-              <p className="text-pink-400 font-medium">Level 2: Regional Trainers</p>
-              <p className="text-white/60 text-xs">Core Team → Regional Super Users</p>
+            <div className="px-6 py-3 bg-pink-600/40 rounded-lg border border-pink-400/60 text-center">
+              <p className="text-white font-semibold">Level 2: Regional Trainers</p>
+              <p className="text-white/80 text-xs">Core Team → Regional Super Users</p>
             </div>
             <div className="h-6 w-0.5 bg-pink-500/30" />
-            <div className="px-6 py-3 bg-amber-500/20 rounded-lg border border-amber-500/30 text-center">
-              <p className="text-amber-400 font-medium">Level 3: State Trainers</p>
-              <p className="text-white/60 text-xs">Regional → ASMs/RSMs</p>
+            <div className="px-6 py-3 bg-amber-600/40 rounded-lg border border-amber-400/60 text-center">
+              <p className="text-white font-semibold">Level 3: State Trainers</p>
+              <p className="text-white/80 text-xs">Regional → ASMs/RSMs</p>
             </div>
             <div className="h-6 w-0.5 bg-amber-500/30" />
-            <div className="px-6 py-3 bg-green-500/20 rounded-lg border border-green-500/30 text-center">
-              <p className="text-green-400 font-medium">Level 4: Field Users</p>
-              <p className="text-white/60 text-xs">State Trainers → All FSRs</p>
+            <div className="px-6 py-3 bg-green-600/40 rounded-lg border border-green-400/60 text-center">
+              <p className="text-white font-semibold">Level 4: Field Users</p>
+              <p className="text-white/80 text-xs">State Trainers → All FSRs</p>
             </div>
           </div>
         </CardContent>

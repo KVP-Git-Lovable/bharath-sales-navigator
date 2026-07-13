@@ -153,7 +153,7 @@ export function ROITracker({ value, onChange }: ROITrackerProps) {
   return (
     <div className="space-y-6">
       {/* Overall ROI */}
-      <Card className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30">
+      <Card className="bg-slate-900/70 border-green-500/40">
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4">
@@ -161,13 +161,13 @@ export function ROITracker({ value, onChange }: ROITrackerProps) {
                 <TrendingUp className="w-8 h-8 text-green-400" />
               </div>
               <div>
-                <p className="text-white/60 text-sm">Overall ROI Achievement</p>
-                <p className="text-4xl font-bold text-green-400">{overallRoi}%</p>
-                <p className="text-white/40 text-xs mt-1">Weighted average across all metric groups</p>
+                <p className="text-white text-sm font-medium">Overall ROI Achievement</p>
+                <p className="text-4xl font-bold text-green-300">{overallRoi}%</p>
+                <p className="text-white/70 text-xs mt-1">Weighted average across all metric groups</p>
               </div>
             </div>
             <div className="text-center md:text-right">
-              <p className="text-white/60 text-sm">Metrics Tracked</p>
+              <p className="text-white/80 text-sm">Metrics Tracked</p>
               <p className="text-2xl font-bold text-white">
                 {trackedCount} / {allMetrics.length}
               </p>
