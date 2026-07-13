@@ -1,8 +1,17 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Calendar, Calculator, TrendingUp, Users, CheckSquare, Download, Save } from "lucide-react";
+import { ArrowLeft, FileText, Calendar, Calculator, TrendingUp, Users, CheckSquare, Download, Save, FolderOpen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { WebsiteHeader } from "@/components/website/WebsiteHeader";
 import { WebsiteFooter } from "@/components/website/WebsiteFooter";
 import { RequirementWizard } from "@/components/implementation/RequirementWizard";
@@ -13,6 +22,28 @@ import { TrainingTracker } from "@/components/implementation/TrainingTracker";
 import { GoLiveChecklist } from "@/components/implementation/GoLiveChecklist";
 import { generateImplementationPDF } from "@/utils/implementationPDFGenerator";
 import { useToast } from "@/hooks/use-toast";
+
+const SAVES_KEY = "quickapp-implementation-saves";
+
+interface SavedToolkit {
+  id: string;
+  name: string;
+  savedAt: string;
+  data: ImplementationData;
+}
+
+function loadSaves(): SavedToolkit[] {
+  try {
+    const raw = localStorage.getItem(SAVES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSaves(saves: SavedToolkit[]) {
+  localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
+}
 
 export interface ImplementationData {
   companyProfile: {
@@ -235,6 +266,14 @@ export default function ImplementationToolkitPage() {
   const [activeTab, setActiveTab] = useState("requirements");
   const [data, setData] = useState<ImplementationData>(defaultData);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [saves, setSaves] = useState<SavedToolkit[]>([]);
+
+  useEffect(() => {
+    setSaves(loadSaves());
+  }, []);
 
   // Load saved data from localStorage
   useEffect(() => {
@@ -256,15 +295,55 @@ export default function ImplementationToolkitPage() {
   };
 
   const handleSave = () => {
+    const defaultName =
+      data.companyProfile.companyName?.trim() ||
+      `Toolkit ${new Date().toLocaleDateString()}`;
+    setSaveName(defaultName);
+    setSaveDialogOpen(true);
+  };
+
+  const confirmSave = () => {
+    const name = saveName.trim();
+    if (!name) {
+      toast({ title: "Name required", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     localStorage.setItem("quickapp-implementation-data", JSON.stringify(data));
-    setTimeout(() => {
-      setIsSaving(false);
-      toast({
-        title: "Progress Saved",
-        description: "Your implementation data has been saved locally.",
-      });
-    }, 500);
+    const current = loadSaves();
+    const existingIdx = current.findIndex((s) => s.name === name);
+    const entry: SavedToolkit = {
+      id: existingIdx >= 0 ? current[existingIdx].id : crypto.randomUUID(),
+      name,
+      savedAt: new Date().toISOString(),
+      data,
+    };
+    const next =
+      existingIdx >= 0
+        ? current.map((s, i) => (i === existingIdx ? entry : s))
+        : [entry, ...current];
+    persistSaves(next);
+    setSaves(next);
+    setSaveDialogOpen(false);
+    setIsSaving(false);
+    toast({
+      title: "Toolkit Saved",
+      description: `"${name}" is available under Load Saved.`,
+    });
+  };
+
+  const handleLoad = (id: string) => {
+    const entry = saves.find((s) => s.id === id);
+    if (!entry) return;
+    saveData(entry.data);
+    setLoadDialogOpen(false);
+    toast({ title: "Loaded", description: `Restored "${entry.name}".` });
+  };
+
+  const handleDeleteSave = (id: string) => {
+    const next = saves.filter((s) => s.id !== id);
+    persistSaves(next);
+    setSaves(next);
   };
 
   const handleGeneratePDF = async () => {
@@ -364,6 +443,14 @@ export default function ImplementationToolkitPage() {
                 {isSaving ? "Saving..." : "Save Progress"}
               </Button>
               <Button
+                variant="outline"
+                onClick={() => setLoadDialogOpen(true)}
+                className="bg-white/5 border-white/20 text-white hover:bg-white/10"
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                Load Saved ({saves.length})
+              </Button>
+              <Button
                 onClick={handleGeneratePDF}
                 className="bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600"
               >
@@ -446,6 +533,73 @@ export default function ImplementationToolkitPage() {
       </section>
 
       <WebsiteFooter />
+
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Toolkit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Save name</Label>
+            <Input
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              placeholder="e.g., Acme Corp — Draft 1"
+            />
+            <p className="text-xs text-muted-foreground">
+              Saving with an existing name overwrites that entry.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSave}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={loadDialogOpen} onOpenChange={setLoadDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Saved Toolkits</DialogTitle>
+          </DialogHeader>
+          {saves.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              No saved toolkits yet. Click "Save Progress" to create one.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {saves.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{s.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(s.savedAt).toLocaleString()} ·{" "}
+                      {s.data.companyProfile.companyName || "No company name"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" onClick={() => handleLoad(s.id)}>
+                      Load
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteSave(s.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
