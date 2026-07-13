@@ -1,4 +1,4 @@
-import { Check, Zap, Building2, Rocket, Crown, Package, RefreshCw, Bolt, Users, Brain, Sparkles, Headphones, Settings, Code, Store, MessageCircle, Megaphone, LayoutGrid, PackagePlus, LifeBuoy, MapPin } from "lucide-react";
+import { Check, Zap, Building2, Rocket, Crown, Package, Users, Brain, Sparkles, Store, Megaphone, LayoutGrid, PackagePlus, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
@@ -152,8 +152,6 @@ export const PricingPage = () => {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-2 text-sm">
             <a href="#core" className="px-4 py-2 rounded-full bg-muted hover:bg-muted/70 transition-colors font-medium">Core Products</a>
-            <a href="#addons" className="px-4 py-2 rounded-full bg-muted hover:bg-muted/70 transition-colors font-medium">Add-Ons</a>
-            <a href="#support" className="px-4 py-2 rounded-full bg-muted hover:bg-muted/70 transition-colors font-medium">Support & Services</a>
           </div>
         </div>
       </section>
