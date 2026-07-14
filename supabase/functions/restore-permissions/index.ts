@@ -13,8 +13,8 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(url, serviceKey);
 
-    const dataUrl = new URL("./data.json", import.meta.url);
-    const rows = JSON.parse(await Deno.readTextFile(dataUrl));
+    const rowsMod = await import("./data.json", { with: { type: "json" } });
+    const rows = (rowsMod as any).default;
 
     const BATCH = 250;
     let inserted = 0;
