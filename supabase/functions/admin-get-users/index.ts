@@ -50,23 +50,29 @@ Deno.serve(async (req) => {
       }
     )
 
-    // Check if user has admin_user_list permission via profile_object_permissions
-    const { data: profileData } = await supabaseAdmin
-      .from('user_profiles')
-      .select('profile_id')
-      .eq('user_id', userId)
-      .single()
-
+    // System-admin bypass — a system administrator should never be blocked here.
     let hasPermission = false
-    if (profileData?.profile_id) {
-      const { data: perms } = await supabaseAdmin
-        .from('profile_object_permissions')
-        .select('can_read')
-        .eq('profile_id', profileData.profile_id)
-        .eq('object_name', 'admin_user_list')
-        .eq('can_read', true)
-        .limit(1)
-      hasPermission = (perms && perms.length > 0) || false
+    const { data: sysAdmin } = await supabaseAdmin.rpc('is_system_admin', { _user_id: userId })
+    if (sysAdmin === true) {
+      hasPermission = true
+    } else {
+      // Otherwise fall back to the admin_user_list sub-feature grant.
+      const { data: profileData } = await supabaseAdmin
+        .from('user_profiles')
+        .select('profile_id')
+        .eq('user_id', userId)
+        .single()
+
+      if (profileData?.profile_id) {
+        const { data: perms } = await supabaseAdmin
+          .from('profile_object_permissions')
+          .select('can_read')
+          .eq('profile_id', profileData.profile_id)
+          .eq('object_name', 'admin_user_list')
+          .eq('can_read', true)
+          .limit(1)
+        hasPermission = (perms && perms.length > 0) || false
+      }
     }
 
     if (!hasPermission) {
