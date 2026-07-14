@@ -1,58 +1,42 @@
-## Root cause
+## What the error means
 
-The Analytics page hides its three tabs when the current user's security profile does not have `can_read` on these keys:
+The red toast `Failed to fetch users: Edge Function returned a non-2xx status code` is coming from the `admin-get-users` edge function returning **HTTP 403 – "You do not have permission to view users"** (see `runtime-errors` block).
 
-- `analytics_business_summary` (Productivity tab)
-- `analytics_order_details` (Target tab)
-- `analytics_product_breakdown` (Products tab)
-
-DB check for the System Administrator profile (`98c1259e-…`) confirms **none of these keys exist** in `profile_object_permissions`. Same for every other profile:
+That function's gate (verified in `supabase/functions/admin-get-users/index.ts` lines 53–77) is exactly one check:
 
 ```
-System Administrator: total=675, admin_read=144, analytics_read=0
-Sales Manager:        total=675, admin_read=144, analytics_read=0
-Field Sales Executive:total=675, admin_read=144, analytics_read=0
+SELECT can_read FROM profile_object_permissions
+WHERE profile_id = <caller's user_profiles.profile_id>
+  AND object_name = 'admin_user_list'
+  AND can_read = true
 ```
 
-Only the hierarchical variants exist (`widget_analytics_*`, `field_analytics_*`, `action_analytics_*`, `module_analytics`). The bare sub-feature keys defined in `src/components/security/permissionModules.ts` (e.g. `analytics_business_summary`, `analytics_beat_details`, `analytics_order_details`, `analytics_product_breakdown`, `analytics_pending_payments`, `analytics_user_filter`, `analytics_date_range_picker`, `analytics_performance_calendar`, `analytics_leaderboard`) were never included in the earlier reseed migration (`20260714110117…`) — that migration only enumerated the hierarchical catalog.
+If the row is missing / `can_read` is false, the function returns 403.
 
-Because `hasFeaturePermission('analytics_business_summary','can_read')` returns `false`, all three tabs are hidden and the Analytics page appears "empty" for System Administrator (and by extension for other system profiles).
+## Why it happened
 
-Why it worked "before deletion": the previous System Administrator row was created interactively via the Permissions UI, which inserts flat `permissionModules.ts` keys. The auto-restore only copied whatever keys existed at that time in other profiles — none of which had the flat analytics keys either — so they never came back.
+Same root cause as the Analytics tabs: the reseed after the System Administrator delete only included the **hierarchical** permission catalog (`widget_*`, `field_*`, `action_*`, `module_*`). The **flat sub-feature keys** from `permissionModules.ts` — including `admin_user_list`, `admin_user_create`, `admin_user_edit`, `admin_user_delete`, `admin_user_activate_deactivate`, `admin_user_reset_password`, `admin_user_hierarchy`, `admin_approver_management`, `admin_security_roles_display` — were not seeded, so the edge function's `admin_user_list` check fails with 403.
 
-## Fix
+DB confirms: caller (Abhishek Pai, and every other System-Administrator user like Girish, Kumar, Prajwal C) has `user_profiles.profile_id = 98c1259e-…` = System Administrator profile.
 
-One idempotent migration that:
+## Fix status
 
-1. Builds a catalog of the flat sub-feature keys from `permissionModules.ts` that the app checks but the DB is missing. Scope of the seed:
-   - Every sub-feature listed under every module in `permissionModules.ts` (analytics, admin_*, retailers, my_beats, orders, invoices, my_visit, gps_track, expenses, leave, targets, gamification, ai_assistant, coach, project_mgmt, competition, distributor_*, etc.), plus the top-level module keys themselves (e.g. `analytics`, `retailers`, `orders`).
-   - Insert `permission_type='sub_feature'` (or `'module'` for top-level) and appropriate `parent_module`.
-2. `INSERT … SELECT` for every `security_profiles` row with `is_system = true`, setting all six flags (`can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all`) to `true`.
-3. `ON CONFLICT (profile_id, object_name) DO UPDATE SET can_read = true` — guarantees existing partial rows are widened, never narrowed.
-4. Post-insert assertion:
-   ```sql
-   SELECT COUNT(*) FROM profile_object_permissions
-   WHERE profile_id = '98c1259e-0368-4e1a-a4e8-01e173cbfb10'
-     AND object_name IN (
-       'analytics_business_summary',
-       'analytics_order_details',
-       'analytics_product_breakdown'
-     ) AND can_read;
-   ```
-   `RAISE EXCEPTION` if it is not 3.
+The migration we just ran (Analytics fix) seeded the full flat sub-feature catalog — **271 keys, including all `admin_user_*` keys** — into every `is_system = true` profile with all six flags = `true`. So the DB is already correct.
 
-No frontend changes. Fully idempotent, safe to re-run, no destructive statements.
+## What still needs to happen
 
-## After it runs
+Nothing on the DB or code side. The 403 you see is from before the migration finished. Two things to do:
 
-Prajwal (and any other System Administrator user) must **hard-refresh once** — the `useProfilePermissions` cache is 30 minutes and permissions are also kept in `localStorage`. After refresh the Productivity, Target, and Products tabs and their widgets appear again.
+1. **Hard refresh** the browser (or log out / log in). This clears the 30-min `useProfilePermissions` cache and forces the edge function to be called again — it will now find `admin_user_list = true` and return the user list.
+2. Confirm the user list renders on `/admin#users`.
 
-## Prevent recurrence
+## If it still 403s after hard-refresh (contingency)
 
-The existing `trg_backfill_system_profile` (AFTER INSERT on `security_profiles`) already seeds the hierarchical catalog. Extend the same trigger function to also seed the flat sub-feature catalog so any future recreation of a system profile carries both key sets. This is a `CREATE OR REPLACE FUNCTION` — no schema break.
+Only if step 1 doesn't fix it, I'll:
+- Query `profile_object_permissions` for the exact `(profile_id, 'admin_user_list')` row to confirm `can_read = true`.
+- Check `edge_function_logs` for the specific 403 line to see whether the caller's `profile_id` is actually the seeded one.
+- Extend the gate in `admin-get-users` to also accept `public.is_system_admin(caller.id)` as a bypass (matches the standard `is_system_admin` pattern used elsewhere in the app), so a system-admin never gets blocked by a missing sub-feature key.
 
 ## Files touched
 
-- `supabase/migrations/<new>_seed_missing_subfeature_permissions.sql` (new)
-
-No `.ts`/`.tsx` files change.
+None yet — this is a verify-and-refresh step. Only the contingency above would touch `supabase/functions/admin-get-users/index.ts`.
