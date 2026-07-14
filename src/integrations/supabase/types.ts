@@ -12009,59 +12009,6 @@ export type Database = {
         }
         Relationships: []
       }
-      profile_object_permissions: {
-        Row: {
-          can_create: boolean | null
-          can_delete: boolean | null
-          can_edit: boolean | null
-          can_modify_all: boolean | null
-          can_read: boolean | null
-          can_view_all: boolean | null
-          created_at: string | null
-          id: string
-          object_name: string
-          parent_module: string | null
-          permission_type: string
-          profile_id: string | null
-        }
-        Insert: {
-          can_create?: boolean | null
-          can_delete?: boolean | null
-          can_edit?: boolean | null
-          can_modify_all?: boolean | null
-          can_read?: boolean | null
-          can_view_all?: boolean | null
-          created_at?: string | null
-          id?: string
-          object_name: string
-          parent_module?: string | null
-          permission_type?: string
-          profile_id?: string | null
-        }
-        Update: {
-          can_create?: boolean | null
-          can_delete?: boolean | null
-          can_edit?: boolean | null
-          can_modify_all?: boolean | null
-          can_read?: boolean | null
-          can_view_all?: boolean | null
-          created_at?: string | null
-          id?: string
-          object_name?: string
-          parent_module?: string | null
-          permission_type?: string
-          profile_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_object_permissions_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "security_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           anniversary_date: string | null
