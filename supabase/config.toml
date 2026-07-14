@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.restore-sardar-beats]
 verify_jwt = false
+
+[functions.restore-permissions]
+verify_jwt = false
