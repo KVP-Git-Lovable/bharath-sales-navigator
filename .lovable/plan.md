@@ -1,59 +1,49 @@
+## Give System Administrator full access to every permission in Security & Access
 
-## What I found
+### Why it's currently broken
 
-**Prajwal C** (`d63ecc6f-4ef4-468b-a237-7a6617bb7cdd`) has a row in `public.user_profiles` pointing at `profile_id = 98c1259e-0368-4e1a-a4e8-01e173cbfb10`, but that security profile **no longer exists** in `public.security_profiles`.
+Prajwal → System Administrator profile (`98c1259e-…`) currently holds **531** permission rows, but only **7** of them start with `admin_`, and all 7 are `admin_attendance_*`. That's why `/admin-controls` only shows the Attendance Management card and every other admin route is blocked.
 
-Current `security_profiles` table only contains:
-- Sales Manager
-- Field Sales Executive
-- Product Manager
+Root cause: the earlier restore migration seeded permissions by copying from the *union of other profiles*. The remaining profiles had almost no `admin_*` keys, so almost nothing was restored. The `auto_seed_system_admin_permissions` trigger only fires on new inserts into other profiles, so it doesn't backfill.
 
-The **System Administrator** profile is gone. That is why the dashboard shows *"No Permissions Assigned"* — the permissions query joins through `user_profiles → profile_id → profile_object_permissions` and finds nothing.
+### What "full access" means here
 
-### How & when it was deleted
+The Security & Access UI builds its permission tree from two files:
 
-- `user_profiles.profile_id` has **no foreign key** to `security_profiles`, so deleting a profile did not cascade or block — it just orphaned the user rows.
-- **8 users total** are currently orphaned on this same missing profile id (not just Prajwal), so this is one bulk deletion event, not a per-user mistake.
-- There is **no audit trail** of the deletion:
-  - `destructive_audit_log` has zero rows for `table_name = 'security_profiles'`
-  - `recycle_bin` and `permanent_deletion_log` have no entry for id `98c1259e-…` or for `original_table = 'security_profiles'`
-- Conclusion: the profile was deleted directly (either via the Security & Access Control UI's "Delete profile" action, which does a hard delete and does not write to the destructive audit / recycle bin, or via a direct SQL/admin action). We cannot pinpoint the exact user or timestamp because nothing was logged. Going forward this should be fixed (see step 4 below).
+- `src/components/security/hierarchicalPermissions.ts` → module / field / action / widget keys shown in the Hierarchical editor.
+- `src/components/security/permissionModules.ts` → the flat legacy catalog used by the module editor and by `validatePermissions`.
 
-## Fix plan (single migration)
+The union of every key referenced by these two files is exactly what the UI can toggle. System Administrator should hold every one of those keys with all six flags = `true` (`can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all`).
 
-1. **Recreate the profile in place** — re-insert `security_profiles` with the same id `98c1259e-0368-4e1a-a4e8-01e173cbfb10`, `name = 'System Administrator'`, `is_system = true`. Using the same id automatically re-links Prajwal and the other 7 orphaned users; no `user_profiles` updates needed.
-2. **Seed full permissions** — bulk `INSERT` into `profile_object_permissions` one row per distinct `(object_name, permission_type, parent_module)` currently referenced by any other profile, all flags = `true`, for `profile_id = 98c1259e-…`. This matches what the existing `auto_seed_system_admin_permissions` trigger would do for future new permission keys.
-3. **Verification query** — after the migration, confirm Prajwal's join returns >0 rows and dashboard access is restored.
-4. **Prevent recurrence** (recommended, small follow-up):
-   - Block delete of any `is_system = true` profile in the RLS/policy or via a `BEFORE DELETE` trigger that raises an exception.
-   - Add an `AFTER DELETE` trigger on `security_profiles` that logs the deleted row into `destructive_audit_log` so we always know who/when.
-   - Optionally add a real FK `user_profiles.profile_id → security_profiles(id) ON DELETE RESTRICT` so orphaning becomes impossible.
+### Fix — one migration, no frontend changes
 
-## Technical details
+1. Build a `VALUES (...)` list containing every unique `object_name` (with its `permission_type` and `parent_module`) referenced by `hierarchicalPermissions.ts` + `permissionModules.ts`. This is generated once by scanning those two files locally and inlined into the migration so it is self-contained and reproducible.
+2. For **every** profile where `is_system = true` (currently just System Administrator, but future-proof):
+   ```sql
+   INSERT INTO profile_object_permissions
+     (profile_id, object_name, permission_type, parent_module,
+      can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all)
+   SELECT sp.id, v.object_name, v.permission_type, v.parent_module,
+          true, true, true, true, true, true
+   FROM security_profiles sp
+   CROSS JOIN (VALUES … full catalog … ) AS v(object_name, permission_type, parent_module)
+   WHERE sp.is_system = true
+   ON CONFLICT (profile_id, object_name, permission_type) DO UPDATE
+     SET can_read = true, can_create = true, can_edit = true,
+         can_delete = true, can_view_all = true, can_modify_all = true;
+   ```
+   The `ON CONFLICT ... DO UPDATE` flips any pre-existing row (including the 7 attendance ones) to fully permitted, and inserts every missing row.
+3. Harden `auto_seed_system_admin_permissions` and add a matching `AFTER INSERT ON security_profiles` trigger so any future system profile that gets (re)created is automatically backfilled with the full permission set that currently exists in `profile_object_permissions`. That way another accidental delete + recreate self-heals.
+4. In-migration verification: `RAISE` if `COUNT(*) FROM profile_object_permissions WHERE profile_id = '98c1259e-…' AND object_name LIKE 'admin_%' AND can_read` is less than the count of admin_* keys in the seeded catalog.
 
-```sql
--- 1. Recreate the deleted profile with its original id
-INSERT INTO public.security_profiles (id, name, description, is_system)
-VALUES (
-  '98c1259e-0368-4e1a-a4e8-01e173cbfb10',
-  'System Administrator',
-  'Full access to all modules and administrative features',
-  true
-)
-ON CONFLICT (id) DO NOTHING;
+### After it runs
 
--- 2. Seed every known permission with full flags
-INSERT INTO public.profile_object_permissions (
-  profile_id, object_name, permission_type, parent_module,
-  can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all
-)
-SELECT DISTINCT
-  '98c1259e-0368-4e1a-a4e8-01e173cbfb10',
-  object_name, permission_type, parent_module,
-  true, true, true, true, true, true
-FROM public.profile_object_permissions
-WHERE profile_id <> '98c1259e-0368-4e1a-a4e8-01e173cbfb10'
-ON CONFLICT DO NOTHING;
-```
+- Prajwal (and any other user still linked to this profile) hard-refreshes once — the 30-min React Query cache and localStorage permission cache clear, and every Admin Controls card + admin route becomes visible again.
+- Any Field-, Action- and Widget-level permissions the UI relies on (visible in the Hierarchical editor tabs) also become allowed, so gated buttons/columns inside modules stop being hidden for System Administrator.
 
-No frontend code changes are required — the permission hook (`useProfilePermissions`) already reads from these tables and caches the result. Prajwal will get his access back on next login / cache refresh.
+### Technical notes
+
+- Only data + trigger changes; no changes to `useProfilePermissions.ts`, `AdminControls.tsx`, or any component.
+- Uses `ON CONFLICT DO UPDATE` because the goal is "make sure everything is `true`", not just "insert if missing" — the previous restore left rows that were partially set.
+- No destructive statements (`DELETE`, `TRUNCATE`) on `security_profiles`, `profile_object_permissions`, or `user_profiles`.
+- Fully idempotent — safe to re-run.
