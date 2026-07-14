@@ -1,42 +1,50 @@
-## What the error means
+# Restore `profile_object_permissions` from the uploaded backup
 
-The red toast `Failed to fetch users: Edge Function returned a non-2xx status code` is coming from the `admin-get-users` edge function returning **HTTP 403 – "You do not have permission to view users"** (see `runtime-errors` block).
+## What we have
+- Uploaded file `profile_object_permissions_rows.sql` — a single `INSERT ... VALUES (...), (...), ...` with **~2,473 rows** and all 12 columns of the original schema. Timestamps range back to 2026-03-18, so this is a full pre-loss snapshot.
+- `security_profiles` (3 system + 1 custom) and `user_profiles` (28 rows) are intact — profile_ids in the backup will resolve.
 
-That function's gate (verified in `supabase/functions/admin-get-users/index.ts` lines 53–77) is exactly one check:
+## Fix (two steps)
 
+### Step 1 — Migration: recreate the table + RLS + trigger
+Idempotent SQL:
+1. `CREATE TABLE IF NOT EXISTS public.profile_object_permissions` with:
+   - `id uuid pk default gen_random_uuid()`
+   - `profile_id uuid REFERENCES security_profiles(id) ON DELETE CASCADE`
+   - `object_name text not null`
+   - `permission_type text not null default 'sub_feature'`
+   - `parent_module text`
+   - six boolean flags default false
+   - `created_at timestamptz default now()`
+   - `UNIQUE (profile_id, object_name, permission_type)` (matches the `ON CONFLICT` used by prior migrations)
+2. `GRANT SELECT, INSERT, UPDATE, DELETE ... TO authenticated; GRANT ALL ... TO service_role;`
+3. `ENABLE ROW LEVEL SECURITY` and re-create the two original policies:
+   - `SELECT`: caller's `user_profiles.profile_id = profile_object_permissions.profile_id`, OR `public.is_system_admin(auth.uid())`.
+   - `ALL` (write): only `public.is_system_admin(auth.uid())`.
+4. Re-create the `backfill_system_profile_permissions` trigger on `security_profiles` (same body as migration `20260714110117…`).
+
+### Step 2 — Data restore from the uploaded backup
+Using the insert-data tool, run the uploaded `INSERT` verbatim with:
 ```
-SELECT can_read FROM profile_object_permissions
-WHERE profile_id = <caller's user_profiles.profile_id>
-  AND object_name = 'admin_user_list'
-  AND can_read = true
+INSERT INTO public.profile_object_permissions (...) VALUES ...
+ON CONFLICT (profile_id, object_name, permission_type) DO UPDATE SET
+  can_read = EXCLUDED.can_read, can_create = EXCLUDED.can_create,
+  can_edit = EXCLUDED.can_edit, can_delete = EXCLUDED.can_delete,
+  can_view_all = EXCLUDED.can_view_all, can_modify_all = EXCLUDED.can_modify_all,
+  parent_module = EXCLUDED.parent_module;
 ```
+- The `id` PK column is included in the backup — we'll keep it (avoids ID churn for anything that referenced these rows).
+- If the raw `INSERT` payload exceeds one tool call, we'll split into a couple of `VALUES` batches — no schema changes, purely data.
 
-If the row is missing / `can_read` is false, the function returns 403.
+### Step 3 — Verify + safety-net
+After the restore, in the same insert call:
+- `SELECT COUNT(*)` per system profile — expect the three system profiles (`System Administrator`, `Sales Manager`, `Field Sales Executive`) to have hundreds of rows each.
+- Re-run the small catalog seed from migration `20260714111408…` (271 flat sub-feature keys) with `ON CONFLICT DO UPDATE ... = true` — cheap belt-and-braces that guarantees `admin_user_list`, `admin_dashboard`, `analytics_*`, etc. exist for every system profile even if the backup was slightly stale.
 
-## Why it happened
-
-Same root cause as the Analytics tabs: the reseed after the System Administrator delete only included the **hierarchical** permission catalog (`widget_*`, `field_*`, `action_*`, `module_*`). The **flat sub-feature keys** from `permissionModules.ts` — including `admin_user_list`, `admin_user_create`, `admin_user_edit`, `admin_user_delete`, `admin_user_activate_deactivate`, `admin_user_reset_password`, `admin_user_hierarchy`, `admin_approver_management`, `admin_security_roles_display` — were not seeded, so the edge function's `admin_user_list` check fails with 403.
-
-DB confirms: caller (Abhishek Pai, and every other System-Administrator user like Girish, Kumar, Prajwal C) has `user_profiles.profile_id = 98c1259e-…` = System Administrator profile.
-
-## Fix status
-
-The migration we just ran (Analytics fix) seeded the full flat sub-feature catalog — **271 keys, including all `admin_user_*` keys** — into every `is_system = true` profile with all six flags = `true`. So the DB is already correct.
-
-## What still needs to happen
-
-Nothing on the DB or code side. The 403 you see is from before the migration finished. Two things to do:
-
-1. **Hard refresh** the browser (or log out / log in). This clears the 30-min `useProfilePermissions` cache and forces the edge function to be called again — it will now find `admin_user_list = true` and return the user list.
-2. Confirm the user list renders on `/admin#users`.
-
-## If it still 403s after hard-refresh (contingency)
-
-Only if step 1 doesn't fix it, I'll:
-- Query `profile_object_permissions` for the exact `(profile_id, 'admin_user_list')` row to confirm `can_read = true`.
-- Check `edge_function_logs` for the specific 403 line to see whether the caller's `profile_id` is actually the seeded one.
-- Extend the gate in `admin-get-users` to also accept `public.is_system_admin(caller.id)` as a bypass (matches the standard `is_system_admin` pattern used elsewhere in the app), so a system-admin never gets blocked by a missing sub-feature key.
+## After it runs
+- Ask affected users to hard-refresh once — clears the 30-min `useProfilePermissions` cache and the localStorage snapshot; login and dashboards render immediately.
+- No app code changes needed.
 
 ## Files touched
-
-None yet — this is a verify-and-refresh step. Only the contingency above would touch `supabase/functions/admin-get-users/index.ts`.
+- New: `supabase/migrations/<ts>_restore_profile_object_permissions_table.sql` (schema + RLS + trigger only)
+- No file edits; data restored via the insert-data tool from the uploaded backup.
