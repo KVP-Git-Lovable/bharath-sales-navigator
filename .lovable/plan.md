@@ -1,49 +1,58 @@
-## Give System Administrator full access to every permission in Security & Access
+## Root cause
 
-### Why it's currently broken
+The Analytics page hides its three tabs when the current user's security profile does not have `can_read` on these keys:
 
-Prajwal → System Administrator profile (`98c1259e-…`) currently holds **531** permission rows, but only **7** of them start with `admin_`, and all 7 are `admin_attendance_*`. That's why `/admin-controls` only shows the Attendance Management card and every other admin route is blocked.
+- `analytics_business_summary` (Productivity tab)
+- `analytics_order_details` (Target tab)
+- `analytics_product_breakdown` (Products tab)
 
-Root cause: the earlier restore migration seeded permissions by copying from the *union of other profiles*. The remaining profiles had almost no `admin_*` keys, so almost nothing was restored. The `auto_seed_system_admin_permissions` trigger only fires on new inserts into other profiles, so it doesn't backfill.
+DB check for the System Administrator profile (`98c1259e-…`) confirms **none of these keys exist** in `profile_object_permissions`. Same for every other profile:
 
-### What "full access" means here
+```
+System Administrator: total=675, admin_read=144, analytics_read=0
+Sales Manager:        total=675, admin_read=144, analytics_read=0
+Field Sales Executive:total=675, admin_read=144, analytics_read=0
+```
 
-The Security & Access UI builds its permission tree from two files:
+Only the hierarchical variants exist (`widget_analytics_*`, `field_analytics_*`, `action_analytics_*`, `module_analytics`). The bare sub-feature keys defined in `src/components/security/permissionModules.ts` (e.g. `analytics_business_summary`, `analytics_beat_details`, `analytics_order_details`, `analytics_product_breakdown`, `analytics_pending_payments`, `analytics_user_filter`, `analytics_date_range_picker`, `analytics_performance_calendar`, `analytics_leaderboard`) were never included in the earlier reseed migration (`20260714110117…`) — that migration only enumerated the hierarchical catalog.
 
-- `src/components/security/hierarchicalPermissions.ts` → module / field / action / widget keys shown in the Hierarchical editor.
-- `src/components/security/permissionModules.ts` → the flat legacy catalog used by the module editor and by `validatePermissions`.
+Because `hasFeaturePermission('analytics_business_summary','can_read')` returns `false`, all three tabs are hidden and the Analytics page appears "empty" for System Administrator (and by extension for other system profiles).
 
-The union of every key referenced by these two files is exactly what the UI can toggle. System Administrator should hold every one of those keys with all six flags = `true` (`can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all`).
+Why it worked "before deletion": the previous System Administrator row was created interactively via the Permissions UI, which inserts flat `permissionModules.ts` keys. The auto-restore only copied whatever keys existed at that time in other profiles — none of which had the flat analytics keys either — so they never came back.
 
-### Fix — one migration, no frontend changes
+## Fix
 
-1. Build a `VALUES (...)` list containing every unique `object_name` (with its `permission_type` and `parent_module`) referenced by `hierarchicalPermissions.ts` + `permissionModules.ts`. This is generated once by scanning those two files locally and inlined into the migration so it is self-contained and reproducible.
-2. For **every** profile where `is_system = true` (currently just System Administrator, but future-proof):
+One idempotent migration that:
+
+1. Builds a catalog of the flat sub-feature keys from `permissionModules.ts` that the app checks but the DB is missing. Scope of the seed:
+   - Every sub-feature listed under every module in `permissionModules.ts` (analytics, admin_*, retailers, my_beats, orders, invoices, my_visit, gps_track, expenses, leave, targets, gamification, ai_assistant, coach, project_mgmt, competition, distributor_*, etc.), plus the top-level module keys themselves (e.g. `analytics`, `retailers`, `orders`).
+   - Insert `permission_type='sub_feature'` (or `'module'` for top-level) and appropriate `parent_module`.
+2. `INSERT … SELECT` for every `security_profiles` row with `is_system = true`, setting all six flags (`can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all`) to `true`.
+3. `ON CONFLICT (profile_id, object_name) DO UPDATE SET can_read = true` — guarantees existing partial rows are widened, never narrowed.
+4. Post-insert assertion:
    ```sql
-   INSERT INTO profile_object_permissions
-     (profile_id, object_name, permission_type, parent_module,
-      can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all)
-   SELECT sp.id, v.object_name, v.permission_type, v.parent_module,
-          true, true, true, true, true, true
-   FROM security_profiles sp
-   CROSS JOIN (VALUES … full catalog … ) AS v(object_name, permission_type, parent_module)
-   WHERE sp.is_system = true
-   ON CONFLICT (profile_id, object_name, permission_type) DO UPDATE
-     SET can_read = true, can_create = true, can_edit = true,
-         can_delete = true, can_view_all = true, can_modify_all = true;
+   SELECT COUNT(*) FROM profile_object_permissions
+   WHERE profile_id = '98c1259e-0368-4e1a-a4e8-01e173cbfb10'
+     AND object_name IN (
+       'analytics_business_summary',
+       'analytics_order_details',
+       'analytics_product_breakdown'
+     ) AND can_read;
    ```
-   The `ON CONFLICT ... DO UPDATE` flips any pre-existing row (including the 7 attendance ones) to fully permitted, and inserts every missing row.
-3. Harden `auto_seed_system_admin_permissions` and add a matching `AFTER INSERT ON security_profiles` trigger so any future system profile that gets (re)created is automatically backfilled with the full permission set that currently exists in `profile_object_permissions`. That way another accidental delete + recreate self-heals.
-4. In-migration verification: `RAISE` if `COUNT(*) FROM profile_object_permissions WHERE profile_id = '98c1259e-…' AND object_name LIKE 'admin_%' AND can_read` is less than the count of admin_* keys in the seeded catalog.
+   `RAISE EXCEPTION` if it is not 3.
 
-### After it runs
+No frontend changes. Fully idempotent, safe to re-run, no destructive statements.
 
-- Prajwal (and any other user still linked to this profile) hard-refreshes once — the 30-min React Query cache and localStorage permission cache clear, and every Admin Controls card + admin route becomes visible again.
-- Any Field-, Action- and Widget-level permissions the UI relies on (visible in the Hierarchical editor tabs) also become allowed, so gated buttons/columns inside modules stop being hidden for System Administrator.
+## After it runs
 
-### Technical notes
+Prajwal (and any other System Administrator user) must **hard-refresh once** — the `useProfilePermissions` cache is 30 minutes and permissions are also kept in `localStorage`. After refresh the Productivity, Target, and Products tabs and their widgets appear again.
 
-- Only data + trigger changes; no changes to `useProfilePermissions.ts`, `AdminControls.tsx`, or any component.
-- Uses `ON CONFLICT DO UPDATE` because the goal is "make sure everything is `true`", not just "insert if missing" — the previous restore left rows that were partially set.
-- No destructive statements (`DELETE`, `TRUNCATE`) on `security_profiles`, `profile_object_permissions`, or `user_profiles`.
-- Fully idempotent — safe to re-run.
+## Prevent recurrence
+
+The existing `trg_backfill_system_profile` (AFTER INSERT on `security_profiles`) already seeds the hierarchical catalog. Extend the same trigger function to also seed the flat sub-feature catalog so any future recreation of a system profile carries both key sets. This is a `CREATE OR REPLACE FUNCTION` — no schema break.
+
+## Files touched
+
+- `supabase/migrations/<new>_seed_missing_subfeature_permissions.sql` (new)
+
+No `.ts`/`.tsx` files change.
