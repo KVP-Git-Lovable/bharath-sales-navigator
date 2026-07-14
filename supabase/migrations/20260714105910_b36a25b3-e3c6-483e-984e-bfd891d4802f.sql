@@ -1,0 +1,1 @@
+-- See /tmp/migration.sql — inlined below
