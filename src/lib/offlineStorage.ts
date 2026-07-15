@@ -31,7 +31,16 @@ export const STORES = {
   SYNC_LOGS: 'syncLogs',
   // Attendance-specific config caching
   WEEK_OFF_CONFIG: 'weekOffConfig',
-  HOLIDAYS: 'holidays'
+  HOLIDAYS: 'holidays',
+  // Phase 7-1: product availability rules + territory lookup (region/zone)
+  PRODUCT_AVAILABILITY: 'productAvailability',
+  TERRITORIES_LOOKUP: 'territoriesLookup',
+  EXPENSES: 'expenses',
+  UOM_MASTER: 'uomMaster',
+  PRODUCT_UOM_MAPPING: 'productUomMapping',
+  PROFILES: 'profiles',
+  DISTRIBUTORS: 'distributors',
+  DISTRIBUTOR_BEAT_MAPPINGS: 'distributorBeatMappings'
 } as const;
 
 // Sync metadata interface
@@ -55,6 +64,8 @@ class OfflineStorage {
   private memoryCache: Map<string, { data: any[]; timestamp: number }> = new Map();
   private readonly CACHE_TTL = 60000; // 1 minute cache
   private readonly MAX_CACHE_SIZE = 10; // Limit number of cached stores to prevent memory bloat
+  private readonly CHUNK_SIZE = 1_000_000; // ~1MB/value — safely under the SharedPreferences bridge limit
+
 
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -98,8 +109,22 @@ class OfflineStorage {
       }
       
       const key = this.getStoreKey(storeName);
-      const { value } = await Preferences.get({ key });
-      const data = value ? JSON.parse(value) : [];
+      const meta = await Preferences.get({ key: `${key}::meta` });
+      let json: string | null;
+      if (meta.value) {
+        const n = parseInt(meta.value, 10) || 0;
+        let acc = '';
+        let incomplete = false;
+        for (let i = 0; i < n; i++) {
+          const part = await Preferences.get({ key: `${key}::c${i}` });
+          if (part.value == null) { incomplete = true; break; }
+          acc += part.value;
+        }
+        json = incomplete ? null : (acc || null);
+      } else {
+        json = (await Preferences.get({ key })).value;
+      }
+      const data = json ? JSON.parse(json) : [];
       
       // Cache in memory for fast subsequent reads
       this.memoryCache.set(storeName, { data, timestamp: Date.now() });
@@ -115,7 +140,29 @@ class OfflineStorage {
   private async setStoreData(storeName: string, data: any[]): Promise<void> {
     try {
       const key = this.getStoreKey(storeName);
-      await Preferences.set({ key, value: JSON.stringify(data) });
+      const json = JSON.stringify(data);
+
+      // Clear any previous chunk manifest first
+      const prev = await Preferences.get({ key: `${key}::meta` });
+      if (prev.value) {
+        const pn = parseInt(prev.value, 10) || 0;
+        for (let i = 0; i < pn; i++) await Preferences.remove({ key: `${key}::c${i}` });
+        await Preferences.remove({ key: `${key}::meta` });
+      }
+
+      if (json.length <= this.CHUNK_SIZE) {
+        await Preferences.set({ key, value: json });
+      } else {
+        await Preferences.remove({ key }); // avoid a stale single value
+        const n = Math.ceil(json.length / this.CHUNK_SIZE);
+        for (let i = 0; i < n; i++) {
+          await Preferences.set({
+            key: `${key}::c${i}`,
+            value: json.slice(i * this.CHUNK_SIZE, (i + 1) * this.CHUNK_SIZE),
+          });
+        }
+        await Preferences.set({ key: `${key}::meta`, value: String(n) });
+      }
       
       // Update memory cache and prune if needed
       this.memoryCache.set(storeName, { data, timestamp: Date.now() });
@@ -125,6 +172,7 @@ class OfflineStorage {
       throw error;
     }
   }
+
 
   // Invalidate memory cache for a store (call after external updates)
   invalidateCache(storeName: string): void {
@@ -175,6 +223,41 @@ class OfflineStorage {
       console.log(`[OfflineStorage] ✅ Replaced ${storeName} with ${items.length} items`);
     } catch (error) {
       console.error(`[OfflineStorage] ❌ Failed to replace ${storeName}:`, error);
+      throw error;
+    }
+  }
+
+  // BATCH upsert: merge many records into a store with a SINGLE underlying write.
+  // Replaces the legacy `for (const r of rows) await save(...)` pattern that
+  // re-read + re-parsed + re-wrote the entire JSON blob N times (O(N²) and
+  // the cause of multi-second UI freezes at ~8k+ products).
+  async saveMany<T extends { id?: string | number }>(storeName: string, records: T[]): Promise<void> {
+    await this.ensureReady();
+    if (!records || records.length === 0) return;
+
+    try {
+      const items = await this.getStoreData<T>(storeName);
+      const indexById = new Map<any, number>();
+      items.forEach((it: any, idx) => { if (it?.id != null) indexById.set(it.id, idx); });
+
+      for (const rec of records) {
+        const r: any = rec as any;
+        if (r.id == null) {
+          r.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        }
+        const existingIdx = indexById.get(r.id);
+        if (existingIdx !== undefined) {
+          items[existingIdx] = r;
+        } else {
+          indexById.set(r.id, items.length);
+          items.push(r);
+        }
+      }
+
+      await this.setStoreData(storeName, items as any[]);
+      console.log(`[OfflineStorage] ✅ saveMany ${records.length} → ${storeName} (single write)`);
+    } catch (error) {
+      console.error(`[OfflineStorage] ❌ saveMany failed for ${storeName}:`, error);
       throw error;
     }
   }
@@ -248,13 +331,17 @@ class OfflineStorage {
       data,
       timestamp: Date.now(),
       createdAt: Date.now(),
-      retryCount: 0
+      retryCount: 0,
+      // Bump when queue payload format changes. Drain treats missing/older
+      // versions as legacy and handles them gracefully.
+      queue_version: 2
     };
     
     await this.save(STORES.SYNC_QUEUE, syncItem);
     this.emitSyncQueueUpdated();
     console.log('[OfflineStorage] 📤 syncQueueUpdated event dispatched');
   }
+
 
   async getSyncQueue(): Promise<any[]> {
     return this.getAll(STORES.SYNC_QUEUE);

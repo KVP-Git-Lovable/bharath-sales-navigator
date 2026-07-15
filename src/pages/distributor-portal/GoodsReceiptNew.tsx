@@ -91,12 +91,16 @@ const GoodsReceiptNew = () => {
     setItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       const updated = { ...item, [field]: value };
-      // Ensure received + returned doesn't exceed ordered
+      // Received capped at ordered; returned capped at received (returned is a subset of what was received)
       if (field === 'received_quantity') {
         updated.received_quantity = Math.max(0, Math.min(updated.ordered_quantity, Number(value) || 0));
+        // Keep returned <= received
+        if (updated.returned_quantity > updated.received_quantity) {
+          updated.returned_quantity = updated.received_quantity;
+        }
       }
       if (field === 'returned_quantity') {
-        updated.returned_quantity = Math.max(0, Math.min(updated.ordered_quantity - updated.received_quantity, Number(value) || 0));
+        updated.returned_quantity = Math.max(0, Math.min(updated.received_quantity, Number(value) || 0));
       }
       return updated;
     }));
@@ -151,76 +155,61 @@ const GoodsReceiptNew = () => {
         unit_price: item.unit_price,
       }));
 
-      await supabase.from('grn_items').insert(grnItems);
+      const { error: grnItemsError } = await supabase.from('grn_items').insert(grnItems);
+      if (grnItemsError) throw grnItemsError;
 
       // Update order items with received quantities
       for (const item of items) {
-        await supabase.from('primary_order_items').update({
+        const { error: updErr } = await supabase.from('primary_order_items').update({
           received_quantity: item.received_quantity,
           batch_number: item.batch_number || null,
           expiry_date: item.expiry_date || null,
         }).eq('id', item.order_item_id);
+        if (updErr) throw updErr;
       }
 
-      // Update inventory
+      // Resolve default warehouse (required for stock RPC + batch tracking)
+      const { data: warehouse, error: whError } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('distributor_id', distributorId)
+        .order('is_default', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (whError) throw whError;
+      if (!warehouse?.id) {
+        throw new Error('No warehouse configured for this distributor. Please create a warehouse before confirming a GRN.');
+      }
+      const warehouseId = warehouse.id;
+
+      // Update inventory + batches + transaction ledger via the atomic GRN RPC.
+      // This keeps distributor_inventory.quantity, inventory_batches, and
+      // distributor_inventory_transactions in sync automatically.
       for (const item of items) {
         if (item.received_quantity <= 0) continue;
 
-        const { data: existing } = await supabase
-          .from('distributor_inventory')
-          .select('*')
-          .eq('distributor_id', distributorId)
-          .eq('product_id', item.product_id)
-          .maybeSingle();
-
-        if (existing) {
-          const newQty = existing.quantity + item.received_quantity;
-          await supabase.from('distributor_inventory').update({
-            quantity: newQty,
-            available_quantity: (existing.available_quantity || 0) + item.received_quantity,
-            total_value: newQty * (existing.unit_cost || item.unit_price),
-            last_received_date: new Date().toISOString().split('T')[0],
-            batch_number: item.batch_number || existing.batch_number,
-            expiry_date: item.expiry_date || existing.expiry_date,
-            updated_at: new Date().toISOString(),
-          }).eq('id', existing.id);
-        } else {
-          await supabase.from('distributor_inventory').insert({
-            distributor_id: distributorId,
-            product_id: item.product_id,
-            variant_id: item.variant_id || null,
-            product_name: item.product_name,
-            variant_name: item.variant_name || null,
-            quantity: item.received_quantity,
-            reserved_quantity: 0,
-            available_quantity: item.received_quantity,
-            reorder_level: 10,
-            max_stock_level: 1000,
-            unit: item.unit,
-            unit_cost: item.unit_price,
-            total_value: item.received_quantity * item.unit_price,
-            batch_number: item.batch_number || null,
-            expiry_date: item.expiry_date || null,
-            last_received_date: new Date().toISOString().split('T')[0],
-          });
+        const { data: rpcData, error: rpcErr } = await supabase.rpc('execute_stock_action', {
+          p_distributor_id: distributorId,
+          p_product_id: item.product_id,
+          p_action: 'GRN',
+          p_quantity: Math.round(item.received_quantity),
+          p_notes: `GRN ${grnNumber} from order ${order.order_number}`,
+          p_created_by: null,
+          p_warehouse_id: warehouseId,
+          p_batch_no: item.batch_number?.trim() || null, // auto-generate if empty
+          p_expiry_date: item.expiry_date || null,
+          p_reference_id: grn.id,
+          p_reference_number: grnNumber,
+          p_supplier_batch_code: item.batch_number?.trim() || null,
+          p_mfg_date: null,
+        } as any);
+        if (rpcErr) throw rpcErr;
+        const result = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData;
+        if (!result?.success) {
+          throw new Error(`${item.product_name}: ${result?.error || 'Failed to update inventory'}`);
         }
-
-        // Log inward transaction
-        await supabase.from('distributor_inventory_transactions').insert({
-          distributor_id: distributorId,
-          product_id: item.product_id,
-          variant_id: item.variant_id || null,
-          transaction_type: 'inward',
-          quantity: item.received_quantity,
-          reference_type: 'grn',
-          reference_id: grn.id,
-          reference_number: grnNumber,
-          batch_number: item.batch_number || null,
-          unit: item.unit,
-          unit_cost: item.unit_price,
-          notes: `GRN ${grnNumber} from order ${order.order_number}`,
-        });
       }
+
 
       // Create return note if any items returned
       const returnedItems = items.filter(i => i.returned_quantity > 0);
@@ -279,9 +268,9 @@ const GoodsReceiptNew = () => {
 
       toast.success(`GRN ${grnNumber} confirmed! Inventory updated.`);
       navigate('/distributor-portal/goods-receipt');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error confirming GRN:', error);
-      toast.error('Failed to confirm GRN');
+      toast.error(error?.message || 'Failed to confirm GRN');
     } finally {
       setSaving(false);
     }

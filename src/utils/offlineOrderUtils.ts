@@ -5,13 +5,85 @@ import { addOrderToSnapshot } from '@/lib/myVisitsSnapshot';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { isSlowConnection } from '@/utils/internetSpeedCheck';
 import { markVisitDataChanged } from '@/lib/visitChangeMarker';
-import { runSchemaHealthCheck, isOrderPlacementBlocked } from '@/utils/schemaHealthCheck';
 
 const SYNC_TIMEOUT_MS = 5000; // 5 second timeout for all sync operations
 
 // DUPLICATE FIX: Prevent multiple sync attempts for the same order in one session
 const syncAttemptLock = new Map<string, number>(); // orderId -> timestamp
 const LOCK_DURATION_MS = 30000; // 30 seconds lock per order
+
+/**
+ * Ensure an order payload carries beat_id, beat_name_snapshot and owner_id_snapshot.
+ * These columns are set ONCE at creation and never updated; they preserve the
+ * beat link, beat name and owner at the moment the order was taken, even if the
+ * beat is later renamed or transferred. Safe to call on already-enriched
+ * payloads (existing non-undefined values are preserved).
+ */
+export async function enrichWithBeatSnapshots(order: any): Promise<any> {
+  if (!order || typeof order !== 'object') return order;
+  const hasBeatId = order.beat_id !== undefined && order.beat_id !== null;
+  const hasBeat = order.beat_name_snapshot !== undefined && order.beat_name_snapshot !== null;
+  const hasOwner = order.owner_id_snapshot !== undefined && order.owner_id_snapshot !== null;
+  if (hasBeatId && hasBeat && hasOwner) return order;
+  if (!order.retailer_id) {
+    return {
+      ...order,
+      beat_id: order.beat_id ?? null,
+      beat_name_snapshot: order.beat_name_snapshot ?? null,
+      owner_id_snapshot: order.owner_id_snapshot ?? null,
+    };
+  }
+
+  let beatTextId: string | null = order.beat_id ?? null;
+  let beatName: string | null = order.beat_name_snapshot ?? null;
+  let ownerId: string | null = order.owner_id_snapshot ?? null;
+
+  // Try IDB cache first for offline safety
+  try {
+    const cached = await offlineStorage.getAll<any>(STORES.RETAILERS).catch(() => [] as any[]);
+    const match = (cached ?? []).find((r: any) => r.id === order.retailer_id);
+    if (match) {
+      if (!beatTextId) beatTextId = match.beat_id ?? null;
+      if (!beatName) beatName = match.beat_name ?? null;
+    }
+  } catch { /* ignore */ }
+
+  if (!beatTextId || !beatName) {
+    try {
+      const { data: r } = await supabase
+        .from('retailers')
+        .select('beat_id, beat_name')
+        .eq('id', order.retailer_id)
+        .maybeSingle();
+      if (r) {
+        if (!beatTextId) beatTextId = (r as any).beat_id ?? null;
+        if (!beatName) beatName = (r as any).beat_name ?? null;
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (beatTextId && (!ownerId || !beatName)) {
+    try {
+      const { data: b } = await supabase
+        .from('beats')
+        .select('owner_id, user_id, beat_name')
+        .eq('beat_id', beatTextId)
+        .maybeSingle();
+      if (b) {
+        ownerId = ownerId ?? (b as any).owner_id ?? (b as any).user_id ?? null;
+        if (!beatName) beatName = (b as any).beat_name ?? null;
+      }
+    } catch { /* ignore */ }
+  }
+
+  return {
+    ...order,
+    beat_id: order.beat_id ?? beatTextId ?? null,
+    beat_name_snapshot: order.beat_name_snapshot ?? beatName ?? null,
+    owner_id_snapshot: order.owner_id_snapshot ?? ownerId ?? null,
+  };
+}
+
 
 /**
  * Submit an order with offline support
@@ -27,21 +99,6 @@ export async function submitOrderWithOfflineSupport(
     connectivityStatus?: 'online' | 'offline' | 'unknown';
   } = {}
 ) {
-  // Pre-submit guard: refuse to queue when the DB is missing critical columns.
-  // Prevents orders from dead-lettering after 48h x 5 retries against a
-  // schema that can't accept order_items.rate or compute totals from
-  // product_variants.price.
-  if (isOrderPlacementBlocked()) {
-    // Re-probe in case the schema has been restored since the cache was set.
-    const fresh = await runSchemaHealthCheck({ force: true }).catch(() => null);
-    if (fresh && !fresh.ok) {
-      const missing = fresh.missing.join(', ');
-      throw new Error(
-        `Order placement blocked: database schema issue (missing ${missing}). Contact your admin.`
-      );
-    }
-  }
-
   // STEP 1: Generate order ID and prepare data FIRST
   const orderId = crypto.randomUUID();
   const orderDate = orderData.order_date || getLocalTodayDate();
@@ -52,7 +109,10 @@ export async function submitOrderWithOfflineSupport(
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(id);
   };
-  
+
+  // Inject beat/owner snapshots (set once at creation; never updated downstream)
+  orderData = await enrichWithBeatSnapshots(orderData);
+
   const normalizedOrder = {
     ...orderData,
     id: orderId,
@@ -61,6 +121,7 @@ export async function submitOrderWithOfflineSupport(
     status: orderData.status || 'confirmed',
     created_at: new Date().toISOString(),
   };
+
 
   // Sanitize payload for direct DB insert (queue sync path already sanitizes separately)
   const { scheme_details, pending_amount, ...orderWithoutExtraFields } = normalizedOrder as any;
@@ -163,12 +224,33 @@ export async function submitOrderWithOfflineSupport(
         // Atomic insert: order header + items in a single transaction.
         // Guarantees an order row can never exist without its items, which
         // prevents empty orders from falsely marking visits as productive.
-        const { error: rpcError } = await supabase.rpc('sync_order_with_items', {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc('sync_order_with_items', {
           p_order: { ...orderForDirectInsert, id: orderId },
           p_items: normalizedItems,
         });
         if (rpcError) throw rpcError;
+        // CRITICAL: RPC returns HTTP success even on validation_error.
+        // Treat anything other than 'ok'/'duplicate' as a hard failure so the order
+        // is queued for retry and logged for support — never silently "synced".
+        const status = (rpcResult as any)?.status;
+        if (status !== 'ok' && status !== 'duplicate') {
+          const errs = (rpcResult as any)?.errors || [(rpcResult as any)?.error || 'unknown_validation_error'];
+          try {
+            await supabase.from('failed_sync_log').upsert({
+              idempotency_key: (orderForDirectInsert as any).idempotency_key || orderId,
+              user_id: orderData.user_id,
+              payload: { order: { ...orderForDirectInsert, id: orderId }, items: normalizedItems } as any,
+              error: JSON.stringify(errs),
+              retry_count: 0,
+              last_failed_at: new Date().toISOString(),
+            } as any, { onConflict: 'idempotency_key' });
+          } catch (logErr) {
+            console.warn('[offlineOrderUtils] failed_sync_log write failed (non-fatal):', logErr);
+          }
+          throw new Error(`RPC ${status || 'error'}: ${JSON.stringify(errs)}`);
+        }
       })();
+      
       
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('10s timeout')), 10000)
@@ -176,6 +258,27 @@ export async function submitOrderWithOfflineSupport(
       
       await Promise.race([submitPromise, timeoutPromise]);
       console.log('✅ Order synced immediately to database:', orderId);
+
+      // Mark the local record synced, then remove it — mirrors the
+      // post-sync cleanup performed by the queue drain in useOfflineSync.
+      // Without this, OrderSyncStatus would keep reporting Pending for
+      // orders that were fully persisted via the immediate-sync path.
+      try {
+        const existing = await offlineStorage.getById<any>(STORES.ORDERS, orderId).catch(() => null);
+        if (existing) {
+          await offlineStorage.save(STORES.ORDERS, {
+            ...existing,
+            sync_status: 'synced',
+            sync_attempts: (existing.sync_attempts || 0) + 1,
+            last_attempt_at: new Date().toISOString(),
+            sync_error: null,
+          });
+        }
+        await offlineStorage.delete(STORES.ORDERS, orderId);
+      } catch (cleanupErr) {
+        console.warn('[offlineOrderUtils] Post-sync local cleanup failed (non-fatal):', cleanupErr);
+      }
+
       options.onOnline?.();
     } catch (syncError: any) {
       // On any error/timeout, queue for retry - never lose order data

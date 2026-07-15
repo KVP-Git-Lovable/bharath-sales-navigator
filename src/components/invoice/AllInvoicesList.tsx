@@ -3,17 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Loader2, Edit, MessageCircle, BookOpen, Archive, CalendarIcon } from "lucide-react";
+import { Download, Loader2, Edit, MessageCircle, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { fetchAndGenerateInvoice } from "@/utils/invoiceGenerator";
 import { autoSendInvoiceWhatsApp } from "@/utils/autoSendInvoice";
 import EditInvoiceDialog from "./EditInvoiceDialog";
-import JSZip from "jszip";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
+import InvoiceStatusBadge from "./InvoiceStatusBadge";
 
 interface Invoice {
   id: string;
@@ -31,10 +26,6 @@ export default function AllInvoicesList() {
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<{ orderId: string; invoiceNumber: string } | null>(null);
-  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
-  const [toDate, setToDate] = useState<Date | undefined>(undefined);
-  const [bulkDownloading, setBulkDownloading] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
 
   useEffect(() => {
     fetchInvoices();
@@ -166,80 +157,6 @@ export default function AllInvoicesList() {
     }
   };
 
-  // Filter invoices by selected date range (inclusive). Date-only comparison.
-  const filteredInvoices = invoices.filter((inv) => {
-    if (!fromDate && !toDate) return true;
-    const created = new Date(inv.created_at);
-    const createdDay = new Date(created.getFullYear(), created.getMonth(), created.getDate());
-    if (fromDate) {
-      const f = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
-      if (createdDay < f) return false;
-    }
-    if (toDate) {
-      const t = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
-      if (createdDay > t) return false;
-    }
-    return true;
-  });
-
-  const handleBulkDownloadZip = async () => {
-    if (filteredInvoices.length === 0) {
-      toast.error("No invoices in selected period");
-      return;
-    }
-    setBulkDownloading(true);
-    setBulkProgress({ done: 0, total: filteredInvoices.length });
-    try {
-      const zip = new JSZip();
-      const BATCH = 4;
-      let done = 0;
-      const usedNames = new Set<string>();
-      for (let i = 0; i < filteredInvoices.length; i += BATCH) {
-        const batch = filteredInvoices.slice(i, i + BATCH);
-        const results = await Promise.allSettled(
-          batch.map(async (inv) => {
-            const { blob } = await fetchAndGenerateInvoice(inv.id);
-            let name = `${inv.invoice_number || inv.id}.pdf`;
-            let n = 1;
-            while (usedNames.has(name)) {
-              name = `${inv.invoice_number || inv.id}_${n++}.pdf`;
-            }
-            usedNames.add(name);
-            return { name, blob };
-          }),
-        );
-        for (const r of results) {
-          if (r.status === "fulfilled") {
-            zip.file(r.value.name, r.value.blob);
-          } else {
-            console.error("Bulk invoice failure:", r.reason);
-          }
-        }
-        done += batch.length;
-        setBulkProgress({ done, total: filteredInvoices.length });
-      }
-
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const fromLabel = fromDate ? format(fromDate, "yyyy-MM-dd") : "all";
-      const toLabel = toDate ? format(toDate, "yyyy-MM-dd") : "all";
-      const url = URL.createObjectURL(zipBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `invoices_${fromLabel}_to_${toLabel}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success(`Downloaded ${filteredInvoices.length} invoices as ZIP`);
-    } catch (err: any) {
-      console.error("Bulk ZIP download failed:", err);
-      toast.error(err?.message || "Failed to build ZIP");
-    } finally {
-      setBulkDownloading(false);
-      setBulkProgress(null);
-    }
-  };
-
   if (loading) {
     return (
       <Card>
@@ -259,95 +176,9 @@ export default function AllInvoicesList() {
         </p>
       </CardHeader>
       <CardContent>
-        {/* Period filter + bulk download (additive) */}
-        <div className="flex flex-wrap items-end gap-3 mb-4 p-3 rounded-md border bg-muted/30">
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">From</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn("w-[170px] justify-start text-left font-normal", !fromDate && "text-muted-foreground")}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {fromDate ? format(fromDate, "dd MMM yyyy") : "Select date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={fromDate}
-                  onSelect={setFromDate}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">To</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={cn("w-[170px] justify-start text-left font-normal", !toDate && "text-muted-foreground")}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {toDate ? format(toDate, "dd MMM yyyy") : "Select date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={toDate}
-                  onSelect={setToDate}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          {(fromDate || toDate) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setFromDate(undefined);
-                setToDate(undefined);
-              }}
-            >
-              Clear
-            </Button>
-          )}
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">
-              {filteredInvoices.length} invoice{filteredInvoices.length === 1 ? "" : "s"} in period
-            </span>
-            <Button
-              size="sm"
-              onClick={handleBulkDownloadZip}
-              disabled={bulkDownloading || filteredInvoices.length === 0}
-            >
-              {bulkDownloading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {bulkProgress ? `Generating ${bulkProgress.done}/${bulkProgress.total}` : "Preparing..."}
-                </>
-              ) : (
-                <>
-                  <Archive className="mr-2 h-4 w-4" />
-                  Download Invoices
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {filteredInvoices.length === 0 ? (
+        {invoices.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            {invoices.length === 0 ? "No invoices found" : "No invoices in selected period"}
+            No invoices found
           </div>
         ) : (
           <div className="rounded-md border">
@@ -362,10 +193,13 @@ export default function AllInvoicesList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.map((invoice) => (
+                {invoices.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">
-                      {invoice.invoice_number || "N/A"}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{invoice.invoice_number || "N/A"}</span>
+                        <InvoiceStatusBadge invoiceNumber={invoice.invoice_number} variant="row" />
+                      </div>
                     </TableCell>
                     <TableCell>{invoice.retailer_name}</TableCell>
                     <TableCell>

@@ -1,13 +1,25 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { useConnectivity } from './useConnectivity';
 import { useAuth } from './useAuth';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { useManagedInterval } from '@/utils/intervalManager';
+import { fetchAllPaginated, chunkIds } from '@/utils/fetchAllPaginated';
+import type { AvailabilityRow, TerritoryLookupEntry } from '@/utils/productAvailability';
+import { prefetchAllProductUnits } from '@/lib/uomEngine';
+
+// Trimmed columns for picker / order-entry use case (avoids select('*')
+// pulling rarely-used heavy fields). Kept in sync with TableOrderForm needs.
+const PRODUCT_PICKER_COLUMNS =
+  'id, name, sku, product_number, rate, base_unit, base_unit_category, category_id, closing_stock, gst_percentage, hsn_code, tax_master_id, default_sales_uom_id, price_basis_uom_id, is_active';
 
 // Progress callback type for cache warming UI
 export type CacheProgressCallback = (stepId: string, status: 'loading' | 'done' | 'error') => void;
+
+// Bump to force every device to re-warm master data once (overwrites stale
+// UOM blob + header-only order rows from before the fetch fixes).
+const MASTER_CACHE_SCHEMA_VERSION = '2';
 
 /**
  * Hook to cache ONLY essential offline data (products, beats, retailers)
@@ -18,49 +30,102 @@ export function useMasterDataCache() {
   const isOnline = connectivityStatus === 'online';
   const { user } = useAuth();
 
-  // Cache ONLY active products and related data needed for order entry
-  const cacheProducts = useCallback(async (onProgress?: CacheProgressCallback) => {
+  // Phase 7-1: reactive maps for the availability resolver. Loaded from the
+  // offline cache (filled by cacheProductAvailability) so consumers can call
+  // isProductAvailable / buildRetailerContext without an extra round-trip.
+  const [availabilityByProductId, setAvailabilityByProductId] = useState<Map<string, AvailabilityRow[]>>(new Map());
+  const [territoriesById, setTerritoriesById] = useState<Map<string, TerritoryLookupEntry>>(new Map());
+
+  const reloadAvailabilityMaps = useCallback(async () => {
     try {
-      onProgress?.('products', 'loading');
-      console.log('[Cache] Syncing active products for offline order entry...');
-      
-      // Fetch data FIRST, only clear cache if fetch succeeds
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*')
-        .or('is_active.eq.true,is_active.is.null');
+      const [rows, terrs] = await Promise.all([
+        offlineStorage.getAll(STORES.PRODUCT_AVAILABILITY) as Promise<AvailabilityRow[]>,
+        offlineStorage.getAll(STORES.TERRITORIES_LOOKUP) as Promise<Array<{ id: string; region: string | null; zone: string | null }>>,
+      ]);
 
-      if (productsError) throw productsError;
-
-      // Cache only active variants
-      const { data: variants } = await supabase
-        .from('product_variants')
-        .select('*')
-        .or('is_active.eq.true,is_active.is.null');
-
-      // Only clear and update cache if all fetches succeeded
-      if (products) {
-        await offlineStorage.clear(STORES.PRODUCTS);
-        for (const product of products) {
-          await offlineStorage.save(STORES.PRODUCTS, product);
-        }
-        console.log(`[Cache] ✅ ${products.length} active products cached`);
+      const byProduct = new Map<string, AvailabilityRow[]>();
+      for (const r of rows ?? []) {
+        const list = byProduct.get(r.product_id) ?? [];
+        list.push(r);
+        byProduct.set(r.product_id, list);
       }
+      setAvailabilityByProductId(byProduct);
 
-      if (variants) {
-        await offlineStorage.clear(STORES.VARIANTS);
-        for (const variant of variants) {
-          await offlineStorage.save(STORES.VARIANTS, variant);
-        }
-        console.log(`[Cache] ✅ ${variants.length} variants cached`);
+      const terrMap = new Map<string, TerritoryLookupEntry>();
+      for (const t of terrs ?? []) {
+        terrMap.set(t.id, { region: t.region, zone: t.zone });
       }
-
-      onProgress?.('products', 'done');
-    } catch (error) {
-      console.error('[Cache] Error caching products, keeping existing cache:', error);
-      onProgress?.('products', 'error');
+      setTerritoriesById(terrMap);
+    } catch (err) {
+      console.warn('[Cache] Failed to load availability maps from offline cache:', err);
     }
   }, []);
+
+  useEffect(() => {
+    reloadAvailabilityMaps();
+    const onRefresh = () => reloadAvailabilityMaps();
+    window.addEventListener('masterDataRefreshed', onRefresh);
+    return () => window.removeEventListener('masterDataRefreshed', onRefresh);
+  }, [reloadAvailabilityMaps]);
+
+
+  // Cache ONLY active products and related data needed for order entry
+  const cacheProducts = useCallback(async (onProgress?: CacheProgressCallback) => {
+    onProgress?.('products', 'loading');
+    console.log('[Cache] Syncing active products for offline order entry...');
+
+    const MAX_ATTEMPTS = 3;
+    const BACKOFF_MS = [1000, 2000, 4000];
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        // PAGINATED: PostgREST caps individual requests at 1,000 rows — loop until short page.
+        // Smaller pageSize (500) keeps each request lighter on slow mobile networks.
+        const products = await fetchAllPaginated<any>((from, to) =>
+          supabase
+            .from('products')
+            .select(`${PRODUCT_PICKER_COLUMNS}, category:product_categories(name)`)
+            .or('is_active.eq.true,is_active.is.null')
+            .order('name')
+            .range(from, to),
+          500
+        );
+
+        const variants = await fetchAllPaginated<any>((from, to) =>
+          supabase
+            .from('product_variants')
+            .select('*')
+            .or('is_active.eq.true,is_active.is.null')
+            .range(from, to),
+          500
+        );
+
+        // Only clear and update cache if all fetches succeeded.
+        if (products) {
+          await offlineStorage.replaceAll(STORES.PRODUCTS, products);
+          console.log(`[Cache] ✅ ${products.length} active products cached`);
+        }
+        if (variants) {
+          await offlineStorage.replaceAll(STORES.VARIANTS, variants);
+          console.log(`[Cache] ✅ ${variants.length} variants cached`);
+        }
+
+        onProgress?.('products', 'done');
+        return;
+      } catch (error) {
+        lastError = error;
+        console.warn(`[Cache] Products fetch attempt ${attempt}/${MAX_ATTEMPTS} failed:`, error);
+        if (attempt < MAX_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, BACKOFF_MS[attempt - 1] ?? 2000));
+        }
+      }
+    }
+
+    console.error('[Cache] Error caching products after retries, keeping existing cache:', lastError);
+    onProgress?.('products', 'error');
+  }, []);
+
 
   // Cache schemes separately for progress tracking
   const cacheSchemes = useCallback(async (onProgress?: CacheProgressCallback) => {
@@ -80,18 +145,12 @@ export function useMasterDataCache() {
         .select('*');
 
       if (schemes) {
-        await offlineStorage.clear(STORES.SCHEMES);
-        for (const scheme of schemes) {
-          await offlineStorage.save(STORES.SCHEMES, scheme);
-        }
+        await offlineStorage.replaceAll(STORES.SCHEMES, schemes);
         console.log(`[Cache] ✅ ${schemes.length} schemes cached`);
       }
 
       if (categories) {
-        await offlineStorage.clear(STORES.CATEGORIES);
-        for (const category of categories) {
-          await offlineStorage.save(STORES.CATEGORIES, category);
-        }
+        await offlineStorage.replaceAll(STORES.CATEGORIES, categories);
         console.log(`[Cache] ✅ ${categories.length} categories cached`);
       }
 
@@ -103,6 +162,122 @@ export function useMasterDataCache() {
     }
   }, []);
 
+  // Cache UOM master (enabled units) + product↔UOM mappings so the unit
+  // selector works offline. Mirrors the schemes-caching block above.
+  const cacheUomData = useCallback(async (onProgress?: CacheProgressCallback) => {
+    try {
+      onProgress?.('uom', 'loading');
+      console.log('[Cache] Syncing UOM master + product UOM mappings...');
+
+      // 1) Small, reliable: enabled uom_master — cache it IMMEDIATELY.
+      const { data: uomRows } = await supabase
+        .from('uom_master')
+        .select('id, code, name, category, is_base, is_system, enabled_units!inner(enabled)')
+        .eq('enabled_units.enabled', true)
+        .order('name');
+
+      const enabledUnits = (uomRows || []).map((r: any) => ({
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        category: r.category,
+        is_base: r.is_base,
+        is_system: r.is_system,
+      }));
+
+      if (enabledUnits.length > 0) {
+        await offlineStorage.replaceAll(STORES.UOM_MASTER, enabledUnits);
+        console.log(`[Cache] ✅ ${enabledUnits.length} enabled UOM units cached`);
+      }
+
+      // 2) Big & fragile: product_uom_mapping — ISOLATED so a failure here
+      //    can't wipe out the UOM_MASTER cache (base-unit fallback depends on it).
+      try {
+        const activeProducts = await offlineStorage.getAll<any>(STORES.PRODUCTS);
+        const activeIds = (activeProducts || []).map((p: any) => p.id).filter(Boolean);
+        const mappings: any[] = [];
+        for (const chunk of chunkIds(activeIds)) {
+          const part = await fetchAllPaginated<any>((from, to) =>
+            supabase.from('product_uom_mapping')
+              .select('id, product_id, uom_id, conversion_to_base, is_default_sales, is_price_basis, is_default_purchase, is_active')
+              .in('product_id', chunk)
+              .order('id', { ascending: true })   // deterministic pagination — no dropped rows
+              .range(from, to));
+          if (part) mappings.push(...part);
+        }
+        await offlineStorage.replaceAll(STORES.PRODUCT_UOM_MAPPING, mappings);
+        console.log(`[Cache] ✅ ${mappings.length} product UOM mappings cached`);
+      } catch (mapErr) {
+        console.warn('[Cache] product_uom_mapping fetch failed; UOM_MASTER + base-unit fallback still available', mapErr);
+      }
+
+      // 3) Bulk-prefetch complete per-product unit blobs via one RPC.
+      //    Immune to pagination — populates in-memory + IndexedDB caches.
+      try {
+        await prefetchAllProductUnits();
+        console.log('[Cache] ✅ all product units prefetched');
+      } catch (e) {
+        console.warn('[Cache] prefetch units failed', e);
+      }
+
+      onProgress?.('uom', 'done');
+    } catch (error) {
+      console.error('[Cache] Error caching UOM data, keeping existing cache:', error);
+      onProgress?.('uom', 'error');
+    }
+  }, []);
+
+
+  // Cache profiles + distributors + distributor↔beat mappings so the
+  // AddRetailer form (Owner dropdown, Distributor selector) works offline.
+  const cacheOrgData = useCallback(async (onProgress?: CacheProgressCallback) => {
+    try {
+      onProgress?.('org', 'loading');
+      console.log('[Cache] Syncing profiles + distributors + beat mappings...');
+
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .order('full_name');
+      if (profs) {
+        await offlineStorage.replaceAll(STORES.PROFILES, profs.filter((p: any) => p.full_name));
+        console.log(`[Cache] ✅ ${profs.length} profiles cached`);
+      }
+
+      const { data: dists } = await supabase
+        .from('distributors')
+        .select('id, name, status')
+        .eq('status', 'active')
+        .order('name');
+      if (dists) {
+        await offlineStorage.replaceAll(STORES.DISTRIBUTORS, dists);
+        console.log(`[Cache] ✅ ${dists.length} distributors cached`);
+      }
+
+      const maps = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('distributor_beat_mappings')
+          .select('beat_id, distributor_id, distributors(id, name)')
+          .range(from, to)
+      );
+      if (maps) {
+        // Ensure each row has an id for offlineStorage keying
+        const withIds = maps.map((m: any, idx: number) => ({
+          id: `${m.beat_id}__${m.distributor_id}__${idx}`,
+          ...m,
+        }));
+        await offlineStorage.replaceAll(STORES.DISTRIBUTOR_BEAT_MAPPINGS, withIds);
+        console.log(`[Cache] ✅ ${withIds.length} distributor-beat mappings cached`);
+      }
+
+      onProgress?.('org', 'done');
+    } catch (error) {
+      console.error('[Cache] Error caching org data, keeping existing cache:', error);
+      onProgress?.('org', 'error');
+    }
+  }, []);
+
+
   // Cache ONLY active beats for current user
   const cacheBeats = useCallback(async (onProgress?: CacheProgressCallback) => {
     if (!user) return;
@@ -110,26 +285,97 @@ export function useMasterDataCache() {
     try {
       onProgress?.('beats', 'loading');
       console.log('[Cache] Syncing active beats...');
+
+      // Re-check session — auth may have dropped between hook init and this call
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id || session.user.id !== user.id) {
+        console.warn('[Cache] Skipping beats sync — session not ready / user changed');
+        onProgress?.('beats', 'error');
+        return;
+      }
       
-      const { data: beats, error } = await supabase
-        .from('beats')
-        .select('*')
-        .eq('is_active', true)
-        .or(`user_id.eq.${user.id},owner_id.eq.${user.id},created_by.eq.${user.id}`);
+      const nowIso = new Date().toISOString();
+      const [ownedRes, accessRes] = await Promise.all([
+        supabase
+          .from('beats')
+          .select('*')
+          .eq('is_active', true)
+          .eq('user_id', user.id),
+        supabase
+          .from('beat_user_access')
+          .select('access_type, beat_id, effective_from, effective_to, is_active, beats:beats!beat_user_access_beat_id_fkey(*)')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .or(`effective_to.is.null,effective_to.gt.${nowIso}`),
+      ]);
 
-      if (error) throw error;
+      if (ownedRes.error) throw ownedRes.error;
 
-      // Only clear and update cache if fetch succeeded
-      if (beats) {
-        await offlineStorage.clear(STORES.BEATS);
-        for (const beat of beats) {
-          await offlineStorage.save(STORES.BEATS, beat);
+      // Fallback if FK relation name differs: the shared-access embed
+      // (beats:beats!beat_user_access_beat_id_fkey) errors because that FK
+      // does not exist, so re-query without the alias and stitch client-side.
+      let accessRows: any[] = (accessRes?.data ?? []) as any[];
+      if (accessRes?.error || accessRes?.data == null) {
+        try {
+          const alt = await supabase
+            .from('beat_user_access')
+            .select('access_type, beat_id, effective_from, effective_to, is_active')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .or(`effective_to.is.null,effective_to.gt.${nowIso}`);
+          if (alt.error) throw alt.error;
+          const textIds = (alt.data ?? []).map((r: any) => r.beat_id);
+          if (textIds.length) {
+            const { data: beatRows, error: beatErr } = await supabase
+              .from('beats')
+              .select('*')
+              .in('beat_id', textIds);
+            if (beatErr) throw beatErr;
+            const beatMap = new Map<string, any>();
+            for (const b of (beatRows ?? [])) beatMap.set(b.beat_id, b);
+            accessRows = (alt.data ?? []).map((r: any) => ({
+              ...r,
+              beats: beatMap.get(r.beat_id),
+            }));
+          } else {
+            accessRows = [];
+          }
+        } catch (fallbackErr) {
+          console.error('[Cache] Shared-beat access fallback failed:', fallbackErr);
+          accessRows = [];
         }
-        console.log(`[Cache] ✅ ${beats.length} active beats cached`);
+      }
+
+      const WRITE_ACCESS = new Set(['OWNED', 'CO_OWNER', 'OPERATIONAL', 'COVERAGE']);
+      const byId = new Map<string, any>();
+      for (const b of (ownedRes.data ?? [])) {
+        byId.set(b.beat_id, { ...b, access_type: 'OWNED' });
+      }
+      for (const row of accessRows) {
+        const at = String(row.access_type || '').toUpperCase();
+        if (!WRITE_ACCESS.has(at)) continue;
+        const beat = row.beats;
+        if (!beat?.beat_id || beat.is_active === false) continue;
+        if (byId.has(beat.beat_id)) continue;
+        byId.set(beat.beat_id, { ...beat, access_type: at });
+      }
+      const beats = Array.from(byId.values());
+
+      // Only clear and update cache if fetch succeeded (single batched write)
+      if (beats) {
+        await offlineStorage.replaceAll(STORES.BEATS, beats);
+        console.log(`[Cache] ✅ ${beats.length} active beats cached (owned + shared)`);
       }
       onProgress?.('beats', 'done');
-    } catch (error) {
-      console.error('[Cache] Error caching beats, keeping existing cache:', error);
+    } catch (error: any) {
+      // SECURITY: On permission errors (42501) the cached data may belong to another
+      // user — clear it instead of preserving to avoid cross-user data leakage.
+      if (error?.code === '42501') {
+        console.warn('[Cache] Permission denied on beats — clearing stale cache');
+        await offlineStorage.clear(STORES.BEATS).catch(() => undefined);
+      } else {
+        console.error('[Cache] Error caching beats, keeping existing cache:', error);
+      }
       onProgress?.('beats', 'error');
     }
   }, [user]);
@@ -148,9 +394,7 @@ export function useMasterDataCache() {
       if (competitorsError) throw competitorsError;
 
       if (competitors) {
-        for (const competitor of competitors) {
-          await offlineStorage.save(STORES.COMPETITION_MASTER, competitor);
-        }
+        await offlineStorage.replaceAll(STORES.COMPETITION_MASTER, competitors);
         console.log(`Cached ${competitors.length} competitors`);
       }
 
@@ -163,15 +407,50 @@ export function useMasterDataCache() {
       if (skusError) throw skusError;
 
       if (skus) {
-        for (const sku of skus) {
-          await offlineStorage.save(STORES.COMPETITION_SKUS, sku);
-        }
+        await offlineStorage.replaceAll(STORES.COMPETITION_SKUS, skus);
         console.log(`Cached ${skus.length} competition SKUs`);
       }
       onProgress?.('competition', 'done');
     } catch (error) {
       console.error('Error caching competition data:', error);
       onProgress?.('competition', 'error');
+    }
+  }, []);
+
+  // Phase 7-1: cache product availability rules + a small territories lookup
+  // (id -> {region, zone}) so the resolver can build a retailer context offline.
+  const cacheProductAvailability = useCallback(async (onProgress?: CacheProgressCallback) => {
+    try {
+      onProgress?.('productAvailability', 'loading');
+      console.log('[Cache] Syncing product availability + territories lookup...');
+
+      // PAGINATED — never a 1k-cap raw query.
+      const availability = await fetchAllPaginated<AvailabilityRow>((from, to) =>
+        supabase
+          .from('product_availability')
+          .select('product_id, scope_type, scope_value, mode')
+          .range(from, to)
+      );
+
+      const territories = await fetchAllPaginated<{ id: string; region: string | null; zone: string | null }>((from, to) =>
+        supabase
+          .from('territories')
+          .select('id, region, zone')
+          .range(from, to)
+      );
+
+      if (availability) {
+        await offlineStorage.replaceAll(STORES.PRODUCT_AVAILABILITY, availability);
+        console.log(`[Cache] ✅ ${availability.length} product availability rows cached`);
+      }
+      if (territories) {
+        await offlineStorage.replaceAll(STORES.TERRITORIES_LOOKUP, territories);
+        console.log(`[Cache] ✅ ${territories.length} territories cached`);
+      }
+      onProgress?.('productAvailability', 'done');
+    } catch (error) {
+      console.error('[Cache] Error caching product availability, keeping existing cache:', error);
+      onProgress?.('productAvailability', 'error');
     }
   }, []);
 
@@ -182,6 +461,13 @@ export function useMasterDataCache() {
     try {
       onProgress?.('retailers', 'loading');
       console.log('[Cache] Syncing retailers...');
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id || session.user.id !== user.id) {
+        console.warn('[Cache] Skipping retailers sync — session not ready / user changed');
+        onProgress?.('retailers', 'error');
+        return;
+      }
       
       const { data: retailers, error } = await supabase
         .from('retailers')
@@ -196,8 +482,13 @@ export function useMasterDataCache() {
         console.log(`[Cache] ✅ ${retailers.length} retailers cached`);
       }
       onProgress?.('retailers', 'done');
-    } catch (error) {
-      console.error('[Cache] Error caching retailers, keeping existing cache:', error);
+    } catch (error: any) {
+      if (error?.code === '42501') {
+        console.warn('[Cache] Permission denied on retailers — clearing stale cache');
+        await offlineStorage.clear(STORES.RETAILERS).catch(() => undefined);
+      } else {
+        console.error('[Cache] Error caching retailers, keeping existing cache:', error);
+      }
       onProgress?.('retailers', 'error');
     }
   }, [user]);
@@ -209,6 +500,13 @@ export function useMasterDataCache() {
     try {
       onProgress?.('beatPlans', 'loading');
       console.log('[Cache] Syncing upcoming beat plans...');
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id || session.user.id !== user.id) {
+        console.warn('[Cache] Skipping beat plans sync — session not ready / user changed');
+        onProgress?.('beatPlans', 'error');
+        return 0;
+      }
       
       // Get only today and next 3 days
       const today = new Date();
@@ -224,18 +522,20 @@ export function useMasterDataCache() {
 
       if (error) throw error;
 
-      // Only clear and update cache if fetch succeeded
+      // Only clear and update cache if fetch succeeded (single batched write)
       if (beatPlans) {
-        await offlineStorage.clear(STORES.BEAT_PLANS);
-        for (const plan of beatPlans) {
-          await offlineStorage.save(STORES.BEAT_PLANS, plan);
-        }
+        await offlineStorage.replaceAll(STORES.BEAT_PLANS, beatPlans);
         console.log(`[Cache] ✅ ${beatPlans.length} beat plans cached (today + 3 days)`);
       }
       onProgress?.('beatPlans', 'done');
       return beatPlans?.length || 0;
-    } catch (error) {
-      console.error('[Cache] Error caching beat plans, keeping existing cache:', error);
+    } catch (error: any) {
+      if (error?.code === '42501') {
+        console.warn('[Cache] Permission denied on beat_plans — clearing stale cache');
+        await offlineStorage.clear(STORES.BEAT_PLANS).catch(() => undefined);
+      } else {
+        console.error('[Cache] Error caching beat plans, keeping existing cache:', error);
+      }
       onProgress?.('beatPlans', 'error');
       return 0;
     }
@@ -261,16 +561,18 @@ export function useMasterDataCache() {
       if (error) throw error;
 
       if (visits) {
-        await offlineStorage.clear(STORES.VISITS);
-        for (const visit of visits) {
-          await offlineStorage.save(STORES.VISITS, visit);
-        }
+        await offlineStorage.replaceAll(STORES.VISITS, visits);
         console.log(`[Cache] ✅ ${visits.length} visits cached`);
       }
       onProgress?.('visits', 'done');
       return visits?.length || 0;
-    } catch (error) {
-      console.error('[Cache] Error caching visits:', error);
+    } catch (error: any) {
+      if (error?.code === '42501') {
+        console.warn('[Cache] Permission denied on visits — clearing stale cache');
+        await offlineStorage.clear(STORES.VISITS).catch(() => undefined);
+      } else {
+        console.error('[Cache] Error caching visits:', error);
+      }
       onProgress?.('visits', 'error');
       return 0;
     }
@@ -289,7 +591,7 @@ export function useMasterDataCache() {
       
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('*, order_items(*)')
+        .select('*, order_items!order_items_order_id_fkey(*)')
         .eq('user_id', user.id)
         .gte('created_at', `${today}T00:00:00`)
         .lte('created_at', `${today}T23:59:59`);
@@ -297,16 +599,18 @@ export function useMasterDataCache() {
       if (error) throw error;
 
       if (orders) {
-        await offlineStorage.clear(STORES.ORDERS);
-        for (const order of orders) {
-          await offlineStorage.save(STORES.ORDERS, order);
-        }
+        await offlineStorage.replaceAll(STORES.ORDERS, orders);
         console.log(`[Cache] ✅ ${orders.length} orders cached`);
       }
       onProgress?.('orders', 'done');
       return orders?.length || 0;
-    } catch (error) {
-      console.error('[Cache] Error caching orders:', error);
+    } catch (error: any) {
+      if (error?.code === '42501') {
+        console.warn('[Cache] Permission denied on orders — clearing stale cache');
+        await offlineStorage.clear(STORES.ORDERS).catch(() => undefined);
+      } else {
+        console.error('[Cache] Error caching orders:', error);
+      }
       onProgress?.('orders', 'error');
       return 0;
     }
@@ -324,10 +628,13 @@ export function useMasterDataCache() {
       // Run sequentially so progress updates are visible
       await cacheProducts(onProgress);
       await cacheSchemes(onProgress);
+      await cacheUomData(onProgress);
+      await cacheOrgData(onProgress);
       await cacheBeats(onProgress);
       await cacheRetailers(onProgress);
       await cacheBeatPlans(onProgress);
       await cacheCompetitionData(onProgress);
+      await cacheProductAvailability(onProgress);
       await cacheVisits(onProgress);
       await cacheOrders(onProgress);
       
@@ -343,7 +650,8 @@ export function useMasterDataCache() {
       console.error('[Cache] Cache warming failed:', error);
       return false;
     }
-  }, [user, cacheProducts, cacheSchemes, cacheBeats, cacheRetailers, cacheBeatPlans, cacheCompetitionData, cacheVisits, cacheOrders]);
+  }, [user, cacheProducts, cacheSchemes, cacheUomData, cacheOrgData, cacheBeats, cacheRetailers, cacheBeatPlans, cacheCompetitionData, cacheProductAvailability, cacheVisits, cacheOrders]);
+
 
   // Full sync with item counts - returns summary for UI
   type SyncSummaryLocal = {
@@ -383,15 +691,18 @@ export function useMasterDataCache() {
     try {
       // Products
       onProgress('products', 'loading');
-      const { data: products } = await supabase.from('products').select('*').or('is_active.eq.true,is_active.is.null');
-      const { data: variants } = await supabase.from('product_variants').select('*').or('is_active.eq.true,is_active.is.null');
+      // PAGINATED to load EVERY active product/variant (no 1k cap)
+      const products = await fetchAllPaginated<any>((from, to) =>
+        supabase.from('products').select(`${PRODUCT_PICKER_COLUMNS}, category:product_categories(name)`).or('is_active.eq.true,is_active.is.null').order('name').range(from, to)
+      );
+      const variants = await fetchAllPaginated<any>((from, to) =>
+        supabase.from('product_variants').select('*').or('is_active.eq.true,is_active.is.null').range(from, to)
+      );
       if (products) {
-        await offlineStorage.clear(STORES.PRODUCTS);
-        for (const p of products) await offlineStorage.save(STORES.PRODUCTS, p);
+        await offlineStorage.replaceAll(STORES.PRODUCTS, products);
       }
       if (variants) {
-        await offlineStorage.clear(STORES.VARIANTS);
-        for (const v of variants) await offlineStorage.save(STORES.VARIANTS, v);
+        await offlineStorage.replaceAll(STORES.VARIANTS, variants);
       }
       summary.products = (products?.length || 0) + (variants?.length || 0);
       onItemCount?.('products', summary.products);
@@ -402,35 +713,61 @@ export function useMasterDataCache() {
       const { data: schemes } = await supabase.from('product_schemes').select('*').or('is_active.eq.true,is_active.is.null');
       const { data: categories } = await supabase.from('product_categories').select('*');
       if (schemes) {
-        await offlineStorage.clear(STORES.SCHEMES);
-        for (const s of schemes) await offlineStorage.save(STORES.SCHEMES, s);
+        await offlineStorage.replaceAll(STORES.SCHEMES, schemes);
       }
       if (categories) {
-        await offlineStorage.clear(STORES.CATEGORIES);
-        for (const c of categories) await offlineStorage.save(STORES.CATEGORIES, c);
+        await offlineStorage.replaceAll(STORES.CATEGORIES, categories);
       }
       summary.schemes = (schemes?.length || 0) + (categories?.length || 0);
       onItemCount?.('schemes', summary.schemes);
       onProgress('schemes', 'done');
 
-      // Beats
-      onProgress('beats', 'loading');
-      const { data: beats } = await supabase
-        .from('beats')
-        .select('*')
-        .eq('is_active', true)
-        .or(`user_id.eq.${user.id},owner_id.eq.${user.id},created_by.eq.${user.id}`);
-      if (beats) {
-        await offlineStorage.clear(STORES.BEATS);
-        for (const b of beats) await offlineStorage.save(STORES.BEATS, b);
+      // UOM master + product UOM mappings (unit selector needs these offline)
+      onProgress('uom', 'loading');
+      try {
+        await cacheUomData();
+      } catch (e) {
+        console.error('[Cache] UOM sync error:', e);
       }
-      summary.beats = beats?.length || 0;
+      onProgress('uom', 'done');
+
+
+      // Beats (owned + shared with access_type — mirrors AddRetailer online query)
+      onProgress('beats', 'loading');
+      const beatsNowIso = new Date().toISOString();
+      const [ownedBeatsRes, sharedBeatsRes] = await Promise.all([
+        supabase.from('beats').select('*').eq('is_active', true).eq('user_id', user.id),
+        supabase
+          .from('beat_user_access')
+          .select('access_type, beat_id, effective_from, effective_to, is_active, beats:beats!beat_user_access_beat_id_fkey(*)')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .or(`effective_to.is.null,effective_to.gt.${beatsNowIso}`),
+      ]);
+      const WRITE_ACCESS_FULL = new Set(['OWNED', 'CO_OWNER', 'OPERATIONAL', 'COVERAGE']);
+      const beatsById = new Map<string, any>();
+      for (const b of (ownedBeatsRes.data ?? [])) {
+        beatsById.set(b.beat_id, { ...b, access_type: 'OWNED' });
+      }
+      for (const row of ((sharedBeatsRes.data ?? []) as any[])) {
+        const at = String(row.access_type || '').toUpperCase();
+        if (!WRITE_ACCESS_FULL.has(at)) continue;
+        const beat = row.beats;
+        if (!beat?.beat_id || beat.is_active === false) continue;
+        if (beatsById.has(beat.beat_id)) continue;
+        beatsById.set(beat.beat_id, { ...beat, access_type: at });
+      }
+      const beats = Array.from(beatsById.values());
+      await offlineStorage.replaceAll(STORES.BEATS, beats);
+      summary.beats = beats.length;
       onItemCount?.('beats', summary.beats);
       onProgress('beats', 'done');
 
+
       // Retailers
       onProgress('retailers', 'loading');
-      const { data: retailers } = await supabase.from('retailers').select('*').eq('user_id', user.id);
+      // FIX: No user_id filter - includes shared beat retailers via RLS
+      const { data: retailers } = await supabase.from('retailers').select('*');
       if (retailers) {
         await offlineStorage.replaceAll(STORES.RETAILERS, retailers);
       }
@@ -453,8 +790,7 @@ export function useMasterDataCache() {
         .gte('plan_date', todayStr)
         .lte('plan_date', threeDaysStr);
       if (beatPlans) {
-        await offlineStorage.clear(STORES.BEAT_PLANS);
-        for (const bp of beatPlans) await offlineStorage.save(STORES.BEAT_PLANS, bp);
+        await offlineStorage.replaceAll(STORES.BEAT_PLANS, beatPlans);
       }
       summary.beatPlans = beatPlans?.length || 0;
       onItemCount?.('beatPlans', summary.beatPlans);
@@ -465,10 +801,10 @@ export function useMasterDataCache() {
       const { data: competitors } = await supabase.from('competition_master').select('*');
       const { data: skus } = await supabase.from('competition_skus').select('*').eq('is_active', true);
       if (competitors) {
-        for (const c of competitors) await offlineStorage.save(STORES.COMPETITION_MASTER, c);
+        await offlineStorage.replaceAll(STORES.COMPETITION_MASTER, competitors);
       }
       if (skus) {
-        for (const s of skus) await offlineStorage.save(STORES.COMPETITION_SKUS, s);
+        await offlineStorage.replaceAll(STORES.COMPETITION_SKUS, skus);
       }
       summary.competition = (competitors?.length || 0) + (skus?.length || 0);
       onItemCount?.('competition', summary.competition);
@@ -478,8 +814,7 @@ export function useMasterDataCache() {
       onProgress('visits', 'loading');
       const { data: visits } = await supabase.from('visits').select('*').eq('user_id', user.id).eq('planned_date', todayStr);
       if (visits) {
-        await offlineStorage.clear(STORES.VISITS);
-        for (const v of visits) await offlineStorage.save(STORES.VISITS, v);
+        await offlineStorage.replaceAll(STORES.VISITS, visits);
       }
       summary.visits = visits?.length || 0;
       onItemCount?.('visits', summary.visits);
@@ -489,17 +824,23 @@ export function useMasterDataCache() {
       onProgress('orders', 'loading');
       const { data: orders } = await supabase
         .from('orders')
-        .select('*, order_items(*)')
+        .select('*, order_items!order_items_order_id_fkey(*)')
         .eq('user_id', user.id)
         .gte('created_at', `${todayStr}T00:00:00`)
         .lte('created_at', `${todayStr}T23:59:59`);
       if (orders) {
-        await offlineStorage.clear(STORES.ORDERS);
-        for (const o of orders) await offlineStorage.save(STORES.ORDERS, o);
+        await offlineStorage.replaceAll(STORES.ORDERS, orders);
       }
       summary.orders = orders?.length || 0;
       onItemCount?.('orders', summary.orders);
       onProgress('orders', 'done');
+
+      // Phase 7-1: product availability + territories lookup (best-effort).
+      try {
+        await cacheProductAvailability(onProgress);
+      } catch (e) {
+        console.warn('[Cache] availability sync (full) failed:', e);
+      }
 
       // Calculate total
       summary.total = summary.products + summary.schemes + summary.beats + summary.retailers + 
@@ -517,7 +858,7 @@ export function useMasterDataCache() {
       console.error('[Cache] Full sync failed:', error);
       return summary;
     }
-  }, [user]);
+  }, [user, cacheProductAvailability]);
 
   // Cache essential master data with priority loading
   // Critical data loads first (beat plans, retailers) for My Visit to work
@@ -539,11 +880,14 @@ export function useMasterDataCache() {
         cacheBeats()
       ]);
       
-      // Phase 2: IMPORTANT - Load products and schemes (needed for order entry)
-      console.log('[Cache] Phase 2: Loading important data (products + schemes)...');
+      // Phase 2: IMPORTANT - Load products, schemes, availability rules (order entry)
+      console.log('[Cache] Phase 2: Loading important data (products + schemes + availability)...');
       await Promise.all([
         cacheProducts(),
-        cacheSchemes()
+        cacheSchemes(),
+        cacheUomData(),
+        cacheOrgData(),
+        cacheProductAvailability()
       ]);
       
       // Phase 3: DEFERRED - Load competition data in background (not urgent)
@@ -557,7 +901,8 @@ export function useMasterDataCache() {
     } catch (error) {
       console.error('[Cache] Error syncing offline data:', error);
     }
-  }, [isOnline, user, cacheProducts, cacheSchemes, cacheBeats, cacheRetailers, cacheBeatPlans, cacheCompetitionData]);
+  }, [isOnline, user, cacheProducts, cacheSchemes, cacheUomData, cacheOrgData, cacheBeats, cacheRetailers, cacheBeatPlans, cacheCompetitionData, cacheProductAvailability]);
+
 
   // Force refresh master data AND notify UI to reload from storage
   const forceRefreshMasterData = useCallback(async () => {
@@ -571,10 +916,13 @@ export function useMasterDataCache() {
       await Promise.all([
         cacheProducts(),
         cacheSchemes(),
+        cacheUomData(),
+        cacheOrgData(),
         cacheBeats(),
         cacheRetailers(),
         cacheBeatPlans(),
-        cacheCompetitionData()
+        cacheCompetitionData(),
+        cacheProductAvailability()
       ]);
       
       localStorage.setItem('master_data_cached_at', Date.now().toString());
@@ -588,7 +936,8 @@ export function useMasterDataCache() {
       console.error('[Cache] Force refresh failed:', error);
       return false;
     }
-  }, [user, cacheProducts, cacheSchemes, cacheBeats, cacheRetailers, cacheBeatPlans, cacheCompetitionData]);
+  }, [user, cacheProducts, cacheSchemes, cacheUomData, cacheOrgData, cacheBeats, cacheRetailers, cacheBeatPlans, cacheCompetitionData, cacheProductAvailability]);
+
 
   // Load cached data (used when offline)
   const loadCachedData = useCallback(async (storeName: string) => {
@@ -609,8 +958,15 @@ export function useMasterDataCache() {
     const lastCached = localStorage.getItem('master_data_cached_at');
     const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
     
+    const cachedSchemaVersion = localStorage.getItem('master_cache_schema_version');
+    const schemaChanged = cachedSchemaVersion !== MASTER_CACHE_SCHEMA_VERSION;
+
     if (isOnline) {
-      if (!lastCached || parseInt(lastCached) < fourHoursAgo) {
+      if (schemaChanged) {
+        console.log('[Cache] Schema version changed, forcing one-time re-warm...');
+        forceRefreshMasterData();
+        localStorage.setItem('master_cache_schema_version', MASTER_CACHE_SCHEMA_VERSION);
+      } else if (!lastCached || parseInt(lastCached) < fourHoursAgo) {
         console.log('[Cache] Cache expired or missing, syncing offline data...');
         // Use forceRefreshMasterData to also notify UI
         forceRefreshMasterData();
@@ -637,10 +993,12 @@ export function useMasterDataCache() {
   return {
     cacheProducts,
     cacheSchemes,
+    cacheUomData,
     cacheBeats,
     cacheRetailers,
     cacheBeatPlans,
     cacheCompetitionData,
+    cacheProductAvailability,
     cacheVisits,
     cacheOrders,
     cacheAllMasterData,
@@ -648,6 +1006,10 @@ export function useMasterDataCache() {
     warmCacheWithProgress,
     fullOfflineSync,
     loadCachedData,
+    // Phase 7-1 — exposed for the resolver (consumed in Phase 7-3).
+    availabilityByProductId,
+    territoriesById,
+    reloadAvailabilityMaps,
     isOnline
   };
 }

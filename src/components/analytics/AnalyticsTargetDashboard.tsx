@@ -100,15 +100,13 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
 
   // Recursively aggregate hierarchy group data
   const buildGroupedData = (group: HierarchyGroup): any => {
-    if (!group) return { memberIds: [], children: [], members: [], teamTarget: 0, teamActual: 0, teamAchievement: 0 };
-    const members = (group.memberIds || [])
+    const members = group.memberIds
       .map(id => progressMap.get(id))
       .filter(Boolean) as TeamMemberProgress[];
 
     const children = (group.children || [])
-      .filter(Boolean)
       .map(child => buildGroupedData(child))
-      .filter((c: any) => (c?.members?.length ?? 0) > 0 || (c?.children?.length ?? 0) > 0);
+      .filter((c: any) => c.members.length > 0 || c.children.length > 0);
 
     let teamTarget = members.reduce((sum, m) => sum + m.target, 0);
     let teamActual = members.reduce((sum, m) => sum + m.actual, 0);
@@ -126,9 +124,8 @@ export function AnalyticsTargetDashboard({ selectedUserIds, dateRange, periodFil
   const groupedData = useMemo(() => {
     if (!hierarchyGroups?.length || !filteredTeamProgress?.length) return null;
     return hierarchyGroups
-      .filter(Boolean)
       .map(group => buildGroupedData(group))
-      .filter((g: any) => (g?.members?.length ?? 0) > 0 || (g?.children?.length ?? 0) > 0);
+      .filter((g: any) => g.members.length > 0 || g.children.length > 0);
   }, [hierarchyGroups, filteredTeamProgress, progressMap]);
 
   // Flatten hierarchy

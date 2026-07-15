@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Layout } from "@/components/Layout";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,8 @@ import { CompetitionDataForm } from "@/components/CompetitionDataForm";
 import { useCheckInMandatory } from "@/hooks/useCheckInMandatory";
 import { isFocusedProductActive } from "@/utils/focusedProductChecker";
 import { useOfflineOrderEntry } from "@/hooks/useOfflineOrderEntry";
+import { useMasterDataCache } from "@/hooks/useMasterDataCache";
+import { buildRetailerContext, filterAvailableProducts } from "@/utils/productAvailability";
 import { WifiOff, Wifi, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useRetailerVisitTracking } from "@/hooks/useRetailerVisitTracking";
 import { RetailerVisitDetailsModal } from "@/components/RetailerVisitDetailsModal";
@@ -118,6 +120,11 @@ export const OrderEntry = () => {
   const retailerId = searchParams.get("retailerId") || '';
   const retailerName = searchParams.get("retailer") || "Retailer Name";
   const isPhoneOrder = searchParams.get("phoneOrder") === "true";
+  const editOrderId = searchParams.get("editOrderId") || '';
+  const isEditMode = !!editOrderId;
+  const source = searchParams.get("source") || '';
+  const isAdminEdit = source === 'admin' && isEditMode;
+  const [editInvoiceNumber, setEditInvoiceNumber] = React.useState<string | null>(null);
   const {
     isCheckInMandatory,
     loading: checkInMandatoryLoading
@@ -128,8 +135,45 @@ export const OrderEntry = () => {
     products: cachedProducts,
     loading: offlineLoading,
     isOnline,
-    fetchProducts: fetchOfflineProducts
+    fetchProducts: fetchOfflineProducts,
+    resetFetchGuard: resetOfflineProductsGuard
   } = useOfflineOrderEntry();
+
+  // Force-refresh the full master data cache (re-syncs products end-to-end).
+  // Used by the "Refresh products" button + the 10-min staleness check on open.
+  const { forceRefreshMasterData, availabilityByProductId, territoriesById } = useMasterDataCache();
+
+  // Manual refresh: re-sync product master AND reload the picker list.
+  const reloadProductsFromMaster = useCallback(async () => {
+    try {
+      await forceRefreshMasterData();
+    } catch (err) {
+      console.warn('[OrderEntry] forceRefreshMasterData failed, falling back to local fetch', err);
+    }
+    // Reset the in-memory de-dupe guard so the next fetchOfflineProducts
+    // actually re-reads the freshly cached rows instead of returning early.
+    // Reset the in-memory de-dupe guard so the next fetchOfflineProducts
+    // actually re-reads the freshly cached rows instead of returning early.
+    resetOfflineProductsGuard?.();
+    await fetchOfflineProducts();
+  }, [forceRefreshMasterData, fetchOfflineProducts, resetOfflineProductsGuard]);
+
+  // On OPEN: if online and cache is older than ~10 min, kick a background refresh
+  // so newly-added products appear without waiting for the 45-min interval.
+  useEffect(() => {
+    if (!navigator.onLine) return;
+    const lastCached = parseInt(localStorage.getItem('master_data_cached_at') || '0', 10);
+    const tenMinAgo = Date.now() - 10 * 60 * 1000;
+    if (!lastCached || lastCached < tenMinAgo) {
+      console.log('[OrderEntry] Master data >10 min old — background refresh');
+      forceRefreshMasterData().catch(err =>
+        console.warn('[OrderEntry] Background master refresh failed', err)
+      );
+    }
+    // Run once when the screen mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   // PERF: keep Order Entry ultra-fast even on slow/no network
   const DEV_LOG = false;
@@ -285,6 +329,10 @@ export const OrderEntry = () => {
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const [showImageCapture, setShowImageCapture] = useState(false);
 
+  // --- Edit-order mode state (mirrors Cart edit bootstrap) ---
+  const [editLoading, setEditLoading] = useState<boolean>(isEditMode);
+  const [editBlockedReason, setEditBlockedReason] = useState<string | null>(null);
+
   // Function to auto-select "Over Stocked" option
   const handleAutoSelectOverStocked = async () => {
     if (!visitId) return;
@@ -339,6 +387,8 @@ export const OrderEntry = () => {
   const [retailerLat, setRetailerLat] = useState<number | undefined>(undefined);
   const [retailerLng, setRetailerLng] = useState<number | undefined>(undefined);
   const [retailerBeatId, setRetailerBeatId] = useState<string | undefined>(undefined);
+  // Phase 7-3: full retailer record (state/region/zone/territory_id/distributor_id) for availability ctx.
+  const [selectedRetailerForAvail, setSelectedRetailerForAvail] = useState<any>(null);
   const [showVisitDetailsModal, setShowVisitDetailsModal] = useState(false);
   const [hasTrackedVisit, setHasTrackedVisit] = useState(false);
   const [isSettingLocation, setIsSettingLocation] = useState(false);
@@ -436,6 +486,13 @@ export const OrderEntry = () => {
   // Check attendance on mount - OFFLINE FIRST
   useEffect(() => {
     const checkAttendance = async () => {
+      if (isAdminEdit) {
+        // Admin editing from Operations: bypass field-rep attendance gate.
+        setHasAttendance(true);
+        setAttendanceChecked(true);
+        setCheckingAttendance(false);
+        return;
+      }
       if (!userId) {
         setCheckingAttendance(false);
         return;
@@ -467,16 +524,17 @@ export const OrderEntry = () => {
     };
     
     checkAttendance();
-  }, [userId]);
+  }, [userId, isAdminEdit]);
 
   // Global click handler - ANY click/touch inside Order Entry page triggers check-in
   const handlePageInteraction = useCallback(() => {
+    if (isAdminEdit) return; // No visit check-in capture for admin edits
     if (!hasRecordedFirstInteraction.current && userId) {
       hasRecordedFirstInteraction.current = true;
       console.log('📍 First page interaction - capturing check-in');
       recordAction('order').catch((err) => console.log('Check-in error (non-fatal):', err));
     }
-  }, [userId, recordAction]);
+  }, [userId, recordAction, isAdminEdit]);
   
   // Fetch retailer coordinates - CACHE FIRST, non-blocking
   useEffect(() => {
@@ -488,6 +546,9 @@ export const OrderEntry = () => {
         const cachedRetailers = await offlineStorage.getAll<any>(STORES.RETAILERS);
         const cachedRetailer = cachedRetailers.find((r: any) => r.id === validRetailerId);
 
+        if (cachedRetailer) {
+          setSelectedRetailerForAvail(cachedRetailer);
+        }
         if (cachedRetailer?.latitude && cachedRetailer?.longitude) {
           setRetailerLat(cachedRetailer.latitude);
           setRetailerLng(cachedRetailer.longitude);
@@ -582,9 +643,145 @@ export const OrderEntry = () => {
   }, [retailerLat, retailerLng, locationStatus, distance]);
   
   // Use visitId and retailerId from URL params consistently
-  const activeStorageKey = validVisitId && validRetailerId ? `order_cart:${validVisitId}:${validRetailerId}` : validRetailerId ? `order_cart:temp:${validRetailerId}` : 'order_cart:fallback';
+  const activeStorageKey = isEditMode
+    ? `order_cart:edit:${editOrderId}`
+    : (validVisitId && validRetailerId ? `order_cart:${validVisitId}:${validRetailerId}` : validRetailerId ? `order_cart:temp:${validRetailerId}` : 'order_cart:fallback');
+
+  // --- Edit-order bootstrap: guard with canEditOrder + seed cart from original order_items ---
+  useEffect(() => {
+    if (!isEditMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setEditLoading(true);
+        setEditBlockedReason(null);
+
+        if (!navigator.onLine) {
+          setEditBlockedReason('Editing requires an internet connection.');
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const uid = session?.user?.id;
+        if (!uid) {
+          setEditBlockedReason("You don't have permission to edit orders.");
+          return;
+        }
+
+        const { data: order, error: orderErr } = await supabase
+          .from('orders')
+          .select('id, status, invoice_generated_at, dispatched_at, user_id, visit_id, retailer_id, total_amount, invoice_number')
+          .eq('id', editOrderId)
+          .maybeSingle();
+        if (orderErr || !order) {
+          setEditBlockedReason("This order can't be edited in its current state.");
+          return;
+        }
+        if (!cancelled) setEditInvoiceNumber((order as any)?.invoice_number || null);
+
+        const { data: policyRow } = await supabase
+          .from('order_edit_policy')
+          .select('edit_enabled, editable_until')
+          .limit(1)
+          .maybeSingle();
+        const policy = policyRow
+          ? { edit_enabled: !!policyRow.edit_enabled, editable_until: policyRow.editable_until || 'invoice_generated' }
+          : { edit_enabled: true, editable_until: 'invoice_generated' as const };
+
+        const { data: up } = await supabase
+          .from('user_profiles')
+          .select('profile_id')
+          .eq('user_id', uid)
+          .maybeSingle();
+        const profileId = up?.profile_id || null;
+        let hasEdit = false;
+        if (profileId) {
+          const { data: perms } = await supabase
+            .from('profile_object_permissions')
+            .select('object_name, can_edit')
+            .eq('profile_id', profileId)
+            .eq('object_name', 'action_order_edit');
+          hasEdit = !!(perms && perms.some((p: any) => p.can_edit));
+        }
+        const permMap = { action_order_edit: hasEdit };
+
+        const { canEditOrder } = await import('@/utils/canEditOrder');
+        const decision = canEditOrder(order as any, permMap as any, policy as any);
+        if (!decision.allowed) {
+          setEditBlockedReason(decision.reason);
+          return;
+        }
+
+        if (cancelled) return;
+
+        // Seed cart from original order_items, ONLY if the edit cart is empty
+        const editKey = `order_cart:edit:${editOrderId}`;
+        const existing = localStorage.getItem(editKey);
+        const isEmpty = !existing || existing === 'undefined' || existing === 'null' || existing === '[]';
+        if (isEmpty) {
+          const { data: items, error: itemsError } = await supabase
+            .from('order_items')
+            .select('id, product_id, variant_id, product_name, category, rate, unit, quantity, total, hsn_code, uom_id, uom_code, conversion_to_base, original_rate, discount_amount')
+            .eq('order_id', editOrderId);
+          if (itemsError) {
+            console.error('[OrderEntry][edit] failed to load original order_items:', itemsError);
+            localStorage.setItem(editKey, JSON.stringify([]));
+            if (!cancelled) {
+              setCart([]);
+              syncQuantitiesFromCart([]);
+            }
+            return;
+          }
+          if (!Array.isArray(items) || items.length === 0) {
+            console.error('[OrderEntry][edit] no original order_items found for order:', editOrderId);
+            localStorage.setItem(editKey, JSON.stringify([]));
+            if (!cancelled) {
+              setCart([]);
+              syncQuantitiesFromCart([]);
+            }
+            return;
+          }
+          const seeded: CartItem[] = (items || []).map((it: any) => {
+            const cartId = it.variant_id
+              ? `${it.product_id || it.id}_variant_${it.variant_id}`
+              : (it.product_id || it.id);
+            const liveProduct = it.product_id ? products.find(p => p.id === it.product_id) : undefined;
+            const liveVariant = liveProduct && it.variant_id
+              ? liveProduct.variants?.find((v: any) => v.id === it.variant_id)
+              : undefined;
+            return {
+              id: cartId,
+              name: it.product_name,
+              category: it.category || '',
+              rate: Number(it.rate) || 0,
+              unit: it.unit || 'pcs',
+              quantity: Number(it.quantity) || 0,
+              total: Number(it.total) || 0,
+              hsn_code: it.hsn_code || undefined,
+              closingStock: (liveVariant as any)?.stock_quantity ?? liveProduct?.closingStock ?? undefined,
+              ...(it.product_id ? { product_id: it.product_id } : {}),
+              ...(it.variant_id ? { variant_id: it.variant_id } : {}),
+              ...(it.original_rate ? { original_rate: Number(it.original_rate) } : {}),
+            } as any;
+          });
+          localStorage.setItem(editKey, JSON.stringify(seeded));
+          if (!cancelled) {
+            setCart(seeded);
+            syncQuantitiesFromCart(seeded);
+          }
+        }
+      } catch (e: any) {
+        console.error('[OrderEntry][edit] bootstrap failed:', e);
+        if (!cancelled) setEditBlockedReason(e?.message || "This order can't be edited in its current state.");
+      } finally {
+        if (!cancelled) setEditLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEditMode, editOrderId]);
 
   // NOTE: Avoid logging in render path to keep Order Entry fast on slow devices/networks
+
 
   // Load cart and sync quantities - this runs every time we come back to OrderEntry
   useEffect(() => {
@@ -915,8 +1112,35 @@ export const OrderEntry = () => {
   }, [isOnline, fetchOfflineProducts]);
   */
 
+  // Phase 7-3: build availability ctx for the selected retailer (if any).
+  // No retailer selected => show all products.
+  const availabilityCtx = useMemo(
+    () => buildRetailerContext(selectedRetailerForAvail, territoriesById, userId),
+    [selectedRetailerForAvail, territoriesById, userId]
+  );
+
+  // Filter master cache by availability for downstream consumers (TableOrderForm, Voice).
+  const availableCachedProducts = useMemo(() => {
+    if (!validRetailerId || !selectedRetailerForAvail) return cachedProducts;
+    return filterAvailableProducts(
+      cachedProducts as any[],
+      (p) => p.id,
+      availabilityByProductId,
+      availabilityCtx
+    );
+  }, [cachedProducts, validRetailerId, selectedRetailerForAvail, availabilityByProductId, availabilityCtx]);
+
   // Filter products by category and search term
   const filteredProducts = products.filter(product => {
+    // Phase 7-3: availability gate (default visible if no retailer or no rules).
+    if (validRetailerId && selectedRetailerForAvail) {
+      const rows = availabilityByProductId.get(product.id);
+      if (rows && rows.length > 0) {
+        // re-use isProductAvailable via filterAvailableProducts shape
+        const ok = filterAvailableProducts([product as any], (p: any) => p.id, availabilityByProductId, availabilityCtx).length === 1;
+        if (!ok) return false;
+      }
+    }
     // Category filter
     const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
 
@@ -1829,6 +2053,23 @@ export const OrderEntry = () => {
       onClick={handlePageInteraction}
       onTouchStart={handlePageInteraction}
     >
+      {/* Edit-order mode banner */}
+      {isEditMode && (
+        <div className="w-full px-2 sm:px-4 pt-2">
+          {editBlockedReason ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-3 text-sm">
+              <div className="font-semibold mb-1">Cannot edit this order</div>
+              <div>{editBlockedReason}</div>
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(-1)}>Go Back</Button>
+            </div>
+          ) : (
+            <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 p-2.5 text-xs sm:text-sm">
+              <span className="font-semibold">Editing order</span>
+              {editLoading ? ' — loading original items…' : ' — submitting will create a new order that replaces the original.'}
+            </div>
+          )}
+        </div>
+      )}
       {/* Page Header - Fixed layout with stable positioning */}
       <div className="w-full px-2 sm:px-4 py-2 sm:py-3">
         <Card className="shadow-card bg-gradient-primary text-primary-foreground">
@@ -1837,7 +2078,9 @@ export const OrderEntry = () => {
             <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0 overflow-hidden">
               <div className="min-w-0 flex-1 overflow-hidden">
                 <CardTitle className="text-sm sm:text-base font-medium leading-tight truncate">
-                  {isPhoneOrder ? t('order.phoneOrderEntry') : t('order.orderEntry')}
+                  {isAdminEdit
+                    ? `Edit Order${editInvoiceNumber ? ` #${editInvoiceNumber}` : ''}`
+                    : (isPhoneOrder ? t('order.phoneOrderEntry') : t('order.orderEntry'))}
                 </CardTitle>
                 <p className="text-[10px] sm:text-xs text-primary-foreground/80 leading-tight truncate max-w-[40vw] sm:max-w-none">{retailerName}</p>
                 <div className="flex items-center gap-1 mt-0.5">
@@ -1871,7 +2114,7 @@ export const OrderEntry = () => {
                   <span className="text-[8px] sm:text-[9px] leading-tight">{t('common.delete')}</span>
                 </Button>
                 
-                <Button variant="ghost" onClick={() => navigate(`/cart?visitId=${visitId}&retailerId=${retailerId}&retailer=${encodeURIComponent(retailerName)}${isPhoneOrder ? '&phoneOrder=true' : ''}`)} className="text-primary-foreground hover:bg-primary-foreground/20 h-auto p-1.5 sm:p-2 flex flex-col items-center gap-0 min-w-[42px] sm:min-w-[50px] relative">
+                <Button variant="ghost" onClick={() => navigate(`/cart?visitId=${visitId}&retailerId=${retailerId}&retailer=${encodeURIComponent(retailerName)}${isPhoneOrder ? '&phoneOrder=true' : ''}${isEditMode ? `&editOrderId=${encodeURIComponent(editOrderId)}` : ''}${isAdminEdit ? '&source=admin' : ''}`)} className="text-primary-foreground hover:bg-primary-foreground/20 h-auto p-1.5 sm:p-2 flex flex-col items-center gap-0 min-w-[42px] sm:min-w-[50px] relative">
                   <div className="relative">
                     <ShoppingCart size={14} className="sm:w-4 sm:h-4" />
                     {cart.length > 0 && <Badge className="absolute -top-1 -right-1 h-3.5 w-3.5 sm:h-4 sm:w-4 flex items-center justify-center p-0 text-[9px] sm:text-[10px] bg-destructive text-destructive-foreground rounded-full border-0">
@@ -1953,7 +2196,7 @@ export const OrderEntry = () => {
               {/* Row 2: Voice Order + Smart Basket */}
               <div className="flex gap-1.5">
                 <VoiceOrderAssistant
-                  products={cachedProducts.map(p => ({
+                  products={availableCachedProducts.map(p => ({
                     id: p.id,
                     name: p.name,
                     rate: p.rate,
@@ -2813,9 +3056,9 @@ export const OrderEntry = () => {
         </> : (/* Table Order Form */
       <TableOrderForm 
         ref={tableFormRef}
-        products={cachedProducts}
+        products={availableCachedProducts}
         loading={offlineLoading}
-        onReloadProducts={fetchOfflineProducts}
+        onReloadProducts={reloadProductsFromMaster}
         onCartUpdate={handleBulkCartUpdate}
         onStockUpdate={(productId, stockQuantity, productName) => {
           saveStockData(productId, stockQuantity, productName);

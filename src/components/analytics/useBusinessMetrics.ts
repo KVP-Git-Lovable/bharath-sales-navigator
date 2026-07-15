@@ -10,6 +10,7 @@ interface BusinessSummary {
   totalPieces: number;
   totalRevenue: number;
   pendingPayments: number;
+  quantityByUnit: { [unit: string]: number }; // Track quantities by actual unit
 }
 
 interface BeatDetail {
@@ -52,6 +53,17 @@ interface PendingPaymentDetail {
   user_name?: string;
 }
 
+const getKgQuantity = (quantity: unknown, _unit?: unknown) => {
+  // Single unit (Piece) — sum quantity as-is regardless of legacy unit label.
+  const qty = Number(quantity || 0);
+  return Number.isFinite(qty) ? qty : 0;
+};
+
+const getDisplayQuantity = (quantity: unknown, _unit?: unknown) => {
+  const qty = Number(quantity || 0);
+  return { quantity: Number.isFinite(qty) ? qty : 0, unit: 'PCs' };
+};
+
 export const useBusinessMetrics = () => {
   const [summary, setSummary] = useState<BusinessSummary>({
     totalBeats: 0,
@@ -60,7 +72,8 @@ export const useBusinessMetrics = () => {
     totalKg: 0,
     totalPieces: 0,
     totalRevenue: 0,
-    pendingPayments: 0
+    pendingPayments: 0,
+    quantityByUnit: {}
   });
   const [isLoading, setIsLoading] = useState(false);
   
@@ -98,7 +111,8 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch confirmed orders with items - paginated to avoid 1000-row default limit
+      // Fetch confirmed orders first, then map line items separately. Embedding order_items
+      // here is fragile when PostgREST relationship metadata is stale, and caused 0 totals.
       const BATCH_SIZE = 1000;
       let allOrders: any[] = [];
       let offset = 0;
@@ -113,7 +127,8 @@ export const useBusinessMetrics = () => {
             credit_pending_amount,
             retailer_id,
             user_id,
-            order_items(quantity, unit)
+            beat_id,
+            beat_name_snapshot
           `)
           .eq('status', 'confirmed')
           .gte('order_date', fromDate)
@@ -137,98 +152,55 @@ export const useBusinessMetrics = () => {
       }
 
       const orders = allOrders;
+      const orderIds = orders.map(o => o.id).filter(Boolean);
+      const retailerIds = [...new Set(orders.map(o => o.retailer_id).filter(Boolean))];
+      const orderBeatKeys = new Set<string>();
+      orders.forEach((order: any) => {
+        const beatKey = order.beat_id || order.beat_name_snapshot;
+        if (beatKey) orderBeatKeys.add(String(beatKey));
+      });
 
-      // Fetch beats created by selected users within date range
-      // Fetch beats and retailers in parallel
-      const [beatsResult, retailersResult] = await Promise.all([
-        (async () => {
-          let beatsQuery = supabase
-            .from('beats')
-            .select('id, created_by')
-            .gte('created_at', `${fromDate}T00:00:00`)
-            .lte('created_at', `${toDate}T23:59:59`);
-          if (userIds.length > 0) {
-            beatsQuery = beatsQuery.in('created_by', userIds);
-          }
-          return beatsQuery;
-        })(),
-        (async () => {
-          let retailersQuery = supabase
-            .from('retailers')
-            .select('id, user_id')
-            .gte('created_at', `${fromDate}T00:00:00`)
-            .lte('created_at', `${toDate}T23:59:59`);
-          if (userIds.length > 0) {
-            retailersQuery = retailersQuery.in('user_id', userIds);
-          }
-          return retailersQuery;
-        })()
-      ]);
+      let orderItems: any[] = [];
+      for (let i = 0; i < orderIds.length; i += 200) {
+        const { data: items, error: itemsError } = await supabase
+          .from('order_items')
+          .select('order_id, quantity, unit')
+          .in('order_id', orderIds.slice(i, i + 200));
+        if (itemsError) throw itemsError;
+        orderItems = orderItems.concat(items || []);
+      }
 
-      if (beatsResult.error) throw beatsResult.error;
-      if (retailersResult.error) throw retailersResult.error;
+      let linkedRetailers: any[] = [];
+      for (let i = 0; i < retailerIds.length; i += 200) {
+        const { data: retailerBatch } = await supabase
+          .from('retailers')
+          .select('id, beat_id, beat_name')
+          .in('id', retailerIds.slice(i, i + 200));
+        linkedRetailers = linkedRetailers.concat(retailerBatch || []);
+      }
+      linkedRetailers.forEach((retailer: any) => {
+        const beatKey = retailer.beat_id || retailer.beat_name;
+        if (beatKey) orderBeatKeys.add(String(beatKey));
+      });
 
-      const beats = beatsResult.data;
-      const retailers = retailersResult.data;
-
-      const totalBeatsCount = beats?.length || 0;
-      const totalRetailersCount = retailers?.length || 0;
+      const totalBeatsCount = orderBeatKeys.size;
+      const totalRetailersCount = retailerIds.length;
       const totalOrders = orders?.length || 0;
       const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total_amount || 0), 0) || 0;
       const pendingPayments = orders?.reduce((sum, o) => sum + Number(o.credit_pending_amount || 0), 0) || 0;
       
-      // Calculate total KG and Revenue using the same logic as SQL Report - Product and Revenue Performance
+      // Calculate total KG and Revenue directly from order_items so analytics matches DB units.
       let totalKg = 0;
       let totalPieces = 0;
-      let rpcTotalRevenue = 0;
-      let useRpcRevenue = false;
-      
-      // If user names are provided, use the RPC to get product revenue data
-      if (userNames && userNames.length > 0) {
-        useRpcRevenue = true;
-        for (const userName of userNames) {
-          const { data: productData } = await (supabase as any).rpc('get_product_revenue_performance', {
-            user_full_name: userName,
-            start_date: fromDate,
-            end_date: toDate
-          });
-          
-          if (productData) {
-            productData.forEach((row: any) => {
-              const qty = Number(row.quantity_sold || 0);
-              const unit = (row.unit || '').toLowerCase().trim();
-              // Same logic as SQL Report: only convert weight-based units to KG
-              if (unit === 'kg' || unit.includes('kilo')) {
-                totalKg += qty;
-              } else if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-                totalKg += qty / 1000;
-              }
-              // Ignore pieces/pcs - not included in KG calculation
-              // Sum revenue from RPC
-              rpcTotalRevenue += Number(row.revenue || 0);
-            });
-          }
-        }
-      } else {
-        // Fallback: use order_items directly
-        orders?.forEach(order => {
-          (order.order_items as any[])?.forEach((item: any) => {
-            const unit = (item.unit || '').toLowerCase().trim();
-            const qty = Number(item.quantity || 0);
-            
-            if (unit === 'kg' || unit.includes('kilo')) {
-              totalKg += qty;
-            } else if (unit === 'grams' || unit === 'g' || unit === 'gram') {
-              totalKg += qty / 1000;
-            } else {
-              totalPieces += qty;
-            }
-          });
-        });
-      }
-      
-      // Use RPC revenue when available, otherwise use orders sum
-      const finalRevenue = useRpcRevenue ? rpcTotalRevenue : totalRevenue;
+      const quantityByUnit: { [unit: string]: number } = {};
+
+      orderItems.forEach((item: any) => {
+        const unit = (item.unit || 'Unknown').trim();
+        const qty = Number(item.quantity || 0);
+        quantityByUnit[unit] = (quantityByUnit[unit] || 0) + qty;
+        totalKg += getKgQuantity(qty, unit);
+      });
+      totalPieces = Math.round(totalKg * 100) / 100;
 
       setSummary({
         totalBeats: totalBeatsCount,
@@ -236,8 +208,9 @@ export const useBusinessMetrics = () => {
         totalOrders,
         totalKg,
         totalPieces,
-        totalRevenue: finalRevenue,
-        pendingPayments
+        totalRevenue,
+        pendingPayments,
+        quantityByUnit
       });
     } catch (error) {
       console.error('Error fetching business summary:', error);
@@ -253,7 +226,7 @@ export const useBusinessMetrics = () => {
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Get orders with retailer beat_name - paginated
+      // Get orders with retailer and order beat data - paginated
       const BATCH_SIZE = 1000;
       let allOrders: any[] = [];
       let ordersOffset = 0;
@@ -261,7 +234,8 @@ export const useBusinessMetrics = () => {
       while (ordersHasMore) {
         let ordersQuery = supabase
           .from('orders')
-          .select('id, total_amount, user_id, order_date, retailer_id, retailers!inner(id, name, beat_name)')
+          .select('id, total_amount, user_id, order_date, retailer_id, beat_id, beat_name_snapshot, retailers(id, name, beat_name, beat_id)')
+          .eq('status', 'confirmed')
           .gte('order_date', fromDate)
           .lte('order_date', toDate)
           .range(ordersOffset, ordersOffset + BATCH_SIZE - 1);
@@ -292,7 +266,13 @@ export const useBusinessMetrics = () => {
 
       const { data: visits } = await visitsQuery;
 
-      // Group by beat using retailer's beat_name from both visits and orders
+      const orderBeatIds = [...new Set((orders || []).map((order: any) => order.beat_id).filter(Boolean))];
+      const { data: orderBeats } = orderBeatIds.length > 0
+        ? await supabase.from('beats').select('beat_id, beat_name').in('beat_id', orderBeatIds)
+        : { data: [] as any[] };
+      const orderBeatNameMap = new Map((orderBeats || []).map((beat: any) => [beat.beat_id, beat.beat_name]));
+
+      // Group by beat using order snapshot first, then order beat_id/current retailer references.
       const beatMap = new Map<string, BeatDetail>();
 
       // Process visits to count visits per beat
@@ -312,7 +292,7 @@ export const useBusinessMetrics = () => {
 
       // Process orders to count orders and revenue per beat
       orders?.forEach(order => {
-        const beatName = (order.retailers as any)?.beat_name || 'Unknown';
+        const beatName = order.beat_name_snapshot || orderBeatNameMap.get(order.beat_id) || (order.retailers as any)?.beat_name || 'Unassigned';
         if (!beatMap.has(beatName)) {
           beatMap.set(beatName, {
             beat_name: beatName,
@@ -352,8 +332,10 @@ export const useBusinessMetrics = () => {
             retailer_id,
             total_amount,
             credit_pending_amount,
+            beat_name_snapshot,
             retailers(id, name, beat_name)
           `)
+          .eq('status', 'confirmed')
           .gte('order_date', fromDate)
           .lte('order_date', toDate)
           .range(offset, offset + BATCH_SIZE - 1);
@@ -382,7 +364,7 @@ export const useBusinessMetrics = () => {
           retailerMap.set(retailer.id, {
             id: retailer.id,
             name: retailer.name || 'Unknown',
-            beat_name: retailer.beat_name || '-',
+            beat_name: order.beat_name_snapshot || retailer.beat_name || '-',
             orders_count: 0,
             revenue: 0,
             pending_amount: 0
@@ -500,21 +482,22 @@ export const useBusinessMetrics = () => {
         .select('product_name, unit, quantity, total')
         .in('order_id', orderIds);
 
-      // Group by product
+      // Group by product and display weight quantities as KG, not PC/ML.
       const productMap = new Map<string, ProductDetail>();
       
       items?.forEach(item => {
-        const key = `${item.product_name}-${item.unit || 'pcs'}`;
+        const displayQty = getDisplayQuantity(item.quantity, item.unit);
+        const key = `${item.product_name}-${displayQty.unit}`;
         if (!productMap.has(key)) {
           productMap.set(key, {
             product_name: item.product_name || 'Unknown',
-            unit: item.unit || 'pcs',
+            unit: displayQty.unit,
             quantity: 0,
             revenue: 0
           });
         }
         const p = productMap.get(key)!;
-        p.quantity += Number(item.quantity || 0);
+        p.quantity += displayQty.quantity;
         p.revenue += Number(item.total || 0);
       });
 

@@ -38,7 +38,7 @@ export function useOrderBasedDelivery() {
 
     // Subscribe to real-time changes
     const channel = supabase
-      .channel('order_based_delivery_feature')
+      .channel(`order_based_delivery_feature-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

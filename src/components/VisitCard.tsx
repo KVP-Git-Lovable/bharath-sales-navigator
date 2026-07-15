@@ -1,5 +1,6 @@
-import { MapPin, Phone, Store, ShoppingCart, XCircle, BarChart3, Check, Users, MessageSquare, Paintbrush, Camera, LogIn, LogOut, Package, FileText, IndianRupee, Sparkles, Truck, UserCheck, Target, Gift, Ban } from "lucide-react";
+import { MapPin, Phone, Store, ShoppingCart, XCircle, BarChart3, Check, Users, MessageSquare, Paintbrush, Camera, LogIn, LogOut, Package, FileText, IndianRupee, Sparkles, Truck, UserCheck, Target, Gift, Ban, Globe, Pencil } from "lucide-react";
 import { compressImageFile } from "@/utils/imageCompression";
+import { getResilientLocation } from "@/utils/gpsRouteOptimizer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +28,9 @@ import { PaymentMarkingModal } from "./PaymentMarkingModal";
 import { VisitAIInsightsModal } from "./VisitAIInsightsModal";
 import { VanSalesModal } from "./VanSalesModal";
 import { useVanSales } from "@/hooks/useVanSales";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useOrderEditPolicy } from "@/hooks/useOrderEditPolicy";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { checkUploadSpeed } from "@/utils/internetSpeedCheck";
 import { hasRecentUploadErrors, hasRecentUploadAttempts } from "@/utils/uploadErrorChecker";
 import { CameraCapture } from "./CameraCapture";
@@ -51,6 +55,11 @@ import { VisitPointsDisplay, type VisitPointsBreakdown } from "./VisitPointsDisp
 import { CancelOrderDialog } from "./CancelOrderDialog";
 import { useActivityEvents, formatActivityDuration, type ActivityEvent } from "@/hooks/useActivityEvents";
 import { useFeedbackPolicyCheck } from "@/hooks/useFeedbackPolicyCheck";
+import { checkLocationAvailability, classifyLocationError, requestLocationPermission } from "@/utils/locationStatus";
+import { openAppSettings } from "@/utils/permissions";
+import { Capacitor } from "@capacitor/core";
+import { reverseGeocode } from "@/utils/reverseGeocode";
+import { useOrderSyncStatuses, OrderSyncBadge, OrderSyncDetails } from "@/components/order/OrderSyncStatus";
 interface Visit {
   id: string;
   retailerId?: string;
@@ -72,6 +81,20 @@ interface Visit {
   retailerLng?: number;
   lastVisitDate?: string;
   priority?: "high" | "medium" | "low";
+  teammateActivity?: {
+    userId: string;
+    name: string;
+    hasOrder: boolean;
+    orderValue: number;
+    visitTime?: string;
+    ownActivity: boolean;
+  };
+  isCarryForward?: boolean;
+  carriedFromDate?: string;
+  isRescheduled?: boolean;
+  rescheduledFromDate?: string;
+  coveredForUserId?: string;
+  coveredForUserName?: string;
 }
 interface VisitCardProps {
   visit: Visit;
@@ -119,6 +142,9 @@ export const VisitCard = ({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showLocationCaptureModal, setShowLocationCaptureModal] = useState(false);
   const [isCapturingLocation, setIsCapturingLocation] = useState(false);
+  const [locationWarning, setLocationWarning] = useState<string | null>(null);
+  const [locationReady, setLocationReady] = useState(true);
+  const [locationDenied, setLocationDenied] = useState(false);
   const [retailerLat, setRetailerLat] = useState<number | undefined>(visit.retailerLat);
   const [retailerLng, setRetailerLng] = useState<number | undefined>(visit.retailerLng);
   const hasRetailerLocation = retailerLat != null && retailerLng != null;
@@ -230,6 +256,14 @@ export const VisitCard = ({
     distributor_name?: string | null;
   }>>([]);
   const [previousPendingCleared, setPreviousPendingCleared] = useState<number>(0);
+  // FIFO side-effect of today's payment: how much of OLDER outstanding invoices
+  // got cleared automatically when today's collection ran through
+  // apply_retailer_payment_fifo. Sourced from retailer_payment_allocations
+  // rows scoped to today's date whose order_id is NOT in today's order list.
+  const [oldPaymentsCleared, setOldPaymentsCleared] = useState<{
+    amount: number;
+    lastDate: string | null;
+  }>({ amount: 0, lastDate: null });
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCameraCapture, setShowCameraCapture] = useState(false);
@@ -259,14 +293,62 @@ export const VisitCard = ({
   const [showCreditTalkingPoints, setShowCreditTalkingPoints] = useState(false);
   const [creditLimitData, setCreditLimitData] = useState<{ creditLimit: number; score: number; avgDso: number } | null>(null);
   const [showCancelOrderDialog, setShowCancelOrderDialog] = useState(false);
+  const [showEditPickerDialog, setShowEditPickerDialog] = useState(false);
+  const [editableOrderIds, setEditableOrderIds] = useState<Set<string>>(new Set());
   const {
     isVanSalesEnabled
   } = useVanSales();
+  const { can } = usePermissions();
+  const editPolicy = useOrderEditPolicy();
+  const canEditPerm = can('order_edit', 'edit');
+
+  // Ask the DB per-order whether editing is currently allowed under policy
+  // (edit_who / lock point / max edits). Only runs when the policy is on and
+  // the user has the permission, so the picker/button reflect true state.
+  useEffect(() => {
+    if (!editPolicy.edit_enabled || !canEditPerm) {
+      setEditableOrderIds(new Set());
+      return;
+    }
+    const candidates = (ordersTodayList || []).filter(
+      (o: any) => !o.invoice_generated_at && !o.dispatched_at,
+    );
+    if (candidates.length === 0) {
+      setEditableOrderIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        candidates.map(async (o: any) => {
+          try {
+            const { data, error } = await (supabase as any).rpc('can_edit_order', {
+              p_order_id: o.id,
+            });
+            if (error) return null;
+            return data === true ? o.id : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      setEditableOrderIds(new Set(results.filter((x): x is string => !!x)));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editPolicy.edit_enabled, canEditPerm, ordersTodayList]);
+
+
+  const canCheckIn = can('action_attendance_check_in', 'read');
   const {
     isCheckInMandatory
   } = useCheckInMandatory();
   const {
     isLocationEnabled,
+    isCameraEnabled,
+    isCheckInEnabled,
     loading: locationFeatureLoading
   } = useLocationFeature();
 
@@ -312,6 +394,10 @@ export const VisitCard = ({
     selectedDate
   });
 
+  // Per-order sync status derivation (green/amber/red)
+  const { statuses: orderSyncStatuses, refresh: refreshOrderSyncStatuses } =
+    useOrderSyncStatuses(userId, ordersTodayList as any);
+
   // Handle logout - end all active logs
   useEffect(() => {
     const handleLogout = async () => {
@@ -336,10 +422,19 @@ export const VisitCard = ({
   // Listen for order submission events to track checkout timing
   useEffect(() => {
     const handleOrderSubmitted = async (event: CustomEvent) => {
-      const { retailerId: eventRetailerId } = event.detail;
+      const { retailerId: eventRetailerId } = event.detail || {};
       const currentRetailerId = visit.retailerId || visit.id;
       if (eventRetailerId === currentRetailerId) {
         await recordAction('order_submitted');
+        // Force refresh from DB so post-payment (FIFO-applied) server values replace
+        // the optimistic pre-payment snapshot (paid=0 / pending=total).
+        try {
+          await loadLastOrder();
+          // Retry once after recompute_retailer_pending / FIFO settles on server
+          setTimeout(() => { loadLastOrder().catch(() => {}); }, 600);
+        } catch (e) {
+          console.warn('[VisitCard] post-orderSubmitted refresh failed:', e);
+        }
       }
     };
     
@@ -348,6 +443,35 @@ export const VisitCard = ({
       window.removeEventListener('orderSubmitted', handleOrderSubmitted as EventListener);
     };
   }, [visit.retailerId, visit.id, recordAction]);
+
+  // Refetch authoritative order data on window focus / tab visibility change so
+  // navigating back to the visits screen automatically refreshes Today's Order.
+  useEffect(() => {
+    const currentRetailerId = visit.retailerId || visit.id;
+    if (!currentRetailerId) return;
+    const refresh = () => {
+      if (!hasOrderToday && !visit.hasOrder) return;
+      loadLastOrder().catch(() => {});
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [visit.retailerId, visit.id, hasOrderToday, visit.hasOrder]);
+
+  // Auto-load the order once on mount when the visit is known to have an order,
+  // so the Today's Order sync badge (Synced / Pending / Failed) appears without
+  // requiring the user to expand the "View" preview first.
+  useEffect(() => {
+    if (!hasOrderToday && !visit.hasOrder) return;
+    if (ordersTodayList.length > 0) return;
+    loadLastOrder().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasOrderToday, visit.hasOrder, visit.retailerId, visit.id]);
+
 
   const [showVisitDetailsModal, setShowVisitDetailsModal] = useState(false);
   
@@ -459,7 +583,17 @@ export const VisitCard = ({
   // Check if the selected date is today's date (use local timezone for accurate comparison)
   const today = new Date();
   const localTodayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const isTodaysVisit = selectedDate === localTodayString;
+  // A past date is allowed for ordering when an active backdate context matches selectedDate
+  // (set by MyVisits.applyBackdateContext after can_backdate_order RPC succeeds).
+  const isBackdatedOrderAllowed = (() => {
+    try {
+      const raw = sessionStorage.getItem('backdated_order_context');
+      if (!raw) return false;
+      const ctx = JSON.parse(raw);
+      return ctx?.date && ctx.date === selectedDate;
+    } catch { return false; }
+  })();
+  const isTodaysVisit = selectedDate === localTodayString || isBackdatedOrderAllowed;
 
   // Ensure visit tracking ends when this card unmounts or user navigates away
   // REMOVED: Do NOT call endTracking on unmount - it was incorrectly updating end_time to "now"
@@ -512,7 +646,10 @@ export const VisitCard = ({
         
         const matchingOrders = cachedOrders.filter((o: any) => {
           const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
-          return o.user_id === userId && 
+          // Exclude cancelled originals and orders replaced by an edit (live orders only)
+          const isLive = o && o.status !== 'cancelled' && !o.replaced_by_order_id;
+          return isLive &&
+                 o.user_id === userId && 
                  o.retailer_id === retailerId && 
                  orderDateStr === targetDateStr;
         });
@@ -594,15 +731,17 @@ export const VisitCard = ({
                 setLastOrderItems(Array.from(grouped.values()));
               }
               
-              // Calculate payment states
+              // Calculate payment states from server-authoritative per-order values
               const creditOrders = matchingOrders.filter((o: any) => !!o.is_credit_order);
               const cashOrders = matchingOrders.filter((o: any) => !o.is_credit_order);
               const paidFromCash = cashOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
               const totalPaidFromCredit = creditOrders.reduce((sum: number, o: any) => sum + Number(o.credit_paid_amount || 0), 0);
-              const creditOrdersTotal = creditOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+              const todaysPending = creditOrders.reduce((sum: number, o: any) => sum + Number(
+                o.credit_pending_amount ?? (Number(o.total_amount || 0) - Number(o.credit_paid_amount || 0))
+              ), 0);
               
               setPaidTodayAmount(paidFromCash + totalPaidFromCredit);
-              setCreditPendingAmount(Math.max(0, creditOrdersTotal - totalPaidFromCredit));
+              setCreditPendingAmount(Math.max(0, todaysPending));
               setIsCreditOrder(creditOrders.length > 0);
             }
           }
@@ -631,6 +770,30 @@ export const VisitCard = ({
     // OFFLINE GUARD: When offline, use ONLY cached data - NO network calls
     if (!navigator.onLine) {
       console.log('📵 [VisitCard] OFFLINE - using cache only for:', visitRetailerId);
+      try {
+        const cachedRetailer = await offlineStorage.getById<any>(STORES.RETAILERS, visitRetailerId as string);
+        const cachedPending = Number(cachedRetailer?.pending_amount || 0);
+        // Reconcile with today's offline orders/payments so paid credit doesn't linger.
+        const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+        const targetDateStr = targetDate.split('T')[0];
+        const todaysOrders = cachedOrders.filter((o: any) => {
+          const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
+          const isLive = o && o.status !== 'cancelled' && !o.replaced_by_order_id;
+          return isLive && o.user_id === currentUserId && o.retailer_id === visitRetailerId && orderDateStr === targetDateStr;
+        });
+        const todaysPaidOffline = todaysOrders.reduce((sum: number, o: any) => {
+          const isCredit = (o.payment_method || '').toLowerCase() === 'credit';
+          return sum + Number(isCredit ? (o.credit_paid_amount || 0) : (o.total_amount || 0));
+        }, 0);
+        const reconciled = Math.max(0, cachedPending - todaysPaidOffline);
+        // Also surface any offline order's still-outstanding credit_pending so
+        // the banner matches the Today's Order view (max avoids double-counting
+        // synced orders already folded into the cached baseline).
+        const todaysCreditPending = todaysOrders.reduce((s: number, o: any) =>
+          s + Number(o.credit_pending_amount ?? 0), 0);
+        const shown = Math.max(reconciled, todaysCreditPending);
+        if (pendingAmount !== shown) setPendingAmount(shown);
+      } catch (e) { console.log('[VisitCard] offline pending read failed', e); }
       const cachedStatus = await visitStatusCache.get(visitRetailerId, currentUserId, targetDate);
       if (cachedStatus) {
         if (currentStatus !== cachedStatus.status) {
@@ -987,7 +1150,7 @@ export const VisitCard = ({
           // @ts-ignore to bypass TypeScript deep type inference issue
           const ordersResponse = await supabase
             .from('orders')
-            .select('*, order_items(*), distributor_name')
+            .select('*, order_items!order_items_order_id_fkey(*), distributor_name')
             .eq('retailer_id', visitRetailerId)
             .eq('user_id', currentUserId)
             .eq('order_date', targetDate)
@@ -1023,22 +1186,20 @@ export const VisitCard = ({
             const totalPendingCleared = ordersToday.reduce((sum, order) => sum + Number((order as any).previous_pending_cleared || 0), 0);
             setPreviousPendingCleared(totalPendingCleared);
 
-            // Split cash vs credit orders and aggregate properly
+            // Split cash vs credit orders and aggregate from server-authoritative per-order values
             const creditOrders = ordersToday.filter((o: any) => !!o.is_credit_order);
             const cashOrders = ordersToday.filter((o: any) => !o.is_credit_order);
             const paidFromCash = cashOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
-            const creditOrdersTotal = creditOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
             const totalPaidFromCredit = creditOrders.reduce((sum: number, o: any) => sum + Number(o.credit_paid_amount || 0), 0);
             const totalPaidToday = paidFromCash + totalPaidFromCredit;
+            const todaysPending = creditOrders.reduce((sum: number, o: any) => sum + Number(
+              (o as any).credit_pending_amount ?? (Number(o.total_amount || 0) - Number(o.credit_paid_amount || 0))
+            ), 0);
 
-            // Calculate pending using: (Previous pending + Current order) - Amount paid = Updated pending
-            // Use the retailer's pending_amount from state as the previous pending
-            const previousPending = pendingAmount || 0;
-            const updatedPending = Math.max(0, previousPending + creditOrdersTotal - totalPaidFromCredit);
             setIsCreditOrder(creditOrders.length > 0);
             setCreditPaidAmount(totalPaidFromCredit); // Credit paid amount today (for reference)
             setPaidTodayAmount(totalPaidToday); // Total paid amount today (cash + credit)
-            setCreditPendingAmount(updatedPending); // Updated pending after today's order
+            setCreditPendingAmount(Math.max(0, todaysPending)); // Today's order pending (per-order server value)
 
             // CRITICAL: Update local status to productive immediately when orders exist
             console.log('✅ [VisitCard] Orders exist - setting status to productive immediately');
@@ -1085,7 +1246,9 @@ export const VisitCard = ({
               const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
               const offlineOrders = cachedOrders.filter((o: any) => {
                 const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
-                return o.user_id === currentUserId && 
+                const isLive = o && o.status !== 'cancelled' && !o.replaced_by_order_id;
+                return isLive &&
+                       o.user_id === currentUserId && 
                        o.retailer_id === visitRetailerId && 
                        orderDateStr === targetDate;
               });
@@ -1192,8 +1355,36 @@ export const VisitCard = ({
   // Fetch pending amount for retailer - ONLY when online
   // FIX: Defer to avoid initial render cascade that causes flickering
   useEffect(() => {
-    // OFFLINE GUARD: Skip network calls when offline - use existing cached state
-    if (!navigator.onLine) return;
+    // OFFLINE GUARD: Read pending from cached retailers store instead of network
+    const visitRetailerId = visit.retailerId || visit.id;
+    if (!navigator.onLine) {
+      (async () => {
+        try {
+          const cachedRetailer = await offlineStorage.getById<any>(STORES.RETAILERS, visitRetailerId as string);
+          const cachedPending = Number(cachedRetailer?.pending_amount || 0);
+          const { data: { session } } = await supabase.auth.getSession();
+          const currentUserId = viewingUserId || session?.user?.id || userId;
+          const targetDate = selectedDate && selectedDate.length > 0 ? selectedDate : getLocalTodayDate();
+          const targetDateStr = targetDate.split('T')[0];
+          const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+          const todaysOrders = cachedOrders.filter((o: any) => {
+            const orderDateStr = (o.order_date || o.created_at || '').split('T')[0];
+            const isLive = o && o.status !== 'cancelled' && !o.replaced_by_order_id;
+            return isLive && o.user_id === currentUserId && o.retailer_id === visitRetailerId && orderDateStr === targetDateStr;
+          });
+          const todaysPaidOffline = todaysOrders.reduce((sum: number, o: any) => {
+            const isCredit = (o.payment_method || '').toLowerCase() === 'credit';
+            return sum + Number(isCredit ? (o.credit_paid_amount || 0) : (o.total_amount || 0));
+          }, 0);
+          const reconciled = Math.max(0, cachedPending - todaysPaidOffline);
+          const todaysCreditPending = todaysOrders.reduce((s: number, o: any) =>
+            s + Number(o.credit_pending_amount ?? 0), 0);
+          const shown = Math.max(reconciled, todaysCreditPending);
+          if (pendingAmount !== shown) setPendingAmount(shown);
+        } catch (e) { console.log('[VisitCard] offline pending read failed', e); }
+      })();
+      return;
+    }
     
     // Defer to avoid blocking initial paint
     const timer = setTimeout(async () => {
@@ -1452,14 +1643,10 @@ export const VisitCard = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
-  const getPosition = () => new Promise<GeolocationPosition>((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 30000,
-      maximumAge: 10000
-    });
-  });
+  const getPosition = async (): Promise<{ coords: { latitude: number; longitude: number } }> => {
+    const c = await getResilientLocation();
+    return { coords: { latitude: c.latitude, longitude: c.longitude } };
+  };
   // FAST ensureVisit: Returns cached/temp ID immediately, syncs in background
   const ensureVisit = async (userId: string, retailerId: string, date: string): Promise<string> => {
     // STEP 1: INSTANT - Check local cache first (always, regardless of network)
@@ -1603,6 +1790,7 @@ export const VisitCard = ({
           console.log('⚠️ [ensureVisit] Background network sync failed, keeping temp ID:', e);
           // Queue for sync when back online
           await offlineStorage.addToSyncQueue('CREATE_VISIT', {
+            id: crypto.randomUUID(),
             user_id: userId,
             retailer_id: retailerId,
             planned_date: date,
@@ -1613,11 +1801,13 @@ export const VisitCard = ({
     } else {
       // Offline - queue for sync
       await offlineStorage.addToSyncQueue('CREATE_VISIT', {
+        id: crypto.randomUUID(),
         user_id: userId,
         retailer_id: retailerId,
         planned_date: date,
         status: 'planned'
       });
+
     }
     
     return tempVisitId;
@@ -1758,14 +1948,9 @@ export const VisitCard = ({
   };
   const autoCheckOutPreviousVisit = async (userId: string, currentRetailerId: string, today: string) => {
     try {
-      // Get current location for auto check-out
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
-      });
+      // Get current location for auto check-out (resilient: cached → high-accuracy → low-accuracy)
+      const c = await getResilientLocation();
+      const position = { coords: { latitude: c.latitude, longitude: c.longitude } } as GeolocationPosition;
       const currentLocation = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude
@@ -1828,8 +2013,8 @@ export const VisitCard = ({
         return;
       }
 
-      // Check if geolocation is supported
-      if (!navigator.geolocation) {
+      // Check if geolocation is supported (only required when location capture is enabled)
+      if (isLocationEnabled && !navigator.geolocation) {
         toast({
           title: 'Location not supported',
           description: 'Your device does not support location services.',
@@ -1846,58 +2031,42 @@ export const VisitCard = ({
       setCurrentVisitId(visitId);
 
       // Get current location with better error handling
-      let current: {
-        latitude: number;
-        longitude: number;
-      };
-      try {
-        current = await new Promise<{
-          latitude: number;
-          longitude: number;
-        }>((resolve, reject) => {
-          const timeoutId = setTimeout(() => {
-            reject(new Error('Location request timed out. Please ensure location services are enabled.'));
-          }, 15000);
-          navigator.geolocation.getCurrentPosition(position => {
-            clearTimeout(timeoutId);
-            resolve({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude
-            });
-          }, error => {
-            clearTimeout(timeoutId);
-            let errorMessage = 'Unable to get your location.';
-            switch (error.code) {
-              case error.PERMISSION_DENIED:
-                errorMessage = 'Location permission denied. Please enable location access in your device settings.';
+      let current: { latitude: number; longitude: number } | null = null;
+      let address = '';
+      let match: boolean | null = null;
+
+      if (isLocationEnabled) {
+        try {
+          current = await getResilientLocation();
+        } catch (locationError: any) {
+          let errorMessage = 'Failed to get location. Please enable location services.';
+          if (locationError && typeof locationError === 'object' && 'code' in locationError) {
+            switch (locationError.code) {
+              case 1:
+                errorMessage = 'Location permission denied. Please enable location access for this site in your browser and device settings.';
                 break;
-              case error.POSITION_UNAVAILABLE:
-                errorMessage = 'Location information is unavailable. Please check your GPS settings.';
+              case 2:
+                errorMessage = 'Location unavailable. Please check that GPS is ON (Android: Settings → Location → High accuracy).';
                 break;
-              case error.TIMEOUT:
-                errorMessage = 'Location request timed out. Please try again.';
+              case 3:
+                errorMessage = "Couldn't get a GPS fix. Move near a window or outdoors, enable Precise location for this site in Chrome, then tap Capture Location again.";
                 break;
             }
-            reject(new Error(errorMessage));
-          }, {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
+          } else if (locationError?.message) {
+            errorMessage = locationError.message;
+          }
+          toast({
+            title: 'Location Error',
+            description: errorMessage,
+            variant: 'destructive'
           });
-        });
-      } catch (locationError: any) {
-        toast({
-          title: 'Location Error',
-          description: locationError.message || 'Failed to get location. Please enable location services.',
-          variant: 'destructive'
-        });
-        return;
-      }
-      const address = `${current.latitude.toFixed(6)}, ${current.longitude.toFixed(6)}`;
-      let match: boolean | null = null;
-      if (visit.retailerLat && visit.retailerLng) {
-        const distance = calculateDistance(current.latitude, current.longitude, visit.retailerLat, visit.retailerLng);
-        match = distance <= 100;
+          return;
+        }
+        address = `${current.latitude.toFixed(6)}, ${current.longitude.toFixed(6)}`;
+        if (visit.retailerLat && visit.retailerLng) {
+          const distance = calculateDistance(current.latitude, current.longitude, visit.retailerLat, visit.retailerLng);
+          match = distance <= 100;
+        }
       }
 
       // Close location modal
@@ -1983,7 +2152,7 @@ export const VisitCard = ({
         return;
       }
 
-      // For check-in: require photo with front camera
+      // For check-in: prepare context
       pendingPhotoActionRef.current = action;
       pendingCheckDataRef.current = {
         action,
@@ -1997,8 +2166,44 @@ export const VisitCard = ({
         today
       };
 
-      // Open camera capture modal
-      setShowCameraCapture(true);
+      if (isCameraEnabled) {
+        // Open camera capture modal — photo handler finalizes check-in
+        setShowCameraCapture(true);
+      } else {
+        // Camera disabled — finalize check-in immediately without photo
+        await autoCheckOutPreviousVisit(user.id, retailerId, today);
+        const { error: visitErr } = await supabase.from('visits').update({
+          check_in_time: timestamp,
+          check_in_location: current,
+          check_in_address: address || null,
+          location_match_in: match,
+          status: 'in-progress'
+        }).eq('id', visitId);
+        if (visitErr) throw visitErr;
+
+        const { error: attErr } = await supabase.from('attendance').upsert({
+          user_id: user.id,
+          date: today,
+          check_in_time: timestamp,
+          check_in_location: current,
+          check_in_address: address || null,
+          status: 'present'
+        }, { onConflict: 'user_id,date' });
+        if (attErr) console.error('Attendance check-in error:', attErr);
+
+        setPhase('in-progress');
+        setLocationMatchIn(match);
+        setIsCheckedIn(true);
+        window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+          detail: { visitId, status: 'in-progress', retailerId }
+        }));
+        toast({
+          title: 'Check-in successful ✓',
+          description: match === false ? 'Location mismatch detected' : 'Visit started successfully'
+        });
+        pendingPhotoActionRef.current = null;
+        pendingCheckDataRef.current = null;
+      }
     } catch (err: any) {
       console.error('Check-in/out error', err);
 
@@ -2010,7 +2215,8 @@ export const VisitCard = ({
       if (err.message?.includes('Location') || err.message?.includes('GPS')) {
         errorDescription = err.message;
       } else if (err.message?.includes('permission')) {
-        errorDescription = 'Please enable location and camera permissions in your device settings.';
+        const perms = [isLocationEnabled && 'location', isCameraEnabled && 'camera'].filter(Boolean).join(' and ');
+        errorDescription = `Please enable ${perms || 'required'} permissions in your device settings.`;
       } else if (err.message?.includes('timeout') || err.message?.includes('timed out')) {
         errorDescription = 'Request timed out. Please check your GPS and internet connection, then try again.';
       }
@@ -2233,7 +2439,7 @@ export const VisitCard = ({
     }, 0); // setTimeout 0 ensures UI updates first
   };
   const handleNoOrderClick = () => {
-    if (isLocationEnabled && isCheckInMandatory && !isCheckedIn && !proceedWithoutCheckIn && isTodaysVisit) {
+    if (isCheckInEnabled && isCheckInMandatory && !isCheckedIn && !proceedWithoutCheckIn && isTodaysVisit) {
       toast({
         title: 'Check-in Required',
         description: 'Please check in or proceed without check-in first.',
@@ -2295,46 +2501,62 @@ export const VisitCard = ({
       const dayEnd = new Date(targetDate);
       dayEnd.setHours(23, 59, 59, 999);
       
+      // Shared-beat awareness: include teammate orders for this retailer on this date.
+      // We do NOT pre-filter by user_id — RLS (user_has_beat_access) decides what's visible.
+      // This ensures the items panel works even when teammateActivity prop wasn't populated.
+
       // First try offline storage (instant) - always check this first for responsiveness
       let offlineOrders: any[] = [];
       try {
         const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
-        // Format target date as YYYY-MM-DD for comparison
         const targetDateStr = toLocalISODate(targetDate);
-        
+
         offlineOrders = cachedOrders.filter((o: any) => {
-          // Check by order_date first (exact date match), fallback to created_at
+          if (o.retailer_id !== retailerId) return false;
+          // Exclude cancelled originals and orders replaced by an edit (live orders only)
+          if (o.status === 'cancelled' || o.replaced_by_order_id) return false;
           if (o.order_date) {
             const orderDateStr = o.order_date.split('T')[0];
-            return o.user_id === effectiveUserId && o.retailer_id === retailerId && orderDateStr === targetDateStr;
+            return orderDateStr === targetDateStr;
           }
-          // Fallback to created_at timestamp comparison
           const orderDate = new Date(o.created_at);
-          return o.user_id === effectiveUserId && o.retailer_id === retailerId && orderDate >= dayStart && orderDate <= dayEnd;
-        });
+          return orderDate >= dayStart && orderDate <= dayEnd;
+        }).map((o: any) => ({
+          ...o,
+          _source: o.user_id && o.user_id !== effectiveUserId ? 'teammate' : 'mine',
+        }));
         console.log('[VisitCard] Offline orders found:', offlineOrders.length, 'for retailer:', retailerId);
       } catch (e) {
         console.log('[VisitCard] Error reading offline orders:', e);
       }
-      
-      // Then try Supabase (if online) with timeout to avoid blocking
+
+      // Then try Supabase (if online). Query by retailer + date only; RLS gates visibility.
       let dbOrders: any[] = [];
+      let dbReachable = false;
       if (navigator.onLine) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-          
-          const { data } = await supabase
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+          const { data, error } = await supabase
             .from('orders')
-            .select('id, created_at, total_amount, is_credit_order, credit_paid_amount, invoice_number, idempotency_key, order_items(product_name, quantity, rate, original_rate, total, unit)')
-            .eq('user_id', effectiveUserId)
+            .select('id, user_id, created_at, total_amount, is_credit_order, credit_paid_amount, credit_pending_amount, invoice_number, idempotency_key, invoice_generated_at, dispatched_at, order_items!order_items_order_id_fkey(product_name, quantity, rate, original_rate, total, unit)')
             .eq('retailer_id', retailerId)
             .in('status', ['confirmed', 'delivered'])
             .eq('order_date', selectedDate || toLocalISODate(targetDate))
             .abortSignal(controller.signal);
-          
+
           clearTimeout(timeoutId);
-          dbOrders = data || [];
+          if (error) {
+            console.log('[VisitCard] DB orders query error:', error.message);
+          } else {
+            dbReachable = true;
+          }
+          dbOrders = (data || []).map((o: any) => ({
+            ...o,
+            _source: o.user_id && o.user_id !== effectiveUserId ? 'teammate' : 'mine',
+          }));
+          console.log('[VisitCard] DB orders found:', dbOrders.length, 'for retailer:', retailerId, '(own+teammate via RLS)');
         } catch (e: any) {
           if (e.name === 'AbortError') {
             console.log('[VisitCard] DB fetch timed out, using offline data');
@@ -2372,18 +2594,63 @@ export const VisitCard = ({
         }
       });
       
-      // Add offline-only orders (not in DB yet) - check by both id AND idempotency_key
-      offlineOrders.forEach(offlineOrder => {
-        const alreadyInDB = dbOrderMap.has(offlineOrder.id) || 
-          (offlineOrder.idempotency_key && dbIdempotencyMap.has(offlineOrder.idempotency_key));
-        if (!alreadyInDB) {
-          mergedOrders.push(offlineOrder);
-        }
-      });
+      // Add offline-only orders ONLY when DB is unreachable.
+      // If DB responded, it is the source of truth — any offline order not in DB is
+      // either a cancelled/replaced original (post-edit) or already-synced stale data.
+      if (!dbReachable) {
+        offlineOrders.forEach(offlineOrder => {
+          const alreadyInDB = dbOrderMap.has(offlineOrder.id) || 
+            (offlineOrder.idempotency_key && dbIdempotencyMap.has(offlineOrder.idempotency_key));
+          if (!alreadyInDB) {
+            mergedOrders.push(offlineOrder);
+          }
+        });
+      }
       
       console.log('[VisitCard] Merged orders:', mergedOrders.length, 'with items:', mergedOrders.filter(o => o.items?.length > 0).length);
       
       setOrdersTodayList(mergedOrders as any);
+
+      // FIFO "old payment cleared" detection.
+      // When a credit order is placed today and a payment is collected, the
+      // server runs apply_retailer_payment_fifo which clears OLDER pending
+      // invoices first. We surface that here so the rep can see e.g.
+      // "Old payment cleared: ₹50 on 12 Jun 2026" right inside Today's Order.
+      try {
+        const todayOrderIds = mergedOrders.map((o: any) => o.id).filter(Boolean);
+        if (navigator.onLine) {
+          const { data: allocRows } = await supabase
+            .from('retailer_payment_allocations' as any)
+            .select('order_id, amount_applied, applied_at, created_at')
+            .eq('retailer_id', retailerId)
+            .gte('created_at', dayStart.toISOString())
+            .lte('created_at', dayEnd.toISOString());
+
+          const oldAllocs = (allocRows || []).filter(
+            (r: any) => r.order_id && !todayOrderIds.includes(r.order_id)
+          );
+          if (oldAllocs.length > 0) {
+            const totalCleared = oldAllocs.reduce(
+              (s: number, r: any) => s + Number(r.amount_applied || 0),
+              0
+            );
+            const lastDate = oldAllocs
+              .map((r: any) => r.applied_at || r.created_at)
+              .filter(Boolean)
+              .sort()
+              .pop() as string | undefined;
+            setOldPaymentsCleared({
+              amount: totalCleared,
+              lastDate: lastDate || null,
+            });
+          } else {
+            setOldPaymentsCleared({ amount: 0, lastDate: null });
+          }
+        }
+      } catch (e) {
+        console.log('[VisitCard] old-payment-cleared lookup failed (non-fatal):', e);
+      }
+
       if (mergedOrders.length > 0) {
         // CRITICAL FIX: Also calculate and set order totals when loading order details
         const totalOrderValue = mergedOrders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0);
@@ -2392,14 +2659,15 @@ export const VisitCard = ({
         const paidFromCash = cashOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
         const totalPaidFromCredit = creditOrders.reduce((sum: number, o: any) => sum + Number(o.credit_paid_amount || 0), 0);
         const totalPaidToday = paidFromCash + totalPaidFromCredit;
-        const creditOrdersTotal = creditOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
-        const updatedPending = Math.max(0, creditOrdersTotal - totalPaidFromCredit);
+        const todaysPending = creditOrders.reduce((sum: number, o: any) => sum + Number(
+          (o as any).credit_pending_amount ?? (Number(o.total_amount || 0) - Number(o.credit_paid_amount || 0))
+        ), 0);
         
         // Update the order value and payment states
         if (totalOrderValue > 0) {
           updateOrderValue(totalOrderValue, 'db');
           setPaidTodayAmount(totalPaidToday);
-          setCreditPendingAmount(updatedPending);
+          setCreditPendingAmount(Math.max(0, todaysPending));
           setIsCreditOrder(creditOrders.length > 0);
         }
         
@@ -2476,23 +2744,13 @@ export const VisitCard = ({
         
         console.log('[VisitCard] Total items found:', allItems.length);
 
-        // Helper function to convert quantity and rate for display
-        // Uses original_rate (MRP from product master) for accurate display
+        // Display values: keep the actual unit and the stored per-unit rate.
+        // We do NOT force-convert grams → KG anymore — the unit captured on the
+        // line item (and per-unit rate from product master) is the source of truth.
         const getDisplayValues = (qty: number, rate: number, originalRate: number, total: number, unit: string) => {
-          const unitLower = (unit || '').toLowerCase().trim();
-          // Use original_rate for display (full precision), fallback to rate
+          const displayUnit = (unit || '').trim() || 'PC';
           const displayRateBase = originalRate || rate;
-          
-          // Always convert grams to kg for display (consistent with invoice)
-          if (unitLower === 'grams' || unitLower === 'g' || unitLower === 'gram') {
-            const kgQty = qty / 1000;
-            // Use original rate * 1000 to get per KG rate (matches product master)
-            const ratePerKg = displayRateBase * 1000;
-            return { displayQty: kgQty, displayUnit: 'KG', displayRate: ratePerKg };
-          }
-          
-          // For other units, use the original rate directly
-          return { displayQty: qty, displayUnit: unit, displayRate: displayRateBase };
+          return { displayQty: qty, displayUnit: displayUnit.toUpperCase(), displayRate: displayRateBase };
         };
 
         // Group items by product for a clean summary
@@ -2553,6 +2811,22 @@ export const VisitCard = ({
   };
   return <Card className="shadow-card hover:shadow-xl transition-all duration-300 border-l-4 border-l-primary/30 bg-gradient-to-r from-card to-card/50">
       <CardContent className="p-3 sm:p-4">
+        {/* Teammate activity banner (shared beats) */}
+        {visit.teammateActivity && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1.5 text-xs text-indigo-800 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-200">
+            <span className="truncate">
+              <span className="font-semibold">{visit.teammateActivity.name}</span>{' '}
+              {visit.teammateActivity.hasOrder
+                ? `placed an order${visit.teammateActivity.orderValue ? ` of ₹${Math.round(visit.teammateActivity.orderValue).toLocaleString('en-IN')}` : ''} here`
+                : 'visited this retailer'}
+              {visit.teammateActivity.visitTime &&
+                ` · ${new Date(visit.teammateActivity.visitTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`}
+            </span>
+            <span className="shrink-0 rounded-full bg-indigo-200/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide dark:bg-indigo-800/60">
+              Teammate
+            </span>
+          </div>
+        )}
         {/* Header - Retailer info and status */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-3">
           <div className="flex-1 min-w-0">
@@ -2564,6 +2838,27 @@ export const VisitCard = ({
                   </button>
                 </h3>
                 
+                {/* Carried-over indicator */}
+                {visit.isCarryForward && (
+                  <Badge variant="outline" className="text-[10px] border-warning/40 bg-warning/10 text-warning-foreground" title={visit.carriedFromDate ? `Carried from ${visit.carriedFromDate}` : "Carried over"}>
+                    Carried over
+                  </Badge>
+                )}
+
+                {/* Rescheduled indicator */}
+                {visit.isRescheduled && (
+                  <Badge variant="outline" className="text-[10px] border-primary/40 bg-primary/10 text-primary" title={visit.rescheduledFromDate ? `Rescheduled from ${visit.rescheduledFromDate}` : "Rescheduled"}>
+                    Rescheduled
+                  </Badge>
+                )}
+
+                {/* Coverage indicator */}
+                {visit.coveredForUserId && (
+                  <Badge variant="outline" className="text-[10px] border-purple-400/50 bg-purple-500/10 text-purple-600" title={visit.coveredForUserName ? `Covering for ${visit.coveredForUserName}` : "Coverage visit"}>
+                    Coverage
+                  </Badge>
+                )}
+
                 {/* Phone Order Badge - only shown if applicable */}
                 {currentLog?.is_phone_order && (
                   <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
@@ -2626,6 +2921,10 @@ export const VisitCard = ({
               {skipCheckInReason === 'phone-order' && <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-xs px-2 py-1">
                   <Phone size={12} className="mr-1" />
                   Phone Order
+                </Badge>}
+              {visit.visitType === 'portal_order' && <Badge className="bg-indigo-500 text-white hover:bg-indigo-600 text-xs px-2 py-1">
+                  <Globe size={12} className="mr-1" />
+                  Portal Order
                 </Badge>}
               {isJointSalesVisit && hasJointSalesFeedback && <Badge 
                   className="bg-purple-500 text-white hover:bg-purple-600 text-xs px-2 py-1 cursor-pointer"
@@ -2695,25 +2994,29 @@ export const VisitCard = ({
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 gap-1 text-xs text-primary"
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Collection tips"
+                    className="h-7 w-7 text-primary"
                     onClick={() => {
                       recordAction('collection_tips').catch(() => {});
                       setShowCreditTalkingPoints(true);
                     }}
                   >
-                    <MessageSquare className="w-3 h-3" />
-                    Tips
+                    <MessageSquare className="w-3.5 h-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
-                    setShowPaymentModal(true);
-                    // Record action for time tracking
-                    recordAction('payment').catch(err => console.error('Payment tracking failed:', err));
-                  }}>
-                    <IndianRupee className="w-3 h-3" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 gap-1 text-xs"
+                    onClick={() => {
+                      setShowPaymentModal(true);
+                      recordAction('payment').catch(err => console.error('Payment tracking failed:', err));
+                    }}
+                  >
+                    <IndianRupee className="w-3.5 h-3.5" />
                     Pay
                   </Button>
                 </div>
@@ -2723,8 +3026,8 @@ export const VisitCard = ({
 
         <div className="space-y-2">
           {/* First row - Check In, Order, Feedback, AI */}
-          <div className={`grid gap-1.5 sm:gap-2 ${!locationFeatureLoading && isLocationEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
-            {!locationFeatureLoading && isLocationEnabled && (
+          <div className={`grid gap-1.5 sm:gap-2 ${!locationFeatureLoading && isCheckInEnabled && canCheckIn ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            {!locationFeatureLoading && isCheckInEnabled && canCheckIn && (
               <Button
                 size="sm"
                 className={`${getLocationBtnClass()} p-1.5 sm:p-2 h-8 sm:h-10 text-xs sm:text-sm flex flex-col items-center gap-0.5`}
@@ -2742,7 +3045,7 @@ export const VisitCard = ({
               className={`p-1.5 sm:p-2 h-8 sm:h-10 text-xs sm:text-sm flex flex-col items-center gap-0.5 ${
                 hasOrderToday ? "bg-success text-success-foreground" : ""
               } ${
-                (isCheckInMandatory && !isCheckedIn && !proceedWithoutCheckIn && isLocationEnabled) || !isTodaysVisit
+                (isCheckInMandatory && !isCheckedIn && !proceedWithoutCheckIn && isCheckInEnabled) || !isTodaysVisit
                   ? "opacity-50 cursor-not-allowed"
                   : ""
               }`}
@@ -2754,14 +3057,15 @@ export const VisitCard = ({
                 if (!isTodaysVisit) {
                   toast({
                     title: "Cannot Place Order",
-                    description: "You can only place orders for today's visits. Please select today's date.",
+                    description: "Orders can be placed for today's date, or for a past date when backdating is enabled and permitted for you.",
                     variant: "destructive",
                   });
                   return;
                 }
 
                 // Check if check-in is required but not done (sync check, no network)
-                if (isLocationEnabled && isCheckInMandatory && !isCheckedIn && !proceedWithoutCheckIn) {
+                // Skip check-in requirement for backdated orders
+                if (!isBackdatedOrderAllowed && isCheckInEnabled && isCheckInMandatory && !isCheckedIn && !proceedWithoutCheckIn) {
                   toast({
                     title: "Check-in Required",
                     description: "Please check in first to place an order.",
@@ -2834,7 +3138,7 @@ export const VisitCard = ({
                 })();
               }}
               title={
-                isLocationEnabled && !isCheckedIn && !proceedWithoutCheckIn
+                isCheckInEnabled && !isCheckedIn && !proceedWithoutCheckIn
                   ? "Check in first to place order"
                   : `Order${
                       visit.orderValue || hasOrderToday
@@ -2909,6 +3213,25 @@ export const VisitCard = ({
                   {ordersTodayList.length > 1 && (
                     <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">{ordersTodayList.length} orders</Badge>
                   )}
+                  {ordersTodayList.length === 1 && orderSyncStatuses[ordersTodayList[0].id] && (
+                    <span className="ml-2 inline-flex align-middle">
+                      <OrderSyncBadge status={orderSyncStatuses[ordersTodayList[0].id]} />
+                    </span>
+                  )}
+                  {ordersTodayList.length > 1 && (() => {
+                    const worst = ordersTodayList.reduce<any>((acc, o) => {
+                      const s = orderSyncStatuses[o.id];
+                      if (!s) return acc;
+                      const rank = { failed: 3, retrying: 2, syncing: 2, pending: 2, synced: 1 } as any;
+                      if (!acc || rank[s.state] > rank[acc.state]) return s;
+                      return acc;
+                    }, undefined);
+                    return worst ? (
+                      <span className="ml-2 inline-flex align-middle">
+                        <OrderSyncBadge status={worst} />
+                      </span>
+                    ) : null;
+                  })()}
                 </span>
               <Button variant="ghost" size="sm" className="h-7" onClick={async () => {
               recordAction('view_order').catch(() => {});
@@ -2943,7 +3266,25 @@ export const VisitCard = ({
                       <span className="text-warning">Pending Amount:</span>
                       <span className="font-medium text-warning">₹{Math.round(creditPendingAmount).toLocaleString()}</span>
                     </div>
+                    {oldPaymentsCleared.amount > 0 && (
+                      <div className="flex justify-between items-start text-xs pt-1 mt-1 border-t border-amber-200 dark:border-amber-700">
+                        <span className="text-muted-foreground">
+                          Old payment cleared (FIFO):
+                          {oldPaymentsCleared.lastDate && (
+                            <span className="block text-[10px] text-muted-foreground/80">
+                              on {new Date(oldPaymentsCleared.lastDate).toLocaleDateString('en-IN', {
+                                day: '2-digit', month: 'short', year: 'numeric',
+                              })}
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-medium text-success">
+                          ₹{Math.round(oldPaymentsCleared.amount).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
+                  
                   
                   {/* Individual Orders - show each order separately when multiple exist */}
                   {loadingOrder && <div className="text-xs text-muted-foreground mt-2">Loading...</div>}
@@ -2971,25 +3312,40 @@ export const VisitCard = ({
                               <div className="flex items-center gap-2">
                                 <Package size={12} className="text-primary" />
                                 <span className="font-medium">Order {orderIdx + 1}</span>
+                                {(order as any)._source === 'teammate' && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                    by {visit.teammateActivity?.name || 'teammate'}
+                                  </span>
+                                )}
                                 {order.invoice_number && (
                                   <span className="text-muted-foreground">({order.invoice_number})</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold">₹{Math.round(order.total_amount).toLocaleString()}</span>
+                                <OrderSyncBadge status={orderSyncStatuses[order.id]} />
                                 <span className="text-muted-foreground">{isExpanded ? '▲' : '▼'}</span>
                               </div>
                             </button>
                             
                             {isExpanded && (
-                              <OrderItemsExpanded 
-                                orderId={order.id} 
-                                displayItems={displayItems} 
-                                onItemsLoaded={(items) => {
-                                  // Merge newly fetched items into lastOrderItems
-                                  setLastOrderItems(prev => [...prev, ...items]);
-                                }}
-                              />
+                              <>
+                                <OrderItemsExpanded 
+                                  orderId={order.id} 
+                                  displayItems={displayItems} 
+                                  onItemsLoaded={(items) => {
+                                    // Merge newly fetched items into lastOrderItems
+                                    setLastOrderItems(prev => [...prev, ...items]);
+                                  }}
+                                />
+                                <div className="px-2 pb-2">
+                                  <OrderSyncDetails
+                                    orderId={order.id}
+                                    status={orderSyncStatuses[order.id]}
+                                    onChanged={refreshOrderSyncStatuses}
+                                  />
+                                </div>
+                              </>
                             )}
                           </div>
                         );
@@ -3016,6 +3372,13 @@ export const VisitCard = ({
                           </div>
                         );
                       })}
+                      {ordersTodayList.length === 1 && (
+                        <OrderSyncDetails
+                          orderId={ordersTodayList[0].id}
+                          status={orderSyncStatuses[ordersTodayList[0].id]}
+                          onChanged={refreshOrderSyncStatuses}
+                        />
+                      )}
                     </div>
                   ) : null}
                   
@@ -3039,10 +3402,93 @@ export const VisitCard = ({
                         <Ban size={14} className="mr-2" />
                         Cancel Order
                       </Button>
+
+                      {/* Edit Order Button (Phase 2b-3b) — gated by operations_config + can_edit_order RPC */}
+                      {editPolicy.edit_enabled && canEditPerm && (() => {
+                        const editable = ordersTodayList.filter(
+                          (o: any) => editableOrderIds.has(o.id),
+                        );
+                        if (editable.length === 0) return null;
+                        const goEdit = (orderId: string) => {
+                          const vId = currentVisitId || visit.id;
+                          const rId = (visit.retailerId || visit.id) as string;
+                          const rName = visit.retailerName || '';
+                          navigate(`/order-entry?visitId=${encodeURIComponent(vId)}&retailerId=${encodeURIComponent(rId)}&retailer=${encodeURIComponent(rName)}&editOrderId=${encodeURIComponent(orderId)}`);
+                        };
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              if (editable.length === 1) goEdit(editable[0].id);
+                              else setShowEditPickerDialog(true);
+                            }}
+                          >
+                            <Pencil size={14} className="mr-2" />
+                            Edit Order
+                          </Button>
+                        );
+                      })()}
+
                     </div>}
                 </>}
             </div>}
         </div>
+
+        {/* Edit Order Picker Dialog */}
+        <Dialog open={showEditPickerDialog} onOpenChange={setShowEditPickerDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Which order do you want to edit?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              <TooltipProvider>
+                {ordersTodayList
+                  .filter((o: any) => !o.invoice_generated_at && !o.dispatched_at)
+                  .map((o) => {
+                    const allowed = editableOrderIds.has(o.id);
+                    const row = (
+                      <button
+                        key={o.id}
+                        disabled={!allowed}
+                        className="w-full text-left border rounded-md p-3 hover:bg-accent transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                        onClick={() => {
+                          if (!allowed) return;
+                          setShowEditPickerDialog(false);
+                          const vId = currentVisitId || visit.id;
+                          const rId = (visit.retailerId || visit.id) as string;
+                          const rName = visit.retailerName || '';
+                          navigate(`/order-entry?visitId=${encodeURIComponent(vId)}&retailerId=${encodeURIComponent(rId)}&retailer=${encodeURIComponent(rName)}&editOrderId=${encodeURIComponent(o.id)}`);
+                        }}
+                      >
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-medium">
+                            {o.invoice_number ? `Invoice ${o.invoice_number}` : `Order ${o.id.slice(0, 8)}`}
+                          </span>
+                          <span className="text-muted-foreground">₹{Number(o.total_amount || 0).toLocaleString('en-IN')}</span>
+                        </div>
+                        {o.distributor_name && (
+                          <div className="text-xs text-muted-foreground mt-0.5">{o.distributor_name}</div>
+                        )}
+                      </button>
+                    );
+                    if (allowed) return row;
+                    return (
+                      <Tooltip key={o.id}>
+                        <TooltipTrigger asChild>
+                          <div>{row}</div>
+                        </TooltipTrigger>
+                        <TooltipContent>This order can no longer be edited</TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+              </TooltipProvider>
+            </div>
+
+          </DialogContent>
+        </Dialog>
+
 
         {/* Camera Capture Modal */}
         <CameraCapture isOpen={showCameraCapture} onClose={() => {
@@ -3058,11 +3504,11 @@ export const VisitCard = ({
               <DialogTitle className="text-lg font-semibold text-center">Location Options</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 py-4">
-              {isLocationEnabled && !isCheckedIn && isTodaysVisit && <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm text-blue-800 dark:text-blue-200">
-                  <p className="font-medium mb-1">📍 Location & Camera Required</p>
-                  <p className="text-xs">Please allow location and camera access when prompted for check-in.</p>
+              {isCheckInEnabled && !isCheckedIn && isTodaysVisit && <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm text-blue-800 dark:text-blue-200">
+                  <p className="font-medium mb-1">📍 {isLocationEnabled && isCameraEnabled ? 'Location & Camera Required' : isLocationEnabled ? 'Location Required' : 'Camera Required'}</p>
+                  <p className="text-xs">Please allow {[isLocationEnabled && 'location', isCameraEnabled && 'camera'].filter(Boolean).join(' and ')} access when prompted for check-in.</p>
                 </div>}
-            {isLocationEnabled && <div className="grid grid-cols-2 gap-2">
+            {isCheckInEnabled && <div className="grid grid-cols-2 gap-2">
                 <Button onClick={() => {
                   recordAction('check_in').catch(() => {});
                   handleCheckInOut('checkin');
@@ -3126,12 +3572,12 @@ export const VisitCard = ({
                   </Button>
                 </div>}
               
-              {isLocationEnabled && <Button onClick={() => handleCheckInOut('checkout')} className={`w-full h-12 text-base font-medium ${isCheckedOut ? 'bg-success text-success-foreground hover:bg-success/90 border-success' : !isCheckedIn || !isTodaysVisit ? 'bg-muted text-muted-foreground cursor-not-allowed border-muted' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} variant={isCheckedOut ? "default" : "outline"} disabled={!isCheckedIn || isCheckedOut || !isTodaysVisit}>
+              {isCheckInEnabled && <Button onClick={() => handleCheckInOut('checkout')} className={`w-full h-12 text-base font-medium ${isCheckedOut ? 'bg-success text-success-foreground hover:bg-success/90 border-success' : !isCheckedIn || !isTodaysVisit ? 'bg-muted text-muted-foreground cursor-not-allowed border-muted' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground'}`} variant={isCheckedOut ? "default" : "outline"} disabled={!isCheckedIn || isCheckedOut || !isTodaysVisit}>
                   <LogOut className="mr-2 h-5 w-5" />
                   {isCheckedOut ? 'Checked Out' : 'Check Out'}
                 </Button>}
               
-              {isLocationEnabled && <div className="pt-2 border-t">
+              {isCheckInEnabled && <div className="pt-2 border-t">
                   {!showReasonInput && !proceedWithoutCheckIn && !isCheckedIn && <button onClick={() => setShowReasonInput(true)} className="w-full text-sm text-primary hover:underline text-center py-2">
                     Click here to proceed without Check-in
                   </button>}
@@ -3550,15 +3996,26 @@ export const VisitCard = ({
         <StockDataModal isOpen={showStockDataModal} onClose={() => setShowStockDataModal(false)} retailerId={(visit.retailerId || visit.id) as string} retailerName={visit.retailerName} />
 
         {/* Payment Marking Modal */}
-        <PaymentMarkingModal open={showPaymentModal} onOpenChange={setShowPaymentModal} retailerId={(visit.retailerId || visit.id) as string} currentPendingAmount={pendingAmount} onPaymentMarked={(newPendingAmount: number) => {
+        <PaymentMarkingModal open={showPaymentModal} onOpenChange={setShowPaymentModal} retailerId={(visit.retailerId || visit.id) as string} currentPendingAmount={pendingAmount} onPaymentMarked={async (newPendingAmount: number) => {
         // Update local state immediately with the new pending amount
         setPendingAmount(newPendingAmount);
         if (newPendingAmount === 0) {
           setPendingSinceDate(null);
         }
+        // Authoritative refetch so Today's Order Paid/Pending reflect FIFO allocation
+        try {
+          await loadLastOrder();
+          // Retry once after recompute_retailer_pending settles
+          setTimeout(() => { loadLastOrder().catch(() => {}); }, 600);
+        } catch (e) {
+          console.warn('[VisitCard] post-payment refresh failed:', e);
+        }
         // Also dispatch event for any other listeners
-        window.dispatchEvent(new CustomEvent('visitStatusChanged'));
+        window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+          detail: { retailerId: (visit.retailerId || visit.id) as string }
+        }));
       }} />
+
 
         {/* Van Sales Modal */}
         {showVanSales && <VanSalesModal open={showVanSales} onOpenChange={setShowVanSales} retailerId={(visit.retailerId || visit.id) as string} visitId={currentVisitId || visit.id} />}
@@ -3722,9 +4179,13 @@ export const VisitCard = ({
               setOrderValueSource('db');
               const newCreditPending = remaining
                 .filter(o => o.is_credit_order)
-                .reduce((s, o) => s + (o.total_amount - o.credit_paid_amount), 0);
+                .reduce((s, o) => s + Number(
+                  (o as any).credit_pending_amount ?? (Number(o.total_amount || 0) - Number(o.credit_paid_amount || 0))
+                ), 0);
               setCreditPendingAmount(Math.max(0, newCreditPending));
-              const newPaid = remaining.reduce((s, o) => s + o.credit_paid_amount, 0);
+              const newPaid = remaining.reduce((s, o) => s + (
+                o.is_credit_order ? Number(o.credit_paid_amount || 0) : Number(o.total_amount || 0)
+              ), 0);
               setPaidTodayAmount(newPaid);
               setIsCreditOrder(remaining.some(o => o.is_credit_order));
               setLastOrderId(remaining[remaining.length - 1]?.id || null);
@@ -3756,7 +4217,27 @@ export const VisitCard = ({
         />
 
         {/* Location Capture Modal */}
-        <Dialog open={showLocationCaptureModal} onOpenChange={setShowLocationCaptureModal}>
+        <Dialog
+          open={showLocationCaptureModal}
+          onOpenChange={(open) => {
+            setShowLocationCaptureModal(open);
+            if (open) {
+              setLocationWarning(null);
+              setLocationReady(true);
+              setLocationDenied(false);
+              checkLocationAvailability().then((r) => {
+                if (r.message) setLocationWarning(r.message);
+                if (r.status === 'denied' || r.status === 'unavailable') {
+                  setLocationReady(false);
+                  setLocationDenied(r.status === 'denied');
+                } else if (r.status === 'prompt') {
+                  setLocationWarning('Tap Capture to allow location access.');
+                  setLocationReady(true);
+                }
+              });
+            }
+          }}
+        >
           <DialogContent className="max-w-sm">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -3767,31 +4248,82 @@ export const VisitCard = ({
             <p className="text-sm text-muted-foreground">
               This retailer doesn't have a GPS location saved. Please capture the current location before placing an order.
             </p>
+            {locationWarning && (
+              <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+                <div>{locationWarning}</div>
+                {locationDenied && Capacitor.isNativePlatform() && (
+                  <button
+                    type="button"
+                    className="mt-1 underline font-medium"
+                    onClick={() => openAppSettings()}
+                  >
+                    Open app settings
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex gap-2 justify-end mt-2">
               <Button variant="outline" size="sm" onClick={() => setShowLocationCaptureModal(false)}>
                 Cancel
               </Button>
-              <Button 
-                size="sm" 
-                disabled={isCapturingLocation}
+              <Button
+                size="sm"
+                disabled={isCapturingLocation || !locationReady}
                 onClick={async () => {
                   setIsCapturingLocation(true);
+                  setLocationWarning(null);
                   try {
-                    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                      navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 0,
-                      });
-                    });
-                    
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
+                    // On native, if permission is still 'prompt', request it
+                    // now (this is a user gesture) before attempting capture.
+                    if (Capacitor.isNativePlatform()) {
+                      const pre = await checkLocationAvailability();
+                      if (pre.status === 'prompt') {
+                        const granted = await requestLocationPermission();
+                        if (granted.status !== 'ready') {
+                          setLocationWarning(granted.message || 'Location permission denied.');
+                          setLocationReady(false);
+                          setLocationDenied(granted.status === 'denied');
+                          setIsCapturingLocation(false);
+                          return;
+                        }
+                      } else if (pre.status === 'denied' || pre.status === 'unavailable') {
+                        setLocationWarning(pre.message);
+                        setLocationReady(false);
+                        setLocationDenied(pre.status === 'denied');
+                        setIsCapturingLocation(false);
+                        return;
+                      }
+                    }
+
+                    const coords = await getResilientLocation();
+                    const lat = coords.latitude;
+                    const lng = coords.longitude;
                     const retailerId = (visit.retailerId || visit.id) as string;
+
+                    // Look up existing address so we don't overwrite a manual one
+                    const { data: existing } = await supabase
+                      .from('retailers')
+                      .select('address')
+                      .eq('id', retailerId)
+                      .maybeSingle();
+
+                    // Reverse-geocode in parallel; never block capture on geocode failure
+                    let address: string | null = null;
+                    try {
+                      address = await reverseGeocode(lat, lng);
+                    } catch {
+                      address = null;
+                    }
+
+                    const updatePayload: Record<string, any> = { latitude: lat, longitude: lng };
+                    const currentAddress = (existing?.address || '').trim();
+                    if (address && !currentAddress) {
+                      updatePayload.address = address;
+                    }
 
                     const { error } = await supabase
                       .from('retailers')
-                      .update({ latitude: lat, longitude: lng })
+                      .update(updatePayload)
                       .eq('id', retailerId);
 
                     if (error) throw error;
@@ -3802,13 +4334,21 @@ export const VisitCard = ({
 
                     toast({
                       title: "Location Captured",
-                      description: "Retailer location has been saved successfully. You can now place the order.",
+                      description: address && !currentAddress
+                        ? "Coordinates and address saved successfully."
+                        : "Retailer location has been saved successfully.",
                     });
                   } catch (err: any) {
                     console.error('Location capture error:', err);
+                    const { message, status } = classifyLocationError(err);
+                    setLocationWarning(message);
+                    if (status === 'denied' || status === 'unavailable') {
+                      setLocationReady(false);
+                      setLocationDenied(status === 'denied');
+                    }
                     toast({
                       title: "Location Capture Failed",
-                      description: err?.message || "Could not get your current location. Please enable GPS and try again.",
+                      description: message,
                       variant: "destructive",
                     });
                   } finally {

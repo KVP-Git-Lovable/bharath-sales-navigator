@@ -72,7 +72,12 @@ interface AssignedPackingList {
   total_value: number;
   status: string;
   orders: DeliveryOrder[];
+  is_primary?: boolean;
+  dispatch_destination?: string | null;
+  total_packages?: number | null;
+  dispatched_at?: string | null;
 }
+
 
 export default function MyDeliveriesTab() {
   const { toast } = useToast();
@@ -227,7 +232,12 @@ export default function MyDeliveriesTab() {
           });
         }
 
+        // Primary packing-list completion is driven by the child distributor's GRN,
+        // not by this delivery screen. Only secondary deliveries are loaded here.
+
+
         setAssignedPackingLists(packingListsWithOrders);
+
         
         // Auto-expand today's packing lists
         const todayLists = packingListsWithOrders
@@ -489,16 +499,34 @@ export default function MyDeliveriesTab() {
                           <Package className="h-5 w-5 text-primary" />
                         </div>
                         <div className="text-left">
-                          <p className="font-medium">{packingList.packing_list_number}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(packingList.delivery_date), 'dd MMM yyyy')} • {listOrders.length} orders
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{packingList.packing_list_number}</p>
+                            {packingList.is_primary && (
+                              <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">PRIMARY</Badge>
+                            )}
+                          </div>
+                          {packingList.is_primary ? (
+                            <p className="text-sm text-muted-foreground">
+                              {packingList.dispatch_destination || 'Destination N/A'} • {packingList.total_packages ?? 0} pkgs • {packingList.total_items ?? 0} units
+                              {packingList.dispatched_at && (
+                                <> • Dispatched {format(new Date(packingList.dispatched_at), 'dd MMM HH:mm')}</>
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              {format(new Date(packingList.delivery_date), 'dd MMM yyyy')} • {listOrders.length} orders
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={listProgress === 100 ? "default" : "outline"}>
-                          {listCompleted}/{listOrders.length}
-                        </Badge>
+                        {packingList.is_primary ? (
+                          <Badge variant="outline">Dispatched</Badge>
+                        ) : (
+                          <Badge variant={listProgress === 100 ? "default" : "outline"}>
+                            {listCompleted}/{listOrders.length}
+                          </Badge>
+                        )}
                         {expandedLists.has(packingList.id) ? (
                           <ChevronDown className="h-5 w-5 text-muted-foreground" />
                         ) : (
@@ -506,7 +534,8 @@ export default function MyDeliveriesTab() {
                         )}
                       </div>
                     </div>
-                    <Progress value={listProgress} className="h-1.5 mt-3" />
+                    {!packingList.is_primary && <Progress value={listProgress} className="h-1.5 mt-3" />}
+
                   </CardContent>
                 </CollapsibleTrigger>
 

@@ -19,14 +19,23 @@ import { clearMyVisitsSnapshot } from "@/lib/myVisitsSnapshot";
 import { toLocalISODate, getLocalTodayDate, parseLocalDate, formatWeekdayShort } from "@/utils/dateUtils";
 import { UserSelector } from "@/components/UserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
+import { getMyBeats } from "@/services/beatService";
+import { useAppTimezone, getLocalDateString } from "@/hooks/useAppTimezone";
+import { MissedBeatsSection } from "@/components/visits/MissedBeatsSection";
 
 interface Beat {
   id: string; // beat_id
   name: string; // beat name (same as id unless we have prettier names)
   retailerCount: number;
   lastVisited?: string;
+  lastVisitedDate?: string | null; // yyyy-MM-dd for day-math
   category: "all";
   priority: "high" | "medium" | "low";
+  accessType?: 'OWNED' | 'CO_OWNER' | 'OPERATIONAL' | 'VIEW_ONLY' | 'COVERAGE';
+  coverageStartDate?: string | null;
+  coverageEndDate?: string | null;
+  ownerName?: string | null;
+  avgOrderValue?: number | null;
 }
 
 
@@ -56,6 +65,7 @@ const getWeekDays = (selectedWeekStart: Date) => {
 export const BeatPlanning = () => {
   const [searchParams] = useSearchParams();
   const dateParam = searchParams.get('date');
+  const { timezone } = useAppTimezone();
 
   // Initialize date from URL param or use today
   const initialDate = dateParam ? new Date(dateParam + 'T00:00:00') : new Date();
@@ -99,14 +109,7 @@ export const BeatPlanning = () => {
       const cachedBeats = await offlineStorage.getAll<any>(STORES.BEATS);
       const cachedRetailers = await offlineStorage.getAll<any>(STORES.RETAILERS);
 
-      const userBeats = cachedBeats.filter((b: any) =>
-        b.is_active !== false &&
-        (
-          b.user_id === effectiveUserId ||
-          b.owner_id === effectiveUserId ||
-          b.created_by === effectiveUserId
-        )
-      );
+      const userBeats = cachedBeats.filter((b: any) => b.is_active !== false && b.user_id === effectiveUserId);
 
       const userRetailers = cachedRetailers.filter((r: any) => r.user_id === effectiveUserId);
 
@@ -131,6 +134,12 @@ export const BeatPlanning = () => {
             category: beat.category || 'all',
             priority: retailerInfo.priority,
             lastVisited: undefined,
+            lastVisitedDate: null,
+            accessType: beat.accessType,
+            coverageStartDate: beat.coverageStartDate ?? null,
+            coverageEndDate: beat.coverageEndDate ?? null,
+            ownerName: beat.ownerName ?? beat.owner_name ?? null,
+            avgOrderValue: beat.avgOrderValue ?? null,
           };
         });
 
@@ -147,15 +156,9 @@ export const BeatPlanning = () => {
   const loadBeatsFromNetwork = async () => {
     if (!effectiveUserId) return;
     try {
-      // Get user's own beats
-      const { data: beatsData, error: beatsError } = await supabase
-        .from('beats')
-        .select('*')
-        .eq('is_active', true)
-        .or(`user_id.eq.${effectiveUserId},owner_id.eq.${effectiveUserId},created_by.eq.${effectiveUserId}`)
-        .order('created_at', { ascending: true });
-
-      if (beatsError) throw beatsError;
+      // Get user's beats (owned + CO_OWNER + OPERATIONAL + COVERAGE)
+      const myBeats = await getMyBeats(effectiveUserId);
+      const beatsData = (myBeats || []).filter((b: any) => b.is_active !== false);
 
       // Cache beats for offline usage
       if (beatsData?.length) {
@@ -164,11 +167,14 @@ export const BeatPlanning = () => {
         }
       }
 
-      // Get retailer counts for each beat for the current user
-      const { data: retailersData, error: retailersError } = await supabase
-        .from('retailers')
-        .select('beat_id, priority')
-        .eq('user_id', effectiveUserId);
+      // Get retailer counts for each beat (filter by beat_id to include shared beats)
+      const beatIdList = beatsData.map((b: any) => b.beat_id).filter(Boolean);
+      const { data: retailersData, error: retailersError } = beatIdList.length
+        ? await supabase
+            .from('retailers')
+            .select('beat_id, priority')
+            .in('beat_id', beatIdList)
+        : { data: [], error: null } as any;
 
       if (retailersError) throw retailersError;
 
@@ -182,11 +188,11 @@ export const BeatPlanning = () => {
         .lte('plan_date', toLocalISODate(new Date()))
         .order('plan_date', { ascending: false });
 
-      // Create a map of beat_id to last visited date
+      // Create a map of beat_id to last visited ISO date (yyyy-MM-dd)
       const lastVisitedMap = new Map<string, string>();
       (beatPlansData || []).forEach((plan: any) => {
         if (!lastVisitedMap.has(plan.beat_id)) {
-          lastVisitedMap.set(plan.beat_id, new Date(plan.plan_date).toLocaleDateString());
+          lastVisitedMap.set(plan.beat_id, String(plan.plan_date).slice(0, 10));
         }
       });
 
@@ -204,13 +210,20 @@ export const BeatPlanning = () => {
       // Map beats data with retailer counts - show ALL beats even if user has 0 retailers
       const beatsArr: Beat[] = (beatsData || []).map((beat: any) => {
         const retailerInfo = retailerCountMap.get(beat.beat_id) || { count: 0, priority: 'medium' };
+        const lastIso = lastVisitedMap.get(beat.beat_id) ?? null;
         return {
           id: beat.beat_id,
           name: beat.beat_name,
           retailerCount: retailerInfo.count,
           category: beat.category || 'all',
           priority: retailerInfo.priority,
-          lastVisited: lastVisitedMap.get(beat.beat_id),
+          lastVisited: lastIso ? new Date(lastIso).toLocaleDateString() : undefined,
+          lastVisitedDate: lastIso,
+          accessType: beat.accessType,
+          coverageStartDate: beat.coverageStartDate ?? null,
+          coverageEndDate: beat.coverageEndDate ?? null,
+          ownerName: beat.ownerName ?? beat.owner_name ?? null,
+          avgOrderValue: beat.avgOrderValue ?? null,
         };
       });
 
@@ -376,6 +389,28 @@ export const BeatPlanning = () => {
     beat.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Date-aware enrichment: coverage-window gating + computed metrics
+  const selectedDateStr = getLocalDateString(selectedDate, timezone);
+  const todayStr = getLocalDateString(new Date(), timezone);
+  const beatsForDate = filteredBeats.map(beat => {
+    const start = beat.coverageStartDate || '';
+    const end = beat.coverageEndDate || '';
+    const isCoverage = beat.accessType === 'COVERAGE';
+    const isSelectableForDate = !isCoverage
+      ? true
+      : (!!start && !!end && start <= selectedDateStr && end >= selectedDateStr);
+    const isUpcomingCoverage = isCoverage && !!start && start > selectedDateStr;
+    const coverageStartLabel = isUpcomingCoverage
+      ? `Available from ${format(new Date(start), 'MMM d')}`
+      : null;
+    let daysSinceVisit: number | null = null;
+    if (beat.lastVisitedDate) {
+      const ms = new Date(todayStr).getTime() - new Date(beat.lastVisitedDate).getTime();
+      daysSinceVisit = Math.max(0, Math.floor(ms / 86400000));
+    }
+    return { ...beat, isSelectableForDate, isUpcomingCoverage, coverageStartLabel, daysSinceVisit };
+  });
+
   const handleSelectBeat = (beatId: string) => {
     setPlannedBeats(prev => ({
       ...prev,
@@ -499,13 +534,32 @@ export const BeatPlanning = () => {
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
       console.log('Submitting plan for date:', dateString, 'from selectedDate:', selectedDate);
-      
-      // Delete existing plans for this date
-      await supabase
+
+      // 1) Fetch existing planned beat_ids for this date so we can compute
+      //    the precise diff instead of doing a blanket DELETE + bulk INSERT
+      //    (which can leave stale rows when the DELETE is silently filtered
+      //    and then fail with a 23505 unique conflict on the bulk INSERT).
+      const { data: existingRows, error: fetchError } = await supabase
         .from('beat_plans')
-        .delete()
+        .select('beat_id')
         .eq('user_id', user.id)
         .eq('plan_date', dateString);
+      if (fetchError) throw fetchError;
+
+      const existingBeatIds = new Set((existingRows || []).map((r: any) => r.beat_id));
+      const selectedSet = new Set(selectedBeatIds);
+      const toRemove = [...existingBeatIds].filter(id => !selectedSet.has(id));
+
+      // 2) Remove only beats the user deselected
+      if (toRemove.length > 0) {
+        const { error: delError } = await supabase
+          .from('beat_plans')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('plan_date', dateString)
+          .in('beat_id', toRemove);
+        if (delError) throw delError;
+      }
 
       // CRITICAL FIX: Clear snapshot when beat plans change to prevent stale retailer data
       await clearMyVisitsSnapshot(user.id, dateString);
@@ -533,9 +587,10 @@ export const BeatPlanning = () => {
         };
       });
 
+      // 3) Upsert keeps existing rows and adds new ones without 23505 conflicts.
       const { error } = await supabase
         .from('beat_plans')
-        .insert(planData);
+        .upsert(planData, { onConflict: 'user_id,plan_date,beat_id' });
 
       if (error) throw error;
 
@@ -610,47 +665,10 @@ export const BeatPlanning = () => {
     }
   };
 
-  const handleAutoGeneratePlan = async () => {
+  const handleAutoGeneratePlan = () => {
     if (!effectiveUserId) return;
-    
-    setIsGeneratingPlan(true);
-    const loadingToast = toast.loading('Generating optimized plan for this week and next...');
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('auto-generate-beat-plan', {
-        body: { 
-          userId: effectiveUserId,
-          forceRegenerate: true 
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast.dismiss(loadingToast);
-      
-      const result = data?.results?.[0];
-      if (result?.status === 'success') {
-        const plansCreated = result.plansCreated || 0;
-        const prescheduled = result.prescheduledPreserved || 0;
-        
-        toast.success(`Created ${plansCreated} new plans, preserved ${prescheduled} pre-scheduled beats!`);
-        
-        // Navigate to rationale page with the plan result
-        navigate('/auto-plan-rationale', { state: { planResult: result } });
-      } else {
-        toast.error(result?.reason || 'Failed to generate plan');
-      }
-      
-      // Refresh current view
-      loadBeatPlans(toLocalISODate(selectedDate));
-      loadBeatsFromNetwork();
-    } catch (error) {
-      console.error('Auto-generate error:', error);
-      toast.dismiss(loadingToast);
-      toast.error('Failed to generate plan. Please try again.');
-    } finally {
-      setIsGeneratingPlan(false);
-    }
+    // Unified with My Visits: open the preview/editor flow so the user can review before saving.
+    navigate('/auto-plan-preview');
   };
 
   const getTotalPlannedDays = () => {
@@ -827,55 +845,92 @@ export const BeatPlanning = () => {
           </CardContent>
         </Card>
 
+        {/* Beats not covered — self view */}
+        {(!selectedUserId || selectedUserId === 'self' || selectedUserId === user?.id) && user?.id && (
+          <MissedBeatsSection userId={user.id} variant="banner" />
+        )}
+
         {/* Category Tabs removed - showing all beats derived from your retailers */}
 
         {/* Beats List */}
         <div className="space-y-3">
-          {filteredBeats.map((beat) => (
-            <Card key={beat.id} className="shadow-card">
+          {beatsForDate.map((beat) => (
+            <Card key={beat.id} className={`shadow-card ${beat.isUpcomingCoverage ? 'opacity-60' : ''}`}>
               <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-3">
+                {/* Header row */}
+                <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
                       <h3 className="font-semibold text-foreground">{beat.name}</h3>
-                      <Badge className={getPriorityColor(beat.priority)}>
-                        {beat.priority}
-                      </Badge>
+                      {beat.accessType === 'OWNED' && <Badge className="bg-green-100 text-green-700 text-xs">Mine</Badge>}
+                      {beat.accessType === 'CO_OWNER' && <Badge className="bg-purple-100 text-purple-700 text-xs">Shared · Co-owner</Badge>}
+                      {beat.accessType === 'OPERATIONAL' && <Badge className="bg-blue-100 text-blue-700 text-xs">Shared · Operational</Badge>}
+                      {beat.accessType === 'VIEW_ONLY' && <Badge className="bg-gray-100 text-gray-600 text-xs">View only</Badge>}
+                      {beat.accessType === 'COVERAGE' && !beat.isUpcomingCoverage && beat.coverageEndDate && (
+                        <Badge className="bg-amber-100 text-amber-700 text-xs">
+                          Coverage · Until {format(new Date(beat.coverageEndDate), 'MMM d')}
+                        </Badge>
+                      )}
+                      {beat.isUpcomingCoverage && (
+                        <Badge className="bg-gray-100 text-gray-500 text-xs">
+                          🔒 {beat.coverageStartLabel}
+                        </Badge>
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">
-                        Last visited: {beat.lastVisited || 'Never'}
+                    {beat.accessType && beat.accessType !== 'OWNED' && beat.ownerName && (
+                      <p className="text-xs text-muted-foreground">
+                        {beat.accessType === 'COVERAGE' ? 'Covering for:' : 'Owner:'} {beat.ownerName}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {beat.retailerCount} Retailers
-                      </p>
-                    </div>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Last visited: {beat.lastVisited || 'Never'}
+                    </p>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      variant={isBeatSelected(beat.id) ? "destructive" : "default"}
-                      onClick={() => {
-                        if (isBeatSelected(beat.id)) {
-                          handleRemoveBeat(beat.id);
-                        } else {
-                          handleSelectBeat(beat.id);
-                        }
-                      }}
-                    >
-                      {isBeatSelected(beat.id) ? "Remove" : "Select"}
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => navigate(`/beat-analytics?beat=${beat.id}`)}
-                      className="text-xs"
-                    >
-                      Analytics
-                    </Button>
+                  <Badge className={getPriorityColor(beat.priority)}>{beat.priority}</Badge>
+                </div>
+
+                {/* Stats row */}
+                <div className="flex gap-3 bg-muted/40 rounded-md p-2 mb-3">
+                  <div className="flex-1 text-center">
+                    <div className="text-sm font-semibold text-blue-600">{beat.retailerCount}</div>
+                    <div className="text-xs text-muted-foreground">Retailers</div>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <div className="text-sm font-semibold text-emerald-600">
+                      {beat.avgOrderValue ? `₹${beat.avgOrderValue.toLocaleString()}` : '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Avg Order</div>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <div className="text-sm font-semibold text-amber-600">
+                      {beat.daysSinceVisit !== null ? `${beat.daysSinceVisit}d` : '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Since Visit</div>
                   </div>
                 </div>
 
+                {/* Action buttons */}
+                <div className="flex gap-2 justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => navigate(`/beat-analytics?beat=${beat.id}`)}>
+                    Analytics
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={isBeatSelected(beat.id) ? "destructive" : "default"}
+                    disabled={!beat.isSelectableForDate}
+                    title={beat.isUpcomingCoverage ? beat.coverageStartLabel ?? undefined : undefined}
+                    onClick={() => {
+                      if (isBeatSelected(beat.id)) handleRemoveBeat(beat.id);
+                      else handleSelectBeat(beat.id);
+                    }}
+                  >
+                    {isBeatSelected(beat.id)
+                      ? 'Remove'
+                      : beat.isUpcomingCoverage && beat.coverageStartDate
+                        ? `Starts ${format(new Date(beat.coverageStartDate), 'MMM d')}`
+                        : 'Select'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

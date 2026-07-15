@@ -5,6 +5,8 @@ import autoTable from 'jspdf-autotable';
 import { supabase } from "@/integrations/supabase/client";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { getInvoiceDisplaySettingsMap, DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
+import { applyInvoiceWatermark } from "@/utils/invoiceWatermark";
+import { resolveProduct } from "@/utils/resolveProduct";
 
 /**
  * Compress an image (URL string or Blob) for PDF embedding.
@@ -417,22 +419,34 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setFont("helvetica", "normal");
   doc.text((displayInvoiceTime || new Date().toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' })), pageWidth - 15, invoiceY, { align: "right" });
   
-  // Beat/Route Name
+  // Beat/Route Name — wrap long names so they don't overlap the label
   if (beatName) {
     invoiceY += 6;
     doc.setFont("helvetica", "bold");
     doc.text("ROUTE:", pageWidth - 60, invoiceY);
+    const routeLabelWidth = doc.getTextWidth("ROUTE:");
     doc.setFont("helvetica", "normal");
-    doc.text(beatName, pageWidth - 15, invoiceY, { align: "right" });
+    const routeMaxWidth = 45 - routeLabelWidth - 2; // 45mm column, 2mm gap
+    const routeLines = doc.splitTextToSize(String(beatName), Math.max(routeMaxWidth, 20));
+    routeLines.forEach((line: string, idx: number) => {
+      doc.text(line, pageWidth - 15, invoiceY + idx * 4, { align: "right" });
+    });
+    invoiceY += (routeLines.length - 1) * 4;
   }
-  
+
   // Salesman Name
   if (salesmanName) {
     invoiceY += 6;
     doc.setFont("helvetica", "bold");
     doc.text("SALESMAN:", pageWidth - 60, invoiceY);
+    const smLabelWidth = doc.getTextWidth("SALESMAN:");
     doc.setFont("helvetica", "normal");
-    doc.text(salesmanName, pageWidth - 15, invoiceY, { align: "right" });
+    const smMaxWidth = 45 - smLabelWidth - 2;
+    const smLines = doc.splitTextToSize(String(salesmanName), Math.max(smMaxWidth, 20));
+    smLines.forEach((line: string, idx: number) => {
+      doc.text(line, pageWidth - 15, invoiceY + idx * 4, { align: "right" });
+    });
+    invoiceY += (smLines.length - 1) * 4;
   }
 
   // Calculate total discount for savings display
@@ -508,6 +522,18 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     
     // Format quantity - show decimals only if needed
     const qtyStr = Number.isInteger(displayQty) ? displayQty.toString() : displayQty.toFixed(2);
+
+    // GST rate per line: prefer persisted snapshot, then product gst_percentage (legacy)
+    const lineGstRate = Number(
+      (item as any).tax_rate_snapshot ??
+      (item as any).gst_percentage ??
+      0
+    ) || 0;
+    const cgstRate = Number((item as any).cgst_rate ?? (lineGstRate / 2)) || 0;
+    const sgstRate = Number((item as any).sgst_rate ?? (lineGstRate / 2)) || 0;
+    const igstRate = Number((item as any).igst_rate ?? 0) || 0;
+    const cgstStr = igstRate > 0 ? `IGST ${igstRate}%` : (cgstRate > 0 ? `${cgstRate}%` : "-");
+    const sgstStr = igstRate > 0 ? "-" : (sgstRate > 0 ? `${sgstRate}%` : "-");
     
     // If there are item-level discounts in the order, show MRP and Offer columns
     if (hasAnyItemDiscount) {
@@ -521,6 +547,8 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
         qtyStr,
         `Rs.${formatExact(originalRate)}`, // MRP - exact
         hasItemDiscount ? `Rs.${formatExact(effectiveRate)}` : "-", // Offer Price (or "-" if no discount for this item)
+        cgstStr,
+        sgstStr,
         `Rs.${formatExact(rowTotal)}`, // Row total - use stored value
       ];
     } else {
@@ -532,6 +560,8 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
         displayUnit,
         qtyStr,
         `Rs.${formatExact(effectiveRate)}`, // Price (from stored total)
+        cgstStr,
+        sgstStr,
         `Rs.${formatExact(rowTotal)}`, // Row total - use stored value
       ];
     }
@@ -539,29 +569,33 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
 
   // Table headers based on whether item-level discounts exist
   const tableHeaders = hasAnyItemDiscount 
-    ? [["NO", "PRODUCT", "HSN", "UNIT", "QTY", "MRP", "OFFER", "TOTAL"]]
-    : [["NO", "PRODUCT", "HSN/SAC", "UNIT", "QTY", "PRICE", "TOTAL"]];
+    ? [["NO", "PRODUCT", "HSN", "UNIT", "QTY", "MRP", "OFFER", "CGST%", "SGST%", "TOTAL"]]
+    : [["NO", "PRODUCT", "HSN/SAC", "UNIT", "QTY", "PRICE", "CGST%", "SGST%", "TOTAL"]];
 
   // Column styles based on whether item-level discounts exist
   const columnStyles = hasAnyItemDiscount
     ? {
-        0: { cellWidth: 12, halign: "center" as const },
+        0: { cellWidth: 10, halign: "center" as const },
         1: { cellWidth: 'auto' as const, halign: "left" as const },
-        2: { cellWidth: 16, halign: "center" as const },
-        3: { cellWidth: 14, halign: "center" as const },
-        4: { cellWidth: 12, halign: "center" as const },
-        5: { cellWidth: 22, halign: "right" as const },
-        6: { cellWidth: 22, halign: "right" as const },
-        7: { cellWidth: 24, halign: "right" as const },
+        2: { cellWidth: 14, halign: "center" as const },
+        3: { cellWidth: 12, halign: "center" as const },
+        4: { cellWidth: 10, halign: "center" as const },
+        5: { cellWidth: 18, halign: "right" as const },
+        6: { cellWidth: 18, halign: "right" as const },
+        7: { cellWidth: 14, halign: "center" as const },
+        8: { cellWidth: 14, halign: "center" as const },
+        9: { cellWidth: 22, halign: "right" as const },
       }
     : {
-        0: { cellWidth: 15, halign: "center" as const },
+        0: { cellWidth: 12, halign: "center" as const },
         1: { cellWidth: 'auto' as const, halign: "left" as const },
-        2: { cellWidth: 20, halign: "center" as const },
-        3: { cellWidth: 18, halign: "center" as const },
-        4: { cellWidth: 15, halign: "center" as const },
-        5: { cellWidth: 25, halign: "right" as const },
-        6: { cellWidth: 28, halign: "right" as const },
+        2: { cellWidth: 18, halign: "center" as const },
+        3: { cellWidth: 14, halign: "center" as const },
+        4: { cellWidth: 12, halign: "center" as const },
+        5: { cellWidth: 20, halign: "right" as const },
+        6: { cellWidth: 14, halign: "center" as const },
+        7: { cellWidth: 14, halign: "center" as const },
+        8: { cellWidth: 24, halign: "right" as const },
       };
 
   autoTable(doc, {
@@ -597,9 +631,11 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     margin: { left: 15, right: 15 },
   });
 
-  // Calculate totals - CRITICAL: Use order-level values when available
-  // This ensures invoice totals match exactly what cart showed at order time
-  const hasStoredTotals = normalizedItems.some(item => 
+  // Calculate totals - read stored per-line tax from order_items (Phase 4).
+  // Falls back to computeLineTax only when a line has no stored tax (legacy orders).
+  const { resolveLineTax: _resolveLineTax } = await import('@/utils/taxCalc');
+
+  const hasStoredTotals = normalizedItems.some(item =>
     item.taxable_amount != null && item.sgst_amount != null && item.cgst_amount != null
   );
 
@@ -608,7 +644,6 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
     if (hasStoredTotals && item.taxable_amount != null) {
       return sum + Number(item.taxable_amount);
     }
-    // Use stored total from order_items
     return sum + (item._storedTotal || 0);
   }, 0);
 
@@ -616,28 +651,68 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   const appliedOrderDiscount = orderDiscount || 0;
   const subtotal = Math.max(0, itemSubtotal - appliedOrderDiscount);
 
-  // Calculate GST on discounted subtotal
-  const sgst = hasStoredTotals
-    ? cartItems.reduce((sum, item) => sum + (Number(item.sgst_amount) || 0), 0)
-    : subtotal * 0.025;
-
-  const cgst = hasStoredTotals
-    ? cartItems.reduce((sum, item) => sum + (Number(item.cgst_amount) || 0), 0)
-    : subtotal * 0.025;
+  // Sum per-line stored tax (CGST/SGST/IGST/CESS) — fallback per line via helper.
+  const lineTaxes = cartItems.map((it: any) => _resolveLineTax(it));
+  const cgst = lineTaxes.reduce((s, l) => s + l.cgst, 0);
+  const sgst = lineTaxes.reduce((s, l) => s + l.sgst, 0);
+  const igst = lineTaxes.reduce((s, l) => s + l.igst, 0);
+  const cess = lineTaxes.reduce((s, l) => s + l.cess, 0);
 
   // CRITICAL: If orderTotal is provided, use it directly (this is the finalized amount)
-  // This ensures invoice total matches exactly what was shown in cart
-  const total = orderTotal 
-    ? orderTotal 
+  const total = orderTotal
+    ? orderTotal
     : (hasStoredTotals && cartItems.some(item => item.total_amount != null)
         ? cartItems.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0)
-        : (subtotal + sgst + cgst));
+        : (subtotal + cgst + sgst + igst + cess));
+
   
   // Note: totalDiscount tracks item-level discounts, order-level discount is shown separately
   
   // Convert total to words (use rounded total for consistency)
   const roundedTotal = Math.round(total);
   const totalInWords = numberToWords(roundedTotal) + " Rupees Only";
+
+  // Rate-wise GST summary (GST compliant) — grouped by line gst rate
+  {
+    const groups = new Map<number, { taxable: number; cgst: number; sgst: number; igst: number; cess: number }>();
+    cartItems.forEach((it: any, i: number) => {
+      const lt = lineTaxes[i];
+      if (!lt || lt.taxRate <= 0) return;
+      const key = Number(lt.taxRate) || 0;
+      const g = groups.get(key) || { taxable: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 };
+      g.taxable += Number((lt as any).taxableAmount ?? 0) || 0;
+      g.cgst += lt.cgst; g.sgst += lt.sgst; g.igst += lt.igst; g.cess += lt.cess;
+      groups.set(key, g);
+    });
+    if (groups.size > 0) {
+      const anyIgst = Array.from(groups.values()).some(v => v.igst > 0);
+      const head = anyIgst
+        ? [["RATE", "TAXABLE", "CGST", "SGST", "IGST", "TOTAL TAX"]]
+        : [["RATE", "TAXABLE", "CGST", "SGST", "TOTAL TAX"]];
+      const body = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]).map(([rate, v]) => {
+        const totalTax = v.cgst + v.sgst + v.igst + v.cess;
+        const row = [
+          `${rate}%`,
+          `Rs.${formatExact(v.taxable)}`,
+          `Rs.${formatExact(v.cgst)}`,
+          `Rs.${formatExact(v.sgst)}`,
+        ];
+        if (anyIgst) row.push(`Rs.${formatExact(v.igst)}`);
+        row.push(`Rs.${formatExact(totalTax)}`);
+        return row;
+      });
+      autoTable(doc, {
+        startY: (doc as any).lastAutoTable.finalY + 4,
+        head,
+        body,
+        theme: "grid",
+        styles: { fontSize: 7, cellPadding: 1.5, textColor: [0, 0, 0], lineColor: [200, 200, 200], lineWidth: 0.3 },
+        headStyles: { fillColor: [55, 65, 81], textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7, halign: "center" },
+        margin: { left: 15, right: 15 },
+        tableWidth: 'auto',
+      });
+    }
+  }
 
   // Totals section - compact box
   yPos = (doc as any).lastAutoTable.finalY + 6;
@@ -652,8 +727,10 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   const hasOrderLevelDiscount = appliedOrderDiscount > 0;
   const rowHeight = 5;
   const totalRowHeight = 7;
-  // Rows: SUB-TOTAL, (DISCOUNT if any), SGST, CGST, then TOTAL bar
-  const numRows = 3 + (hasOrderLevelDiscount ? 1 : 0);
+  const showIgst = igst > 0;
+  const showCess = cess > 0;
+  // Rows: SUB-TOTAL, (DISCOUNT if any), SGST, CGST, (IGST?), (CESS?), then TOTAL bar
+  const numRows = 3 + (hasOrderLevelDiscount ? 1 : 0) + (showIgst ? 1 : 0) + (showCess ? 1 : 0);
   const totalsBoxHeight = (numRows * rowHeight) + totalRowHeight + 4;
   
   // Draw border box
@@ -683,12 +760,24 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   }
   
   innerY += rowHeight;
-  doc.text("SGST (2.5%)", totalsBoxX + labelOffset, innerY);
+  doc.text("SGST", totalsBoxX + labelOffset, innerY);
   doc.text(`Rs.${formatExact(sgst)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
   
   innerY += rowHeight;
-  doc.text("CGST (2.5%)", totalsBoxX + labelOffset, innerY);
+  doc.text("CGST", totalsBoxX + labelOffset, innerY);
   doc.text(`Rs.${formatExact(cgst)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+
+  if (showIgst) {
+    innerY += rowHeight;
+    doc.text("IGST", totalsBoxX + labelOffset, innerY);
+    doc.text(`Rs.${formatExact(igst)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+  }
+  if (showCess) {
+    innerY += rowHeight;
+    doc.text("CESS", totalsBoxX + labelOffset, innerY);
+    doc.text(`Rs.${formatExact(cess)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+  }
+
 
   // Total amount bar (green)
   innerY += rowHeight + 1;
@@ -965,7 +1054,8 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
       schemeDetails
     });
 
-    return { blob, invoiceNumber: editedInvoice.invoice_number };
+    const stamped = await applyInvoiceWatermark(blob, { invoiceNumber: editedInvoice.invoice_number });
+    return { blob: stamped, invoiceNumber: editedInvoice.invoice_number };
   }
 
   // Fallback to generating from order data (original behavior)
@@ -974,7 +1064,7 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
   // Fetch order (try online first, then fall back to offline cache)
   const { data: dbOrder, error: orderError } = await supabase
     .from("orders")
-    .select("*, order_items(*)")
+    .select("*, order_items!order_items_order_id_fkey(*)")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -1156,20 +1246,39 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
             }
           }
           
-          // Also check if it's a variant (product_id might be variant_id in some cases)
-          if (!enrichedItem.hsn_code) {
+          // Variant display name resolution (DISPLAY ONLY — tax/amounts are NEVER
+          // recomputed; they always come from the stored order_items snapshot).
+          // When the line carries a variant_id, fetch base + variant and route the
+          // display label through resolveProduct so a variant with NULL overrides
+          // inherits the base name — same rule used in order entry / portals.
+          if (item.variant_id) {
+            try {
+              const { data: variantData } = await supabase
+                .from("product_variants")
+                .select("id, variant_name, sku, hsn_code, price, product_id")
+                .eq("id", item.variant_id)
+                .maybeSingle();
+              if (variantData) {
+                const { data: baseData } = await supabase
+                  .from("products")
+                  .select("id, name, sku, hsn_code, rate, image_url, sku_image_url")
+                  .eq("id", variantData.product_id)
+                  .maybeSingle();
+                const resolved = resolveProduct(baseData || { id: variantData.product_id, name: enrichedItem.product_name }, variantData);
+                // Display label only — tax/amount fields untouched.
+                enrichedItem.product_name = resolved.display_name || enrichedItem.product_name;
+                if (!enrichedItem.hsn_code) enrichedItem.hsn_code = resolved.hsn_code || enrichedItem.hsn_code;
+              }
+            } catch { /* offline / RLS — keep snapshot */ }
+          } else if (!enrichedItem.hsn_code) {
+            // Legacy fallback: product_id may itself be a variant id in old data.
             const { data: variantData } = await supabase
               .from("product_variants")
               .select("hsn_code, price")
               .eq("id", item.product_id)
               .maybeSingle();
-            
-            if (variantData?.hsn_code) {
-              enrichedItem.hsn_code = variantData.hsn_code;
-            }
-            if (variantData?.price && variantData.price > 1) {
-              enrichedItem.precise_rate_per_kg = variantData.price;
-            }
+            if (variantData?.hsn_code) enrichedItem.hsn_code = variantData.hsn_code;
+            if (variantData?.price && variantData.price > 1) enrichedItem.precise_rate_per_kg = variantData.price;
           }
         } catch (e) {
           // Offline or error - continue with item as-is
@@ -1222,5 +1331,6 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
       break;
   }
 
-  return { blob, invoiceNumber };
+  const stamped = await applyInvoiceWatermark(blob, { invoiceNumber });
+  return { blob: stamped, invoiceNumber };
 }

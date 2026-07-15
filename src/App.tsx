@@ -1,25 +1,32 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { I18nextProvider } from 'react-i18next';
 import i18n from '@/i18n/config';
-import { HelmetProvider } from "react-helmet-async";
-import { RouteSEO } from "@/components/SEO/RouteSEO";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { PricingPage } from "@/pages/website/PricingPage";
+import { HelmetProvider } from "react-helmet-async";
+import { RouteSEO } from "@/components/SEO/RouteSEO";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { isQAMode } from "@/lib/tableRouter";
+import { registerNavigator as registerQANavigator } from "@/qa/automation/navigate";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { FeatureProvider } from "@/context/FeatureContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { RoleBasedAuthPage } from "@/components/auth/RoleBasedAuthPage";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
+import { cacheWarmingStore } from "@/components/CacheWarmingProgress";
+import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useAndroidBackButton } from "@/hooks/useAndroidBackButton";
 import { visitStatusCache } from "@/lib/visitStatusCache";
-import { NetworkProvider } from "@/contexts/NetworkContext";
+import { NetworkProvider, useNetwork } from "@/contexts/NetworkContext";
+import { QAModeProvider } from "@/contexts/QAModeContext";
 import { SlowConnectionBanner } from "@/components/SlowConnectionBanner";
-import { SchemaHealthBanner } from "@/components/SchemaHealthBanner";
 // PWA install prompt removed per user request
 import ForcedPasswordChangeDialog from "@/components/auth/ForcedPasswordChangeDialog";
 import { useActivityTracker } from "@/hooks/useActivityTracker";
@@ -37,28 +44,27 @@ import DistributorPortalSolution from "./pages/website/solutions/DistributorPort
 
 import VanSalesSolution from "./pages/website/solutions/VanSalesSolution";
 import { ProfessionalServicesSolution } from "./pages/website/solutions/ProfessionalServicesSolution";
-import RetailerPortalSolution from "./pages/website/solutions/RetailerPortalSolution";
-import QuickLocateSolution from "./pages/website/solutions/QuickLocateSolution";
-import QuickInfluenceSolution from "./pages/website/solutions/QuickInfluenceSolution";
-import QuickMarketingSolution from "./pages/website/solutions/QuickMarketingSolution";
-import QuickServiceSolution from "./pages/website/solutions/QuickServiceSolution";
 import ROICalculator from "./pages/website/ROICalculator";
-import ROITrackerPage from "./pages/website/ROITrackerPage";
 import InsightsPage from "./pages/website/InsightsPage";
-import ConnectorsPage from "./pages/website/ConnectorsPage";
-import ImpactPage from "./pages/website/ImpactPage";
 import MigrationPlanPage from "./pages/website/MigrationPlanPage";
 import MigrationChecklistPage from "./pages/website/MigrationChecklistPage";
 import ImplementationToolkitPage from "./pages/website/ImplementationToolkitPage";
 import { ProfessionalServicesROIBlog } from "./pages/website/blogs/ProfessionalServicesROIBlog";
-import { WhyQuickappBlog } from "./pages/website/blogs/WhyQuickappBlog";
-import { BharathBeveragesCaseStudy } from "./pages/website/blogs/BharathBeveragesCaseStudy";
 import { ProfessionalServicesChecklistBlog } from "./pages/website/blogs/ProfessionalServicesChecklistBlog";
-import ChoosingDMSGuideBlog from "./pages/website/blogs/ChoosingDMSGuideBlog";
 import { ContactPage } from "./pages/website/ContactPage";
 import PrivacyPolicyPage from "./pages/website/PrivacyPolicyPage";
 import DemoRequestPage from "./pages/website/DemoRequestPage";
+// Website pages carried over from preprod (production website — do not remove)
+import RetailerPortalSolution from "./pages/website/solutions/RetailerPortalSolution";
+import QuickLocateSolution from "./pages/website/solutions/QuickLocateSolution";
+import ROITrackerPage from "./pages/website/ROITrackerPage";
+import ConnectorsPage from "./pages/website/ConnectorsPage";
+import ImpactPage from "./pages/website/ImpactPage";
+import { WhyQuickappBlog } from "./pages/website/blogs/WhyQuickappBlog";
+import { BharathBeveragesCaseStudy } from "./pages/website/blogs/BharathBeveragesCaseStudy";
+import ChoosingDMSGuideBlog from "./pages/website/blogs/ChoosingDMSGuideBlog";
 import Index from "./pages/Index";
+import Copilot from "./pages/Copilot";
 import { MyVisits } from "./pages/MyVisits";
 import { OrderEntry } from "./pages/OrderEntry";
 import CounterSales from "./pages/CounterSales";
@@ -69,9 +75,11 @@ import EventSummary from "./pages/EventSummary";
 import { Cart } from "./pages/Cart";
 import { MyRetailers } from "./pages/MyRetailers";
 import { MyBeats } from "./pages/MyBeats";
+import MassBeatTransfer from "./pages/MassBeatTransfer";
 import { AddRetailer } from "./pages/AddRetailer";
 import Attendance from "./pages/Attendance";
 import { TodaySummary } from "./pages/TodaySummary";
+import UomQuantityReportPage from "./pages/UomQuantityReportPage";
 import { BeatPlanningFeature } from "./pages/features/BeatPlanningFeature";
 import { RetailerManagementFeature } from "./pages/features/RetailerManagementFeature";
 import { VisitSchedulingFeature } from "./pages/features/VisitSchedulingFeature";
@@ -98,6 +106,9 @@ import { AdminDashboard } from "./pages/AdminDashboard";
 import AdminControls from "./pages/AdminControls";
 import FeatureManagement from "./pages/FeatureManagement";
 import ProductManagementPage from "./pages/ProductManagementPage";
+import UomMasterPage from "./pages/UomMasterPage";
+import BeatCoordinator from "./pages/admin/BeatCoordinator";
+import MyOperations from "./pages/MyOperations";
 import SchemeMasterPage from "./pages/SchemeMasterPage";
 import AttendanceManagement from "./pages/AttendanceManagement";
 import ActivitiesInfo from "./pages/ActivitiesInfo";
@@ -106,6 +117,27 @@ import FeedbackManagement from "./pages/FeedbackManagement";
 import CompetitionMaster from "./pages/CompetitionMaster";
 import CompetitorDetail from "./pages/CompetitorDetail";
 import NotFound from "./pages/NotFound";
+import { isQAMode as isQAModeEnv } from "./lib/tableRouter";
+
+// QA-only screens: lazy-loaded so they never land in the production bundle.
+const RunTestsScreen = lazy(() => import("./qa/screens/RunTestsScreen"));
+const AutomatedTestsScreen = lazy(() => import("./qa/screens/AutomatedTestsScreen"));
+const CustomTestScreen = lazy(() => import("./qa/screens/CustomTestScreen"));
+const TestResultsScreen = lazy(() => import("./qa/screens/TestResultsScreen"));
+
+// Customer Portal Pages
+import CustomerLogin from "./pages/customer-portal/CustomerLogin";
+import CustomerLayout from "./pages/customer-portal/CustomerLayout";
+import CustomerHome from "./pages/customer-portal/CustomerHome";
+import CustomerCatalog from "./pages/customer-portal/CustomerCatalog";
+import CustomerCart from "./pages/customer-portal/CustomerCart";
+import CustomerOrders from "./pages/customer-portal/CustomerOrders";
+import CustomerOrderDetail from "./pages/customer-portal/CustomerOrderDetail";
+import CustomerOrderSuccess from "./pages/customer-portal/CustomerOrderSuccess";
+import CustomerChat from "./pages/customer-portal/CustomerChat";
+import CustomerSchemes from "./pages/customer-portal/CustomerSchemes";
+import CustomerReports from "./pages/customer-portal/CustomerReports";
+import CustomerNotifications from "./pages/customer-portal/CustomerNotifications";
 import UserRoles from "./pages/UserRoles";
 import BrandingRequests from "./pages/BrandingRequests";
 import { BeatDetail } from "./pages/BeatDetail";
@@ -116,6 +148,7 @@ import { RetailerDetail } from "./pages/RetailerDetail";
 import TerritoriesAndDistributors from "./pages/TerritoriesAndDistributors";
 import TerritoryDetail from "./pages/TerritoryDetail";
 import Operations from "./pages/Operations";
+import EditedOrders from "./pages/EditedOrders";
 import GPSTrack from "./pages/GPSTrack";
 import GPSTrackManagement from "./pages/GPSTrackManagement";
 import RetailManagement from "./pages/RetailManagement";
@@ -140,21 +173,25 @@ import PriceBookAdmin from "./pages/admin/PriceBookAdmin";
 import PriceBookDetail from "./pages/admin/PriceBookDetail";
 import RecycleBin from "./pages/RecycleBin";
 import RecycleBinAdmin from "./pages/admin/RecycleBinAdmin";
-import SardarRestoreAudit from "./pages/admin/SardarRestoreAudit";
 import DistributorPortalAdmin from "./pages/admin/DistributorPortalAdmin";
 import TargetVsActual from "./pages/admin/TargetVsActual";
 import PincodeMasterPage from "./pages/admin/PincodeMasterPage";
+import PincodeDetailPage from "./pages/admin/PincodeDetailPage";
 import HierarchyTargets from "./pages/admin/HierarchyTargets";
 import TaxMaster from "./pages/admin/TaxMaster";
 import RetailerExternalDBPage from "./pages/admin/RetailerExternalDBPage";
 import RetailerUnsortedPage from "./pages/admin/RetailerUnsortedPage";
 import NotificationRulesAdmin from "./pages/admin/NotificationRulesAdmin";
+import ActivityTypeManagement from "./components/admin/ActivityTypeManagement";
+import SyncHealth from "./pages/admin/SyncHealth";
+import ActivityCoordinator from "./pages/ActivityCoordinator";
 import MyTargets from "./pages/MyTargets";
 import MyTarget from "./pages/MyTarget";
 import TeamTargets from "./pages/TeamTargets";
 import PerformanceDashboard from "./pages/PerformanceDashboard";
 import TargetAchievementAdvisor from "./pages/TargetAchievementAdvisor";
 import AutoPlanRationale from "./pages/AutoPlanRationale";
+import AutoPlanPreview from "./pages/AutoPlanPreview";
 import PendingPaymentsAll from "./pages/PendingPaymentsAll";
 import JointSalesAnalytics from "./pages/JointSalesAnalytics";
 import DistributorMaster from "./pages/DistributorMaster";
@@ -165,14 +202,6 @@ import PrimaryOrders from "./pages/PrimaryOrders";
 import ResetPassword from "./pages/ResetPassword";
 import HelpCenter from "./pages/HelpCenter";
 import HelpArticle from "./pages/HelpArticle";
-import SupportLayout from "./pages/support/SupportLayout";
-import SupportIdeasPage from "./pages/support/IdeasPage";
-import SupportTicketsPage from "./pages/support/TicketsPage";
-import SupportReleasesPage from "./pages/support/ReleasesPage";
-import SupportReleaseDetailPage from "./pages/support/ReleaseDetailPage";
-import SupportHelpMirror from "./pages/support/HelpMirror";
-import SupportIdeaDetailPage from "./pages/support/IdeaDetailPage";
-import SupportTicketDetailPage from "./pages/support/TicketDetailPage";
 import ChangePassword from "./pages/ChangePassword";
 import StatusDashboard from "./pages/StatusDashboard";
 import MapRedirect from "./pages/MapRedirect";
@@ -216,11 +245,14 @@ import GoodsReceiptNew from "./pages/distributor-portal/GoodsReceiptNew";
 import PriceBookView from "./pages/distributor-portal/PriceBookView";
 import PrimarySchemesView from "./pages/distributor-portal/PrimarySchemesView";
 import PrimaryReturnCreate from "./pages/distributor-portal/PrimaryReturnCreate";
+import DistributorNetwork from "./pages/distributor-portal/DistributorNetwork";
+import NetworkChildDetail from "./pages/distributor-portal/NetworkChildDetail";
+import DistributorPackingLists from "./pages/distributor-portal/DistributorPackingLists";
 import DeliveryRun from "./pages/DeliveryRun";
 import PackingListManagementPage from "./pages/PackingListManagement";
 import MyDeliveriesPage from "./pages/MyDeliveries";
 import PackingListDetailPage from "./pages/PackingListDetail";
-import { ScrollToTop } from "./components/ScrollToTop";
+import PackingListDispatchPage from "./pages/PackingListDispatchPage";
 
 // ARCHIVED: Projects module hidden
 // import ProjectsPage from "./pages/pm/ProjectsPage";
@@ -246,62 +278,123 @@ const queryClient = new QueryClient({
 
 // Master data cache initializer - delayed to let UI render first
 const MasterDataCacheInitializer = () => {
-  const { cacheAllMasterData, isOnline } = useMasterDataCache();
-  
+  const { cacheAllMasterData, warmCacheWithProgress, forceRefreshMasterData, isOnline } = useMasterDataCache();
+  const { user } = useAuth();
+  const lastWarmedRef = useRef<string | null>(null);
+  const wasOnlineRef = useRef<boolean>(isOnline);
+
+  // Offline→online transition: drop stale in-memory UOM caches, invalidate
+  // React Query, and re-fetch the full unit list immediately.
   useEffect(() => {
-    if (isOnline) {
-      // Delay background sync by 1.5s to let UI render first for faster perceived startup
-      const timeoutId = setTimeout(() => {
-        cacheAllMasterData();
-      }, 1500);
-      return () => clearTimeout(timeoutId);
+    const wasOnline = wasOnlineRef.current;
+    wasOnlineRef.current = isOnline;
+    if (!user?.id) return;
+    if (!wasOnline && isOnline) {
+      (async () => {
+        try {
+          const { clearProductUnitsCache } = await import('@/lib/uomEngine');
+          clearProductUnitsCache();
+        } catch {}
+        try { queryClient.invalidateQueries({ queryKey: ['uom'] }); } catch {}
+        try { await forceRefreshMasterData(); } catch (e) {
+          console.warn('[MasterDataCacheInitializer] online-transition refresh failed:', e);
+        }
+      })();
     }
-  }, [isOnline, cacheAllMasterData]);
-  
+  }, [isOnline, user?.id, forceRefreshMasterData]);
+
+  useEffect(() => {
+    if (!isOnline || !user?.id) return;
+
+    // Guard against duplicate concurrent warms for the same user+online state.
+    const warmKey = `${user.id}:${isOnline ? 'online' : 'offline'}`;
+    if (lastWarmedRef.current === warmKey) return;
+    lastWarmedRef.current = warmKey;
+
+    const FRESHNESS_MS = 12 * 60 * 60 * 1000; // 12h
+
+    const decideAndRun = async () => {
+      let needsFullWarm = true;
+      try {
+        const readyAtRaw = localStorage.getItem('master_cache_ready_at');
+        const cachedUser = localStorage.getItem('master_cache_user');
+        const readyAt = readyAtRaw ? parseInt(readyAtRaw, 10) : 0;
+        const isSameUser = cachedUser === user.id;
+        const isFresh = readyAt > 0 && Date.now() - readyAt < FRESHNESS_MS;
+
+        // Core store populated check
+        let productsCount = 0;
+        try {
+          const products = await offlineStorage.getAll(STORES.PRODUCTS);
+          productsCount = products?.length ?? 0;
+        } catch {}
+
+        if (isSameUser && isFresh && productsCount > 0) {
+          needsFullWarm = false;
+        }
+      } catch (e) {
+        console.warn('[MasterDataCacheInitializer] freshness check failed:', e);
+      }
+
+      if (!needsFullWarm) {
+        // Persisted cache is used as-is; mark header green and do a lightweight non-blocking refresh.
+        try { cacheWarmingStore.markReadyFromCache(); } catch {}
+        try { cacheAllMasterData(); } catch (e) {
+          console.warn('[MasterDataCacheInitializer] background refresh failed:', e);
+        }
+        return;
+      }
+
+      try {
+        cacheAllMasterData();
+        cacheWarmingStore.startBackgroundWarming();
+        warmCacheWithProgress((stepId, status) => {
+          cacheWarmingStore.updateStep(stepId, status);
+        })
+          .then(() => {
+            try {
+              localStorage.setItem('master_cache_ready_at', String(Date.now()));
+              localStorage.setItem('master_cache_user', user.id);
+            } catch {}
+          })
+          .catch((e) => console.warn('[MasterDataCacheInitializer] background warm failed:', e));
+      } catch (e) {
+        console.warn('[MasterDataCacheInitializer] warm start failed:', e);
+      }
+    };
+
+    const timeoutId = setTimeout(() => { void decideAndRun(); }, 1500);
+    return () => clearTimeout(timeoutId);
+  }, [isOnline, user?.id, cacheAllMasterData, warmCacheWithProgress]);
+
   return null;
 };
 
 const App = () => {
-  const [hasError, setHasError] = useState(false);
-
   useEffect(() => {
-    const errorHandler = (event: ErrorEvent) => {
-      console.error("Global error:", event.error ?? event.message);
-      setHasError(true);
-    };
+    // Only genuinely harmless browser noise is downgraded. Everything else is LOGGED
+    // (so network/sync failures stay visible) but never blanks the app — render
+    // crashes are handled by <ErrorBoundary> instead.
+    const benign = ['resizeobserver loop', 'resizeobserver', 'script error', 'runtime.lasterror'];
+    const isBenign = (msg?: string) => !!msg && benign.some(e => msg.toLowerCase().includes(e));
 
+    const errorHandler = (event: ErrorEvent) => {
+      const msg = event.error?.message || event.message || '';
+      if (isBenign(msg)) { console.debug('Benign browser error ignored:', msg); event.preventDefault?.(); return; }
+      console.error('Global error (logged, non-fatal):', event.error ?? event.message);
+    };
     const rejectionHandler = (event: PromiseRejectionEvent) => {
       const message = event.reason?.message || event.reason?.toString() || '';
-      
-      const ignoredErrors = [
-        'ServiceWorker',
-        'service-worker',
-        'Failed to fetch',
-        'Network request failed',
-        'NetworkError',
-        'Load failed',
-        'AbortError',
-        'chunk',
-      ];
-      
-      const isIgnored = ignoredErrors.some(err => message.includes(err));
-      
-      if (isIgnored) {
-        console.warn("Non-critical rejection suppressed:", message);
-        event.preventDefault();
-        return;
-      }
-      
-      console.error("Unhandled rejection:", event.reason);
-      setHasError(true);
+      if (isBenign(message)) { console.debug('Benign rejection ignored:', message); event.preventDefault(); return; }
+      // Network/sync errors are meaningful in an offline-first app — log, do not suppress, do not blank UI.
+      console.error('Unhandled rejection (logged, non-fatal):', event.reason);
     };
 
-    window.addEventListener("error", errorHandler);
-    window.addEventListener("unhandledrejection", rejectionHandler);
-
+    window.addEventListener('error', errorHandler);
+    window.addEventListener('unhandledrejection', rejectionHandler);
     return () => {
-      window.removeEventListener("error", errorHandler);
-      window.removeEventListener("unhandledrejection", rejectionHandler);
+      window.removeEventListener('error', errorHandler);
+      window.removeEventListener('unhandledrejection', rejectionHandler);
     };
   }, []);
 
@@ -311,15 +404,18 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <NetworkProvider>
           <AuthProvider>
-            <TooltipProvider>
-              <BrowserRouter>
-                <RouteSEO />
-                <ScrollToTop />
-                <SlowConnectionBanner />
-                <SchemaHealthBanner />
-                <AppContent hasError={hasError} />
-              </BrowserRouter>
-            </TooltipProvider>
+            <FeatureProvider>
+              <QAModeProvider>
+                <TooltipProvider>
+                  <BrowserRouter>
+                    <RouteSEO />
+                    <ScrollToTop />
+                    <SlowConnectionBanner />
+                    <AppContent />
+                  </BrowserRouter>
+                </TooltipProvider>
+              </QAModeProvider>
+            </FeatureProvider>
           </AuthProvider>
         </NetworkProvider>
       </QueryClientProvider>
@@ -328,28 +424,33 @@ const App = () => {
   );
 };
 
-const AppContent = ({ hasError }: { hasError: boolean }) => {
+const AppContent = () => {
+  const location = useLocation();
   useAndroidBackButton();
   useActivityTracker();
   useModuleUsageTracker();
   const { user, mustChangePassword, onPasswordChanged, dismissPasswordChange } = useAuth();
+  const navigate = useNavigate();
 
-  if (hasError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-foreground">Something went wrong</h1>
-          <p className="text-muted-foreground">Please refresh the page to try again</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // QA-only: expose the app's real router to the QA automation engine so
+  // automated actions can drive in-app navigation. Production builds never
+  // register the navigator (isQAMode() returns false).
+  useEffect(() => {
+    if (isQAMode()) registerQANavigator(navigate);
+  }, [navigate]);
+
+  // QA-only: expose the manual-offline toggle on `window.__qaSetOffline`
+  // so the Offline Sync test actions can flip network state without
+  // requiring a UI control. Production builds skip this entirely.
+  const { setManualOfflineMode } = useNetwork();
+  useEffect(() => {
+    if (!isQAMode()) return;
+    (window as any).__qaSetOffline = (offline: boolean) => setManualOfflineMode(offline);
+    return () => {
+      try { delete (window as any).__qaSetOffline; } catch { /* no-op */ }
+    };
+  }, [setManualOfflineMode]);
+
 
   return (
     <>
@@ -367,6 +468,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         />
       )}
       
+      <ErrorBoundary resetKey={location.pathname}>
       <Routes>
         {/* All routes - direct imports, no lazy loading for instant APK page loads */}
         <Route path="/" element={<LandingPage />} />
@@ -374,31 +476,29 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/technology" element={<TechnologyPage />} />
         <Route path="/solutions/field-sales" element={<FieldSalesSolution />} />
         <Route path="/solutions/distributor-portal" element={<DistributorPortalSolution />} />
-        <Route path="/solutions/retailer-portal" element={<RetailerPortalSolution />} />
-        <Route path="/solutions/quick-locate" element={<QuickLocateSolution />} />
-        <Route path="/solutions/quick-influence" element={<QuickInfluenceSolution />} />
-        <Route path="/solutions/quick-marketing" element={<QuickMarketingSolution />} />
-        <Route path="/solutions/quick-service" element={<QuickServiceSolution />} />
         
         <Route path="/solutions/van-sales" element={<VanSalesSolution />} />
         <Route path="/solutions/professional-services" element={<ProfessionalServicesSolution />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/roi-calculator" element={<ROICalculator />} />
-        <Route path="/insights/roi-tracker" element={<ROITrackerPage />} />
         <Route path="/insights" element={<InsightsPage />} />
-        <Route path="/connectors" element={<ConnectorsPage />} />
-        <Route path="/impact" element={<ImpactPage />} />
         <Route path="/insights/migration-plan" element={<MigrationPlanPage />} />
         <Route path="/insights/migration-checklist" element={<MigrationChecklistPage />} />
         <Route path="/insights/implementation-toolkit" element={<ImplementationToolkitPage />} />
         <Route path="/insights/professional-services-roi" element={<ProfessionalServicesROIBlog />} />
         <Route path="/insights/professional-services-checklist" element={<ProfessionalServicesChecklistBlog />} />
-        <Route path="/insights/why-quickapp" element={<WhyQuickappBlog />} />
-        <Route path="/insights/bharath-beverages-case-study" element={<BharathBeveragesCaseStudy />} />
-        <Route path="/blog/choosing-a-dms-guide" element={<ChoosingDMSGuideBlog />} />
         <Route path="/request-demo" element={<DemoRequestPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        {/* Website routes carried over from preprod production website */}
+        <Route path="/solutions/retailer-portal" element={<RetailerPortalSolution />} />
+        <Route path="/solutions/quick-locate" element={<QuickLocateSolution />} />
+        <Route path="/insights/roi-tracker" element={<ROITrackerPage />} />
+        <Route path="/connectors" element={<ConnectorsPage />} />
+        <Route path="/impact" element={<ImpactPage />} />
+        <Route path="/insights/why-quickapp" element={<WhyQuickappBlog />} />
+        <Route path="/insights/bharath-beverages-case-study" element={<BharathBeveragesCaseStudy />} />
+        <Route path="/blog/choosing-a-dms-guide" element={<ChoosingDMSGuideBlog />} />
         <Route path="/auth" element={<RoleBasedAuthPage />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/change-password" element={<ChangePassword />} />
@@ -407,6 +507,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/ai-features-export" element={<AIFeaturesExport />} />
         <Route path="/auth/complete-profile" element={<CompleteProfile />} />
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+        <Route path="/copilot" element={<ProtectedRoute><Copilot /></ProtectedRoute>} />
+        <Route path="/copilot/:threadId" element={<ProtectedRoute><Copilot /></ProtectedRoute>} />
+        
         
         <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
@@ -416,6 +519,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/user_roles" element={<ProtectedRoute><UserRoles /></ProtectedRoute>} />
         <Route path="/security-management" element={<ProtectedRoute><SecurityManagement /></ProtectedRoute>} />
         <Route path="/product-management" element={<ProtectedRoute><ProductManagementPage /></ProtectedRoute>} />
+        <Route path="/admin/uom-master" element={<ProtectedRoute><UomMasterPage /></ProtectedRoute>} />
+        <Route path="/admin/beat-coordinator" element={<ProtectedRoute><BeatCoordinator /></ProtectedRoute>} />
+        <Route path="/my-operations" element={<ProtectedRoute><MyOperations /></ProtectedRoute>} />
         <Route path="/scheme-management" element={<ProtectedRoute><SchemeMasterPage /></ProtectedRoute>} />
         <Route path="/attendance-management" element={<ProtectedRoute><AttendanceManagement /></ProtectedRoute>} />
         <Route path="/feedback-management" element={<ProtectedRoute><FeedbackManagement /></ProtectedRoute>} />
@@ -426,6 +532,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/territory/:id" element={<ProtectedRoute><TerritoryDetail /></ProtectedRoute>} />
         <Route path="/admin-expense-management" element={<ProtectedRoute><AdminExpenseManagement /></ProtectedRoute>} />
         <Route path="/operations" element={<ProtectedRoute><Operations /></ProtectedRoute>} />
+        <Route path="/operations/edited-orders" element={<ProtectedRoute><EditedOrders /></ProtectedRoute>} />
         <Route path="/visit-planner" element={<ProtectedRoute><VisitPlanner /></ProtectedRoute>} />
         <Route path="/visits" element={<ProtectedRoute><BeatPlanning /></ProtectedRoute>} />
         <Route path="/beat-planning" element={<ProtectedRoute><BeatPlanning /></ProtectedRoute>} />
@@ -438,7 +545,9 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/event/:id/summary" element={<ProtectedRoute><EventSummary /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/my-beats" element={<ProtectedRoute><MyBeats /></ProtectedRoute>} />
+        <Route path="/beats/transfer" element={<ProtectedRoute><MassBeatTransfer /></ProtectedRoute>} />
         <Route path="/today-summary" element={<ProtectedRoute><TodaySummary /></ProtectedRoute>} />
+        <Route path="/uom-quantity-report" element={<ProtectedRoute><UomQuantityReportPage /></ProtectedRoute>} />
         <Route path="/add-retailer" element={<ProtectedRoute><AddRetailer /></ProtectedRoute>} />
         <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
         <Route path="/team-approvals" element={<ProtectedRoute><TeamApprovals /></ProtectedRoute>} />
@@ -447,6 +556,7 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/performance-dashboard" element={<ProtectedRoute><PerformanceDashboard /></ProtectedRoute>} />
         <Route path="/target-advisor" element={<ProtectedRoute><TargetAchievementAdvisor /></ProtectedRoute>} />
         <Route path="/auto-plan-rationale" element={<ProtectedRoute><AutoPlanRationale /></ProtectedRoute>} />
+        <Route path="/auto-plan-preview" element={<ProtectedRoute><AutoPlanPreview /></ProtectedRoute>} />
         <Route path="/admin/target-vs-actual" element={<ProtectedRoute><TargetVsActual /></ProtectedRoute>} />
         
         <Route path="/create-beat" element={<ProtectedRoute><CreateBeat /></ProtectedRoute>} />
@@ -502,13 +612,16 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/employee-360" element={<ProtectedRoute><Employee360 /></ProtectedRoute>} />
         <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
         <Route path="/admin/recycle-bin" element={<ProtectedRoute><RecycleBinAdmin /></ProtectedRoute>} />
-        <Route path="/admin/sardar-restore-audit" element={<ProtectedRoute><SardarRestoreAudit /></ProtectedRoute>} />
         <Route path="/admin/distributor-portal" element={<ProtectedRoute><DistributorPortalAdmin /></ProtectedRoute>} />
         <Route path="/admin/pincode-master" element={<ProtectedRoute><PincodeMasterPage /></ProtectedRoute>} />
+        <Route path="/admin/pincode-master/:pincode" element={<ProtectedRoute><PincodeDetailPage /></ProtectedRoute>} />
         <Route path="/admin/tax-master" element={<ProtectedRoute><TaxMaster /></ProtectedRoute>} />
         <Route path="/admin/retailer-external-db" element={<ProtectedRoute><RetailerExternalDBPage /></ProtectedRoute>} />
         <Route path="/admin/retailer-unsorted" element={<ProtectedRoute><RetailerUnsortedPage /></ProtectedRoute>} />
         <Route path="/admin/notification-rules" element={<ProtectedRoute><NotificationRulesAdmin /></ProtectedRoute>} />
+        <Route path="/admin/activity-types" element={<ProtectedRoute><ActivityTypeManagement /></ProtectedRoute>} />
+        <Route path="/admin/activity-coordinator" element={<ProtectedRoute><ActivityCoordinator /></ProtectedRoute>} />
+        <Route path="/admin/sync-health" element={<ProtectedRoute><SyncHealth /></ProtectedRoute>} />
         <Route path="/distributor-master" element={<ProtectedRoute><DistributorMaster /></ProtectedRoute>} />
         <Route path="/add-distributor" element={<ProtectedRoute><AddDistributor /></ProtectedRoute>} />
         <Route path="/distributor/:id" element={<ProtectedRoute><DistributorDetail /></ProtectedRoute>} />
@@ -517,18 +630,6 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/my-deliveries" element={<ProtectedRoute><MyDeliveriesPage /></ProtectedRoute>} />
         <Route path="/help-center" element={<ProtectedRoute><HelpCenter /></ProtectedRoute>} />
         <Route path="/help-center/:articleId" element={<ProtectedRoute><HelpArticle /></ProtectedRoute>} />
-
-        {/* Support hub — Ideas, Tickets, Releases, Help Center */}
-        <Route path="/support" element={<SupportLayout />}>
-          <Route index element={<Navigate to="/support/releases" replace />} />
-          <Route path="ideas" element={<SupportIdeasPage />} />
-          <Route path="ideas/:id" element={<SupportIdeaDetailPage />} />
-          <Route path="tickets" element={<SupportTicketsPage />} />
-          <Route path="tickets/:id" element={<SupportTicketDetailPage />} />
-          <Route path="releases" element={<SupportReleasesPage />} />
-          <Route path="releases/:slug" element={<SupportReleaseDetailPage />} />
-          <Route path="help" element={<SupportHelpMirror />} />
-        </Route>
 
         {/* Distributor Portal Routes */}
         <Route path="/distributor-portal" element={<Navigate to="/distributor-portal/login" replace />} />
@@ -540,11 +641,13 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="primary-orders" element={<PrimaryOrdersList />} />
           <Route path="create-primary-order" element={<CreatePrimaryOrder />} />
           <Route path="primary-order/:id" element={<PrimaryOrderDetail />} />
+          <Route path="primary-order/:id/edit" element={<CreatePrimaryOrder />} />
           <Route path="inventory" element={<DistributorInventory />} />
           <Route path="secondary-sales" element={<SecondarySales />} />
           <Route path="packing-list" element={<PackingList />} />
           <Route path="packing-list-management" element={<PackingListManagement />} />
           <Route path="packing-list/:id" element={<PackingListDetail />} />
+          <Route path="packing-list/:id/dispatch" element={<PackingListDispatchPage bare />} />
           <Route path="goods-receipt/:orderId" element={<GoodsReceiptNew />} />
           <Route path="goods-receipt" element={<GoodsReceiptList />} />
           <Route path="claims" element={<DistributorClaims />} />
@@ -567,11 +670,15 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
           <Route path="price-book" element={<PriceBookView />} />
           <Route path="schemes" element={<PrimarySchemesView />} />
           <Route path="create-return" element={<PrimaryReturnCreate />} />
+          <Route path="packing-lists" element={<DistributorPackingLists />} />
+          <Route path="network" element={<DistributorNetwork />} />
+          <Route path="network/:childId" element={<NetworkChildDetail />} />
         </Route>
 
         {/* D-1 Delivery Module Routes - Main App */}
         <Route path="/packing-list-management" element={<ProtectedRoute><PackingListManagementPage /></ProtectedRoute>} />
         <Route path="/packing-list/:id" element={<ProtectedRoute><PackingListDetailPage /></ProtectedRoute>} />
+        <Route path="/packing-list/:id/dispatch" element={<ProtectedRoute><PackingListDispatchPage /></ProtectedRoute>} />
         <Route path="/delivery-run" element={<ProtectedRoute><DeliveryRun /></ProtectedRoute>} />
 
 
@@ -583,8 +690,70 @@ const AppContent = ({ hasError }: { hasError: boolean }) => {
         <Route path="/templates/:id" element={<ProtectedRoute><TemplateBuilderPage /></ProtectedRoute>} />
         */}
 
+        {/* Customer Portal Routes */}
+        <Route path="/customer-portal" element={<Navigate to="/customer-portal/login" replace />} />
+        <Route path="/customer-portal/login" element={<CustomerLogin />} />
+        <Route path="/customer-portal" element={<CustomerLayout />}>
+          <Route path="home" element={<CustomerHome />} />
+          <Route path="catalog" element={<CustomerCatalog />} />
+          <Route path="cart" element={<CustomerCart />} />
+          <Route path="orders" element={<CustomerOrders />} />
+          <Route path="orders/:orderId" element={<CustomerOrderDetail />} />
+          <Route path="order-success/:orderId" element={<CustomerOrderSuccess />} />
+          <Route path="chat" element={<CustomerChat />} />
+          <Route path="schemes" element={<CustomerSchemes />} />
+          <Route path="reports" element={<CustomerReports />} />
+          <Route path="notifications" element={<CustomerNotifications />} />
+        </Route>
+        <Route path="/customer-portal/*" element={<Navigate to="/customer-portal/login" replace />} />
+
+        {isQAModeEnv() && (
+          <>
+            <Route
+              path="/qa/run-tests"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <RunTestsScreen />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/qa/run-tests/automated"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <AutomatedTestsScreen />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/qa/run-tests/custom"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <CustomTestScreen />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/qa/run-tests/results"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen />}>
+                    <TestResultsScreen />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+          </>
+        )}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </ErrorBoundary>
     </>
   );
 };

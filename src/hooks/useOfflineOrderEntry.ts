@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { offlineStorage, STORES } from '@/lib/offlineStorage';
 import { submitOrderWithOfflineSupport } from '@/utils/offlineOrderUtils';
+import { fetchAllPaginated } from '@/utils/fetchAllPaginated';
 
 interface Product {
   id: string;
@@ -68,31 +69,33 @@ export function useOfflineOrderEntry() {
   // Background sync function - defined before fetchProducts
   const syncProductsInBackground = async () => {
     try {
-      // Fetch all products where is_active is true OR null (treat null as active)
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          *,
-          category:product_categories(name)
-        `)
-        .or('is_active.eq.true,is_active.is.null')
-        .order('name');
+      // Fetch all products where is_active is true OR null (PAGINATED — no 1k cap)
+      const productsData = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('products')
+          .select(`*, category:product_categories(name)`)
+          .or('is_active.eq.true,is_active.is.null')
+          .order('name')
+          .range(from, to)
+      );
 
-      if (productsError) throw productsError;
+      // Fetch all active schemes (is_active true or null) — paginated
+      const schemesData = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('product_schemes')
+          .select('*')
+          .or('is_active.eq.true,is_active.is.null')
+          .range(from, to)
+      );
 
-      // Fetch all active schemes (is_active true or null)
-      const { data: schemesData } = await supabase
-        .from('product_schemes')
-        .select('*')
-        .or('is_active.eq.true,is_active.is.null');
-
-      // Fetch all active variants (is_active true or null)
-      const { data: variantsData, error: variantsError } = await supabase
-        .from('product_variants')
-        .select('*')
-        .or('is_active.eq.true,is_active.is.null');
-
-      if (variantsError) throw variantsError;
+      // Fetch all active variants (paginated)
+      const variantsData = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('product_variants')
+          .select('*')
+          .or('is_active.eq.true,is_active.is.null')
+          .range(from, to)
+      );
 
       const variantsByProductId = new Map<string, any[]>();
 
@@ -112,16 +115,14 @@ export function useOfflineOrderEntry() {
       setProducts(enrichedProducts);
       setLoading(false);
 
-      // Cache for offline use - do this in background
-      offlineStorage.clear(STORES.PRODUCTS).then(() => {
-        enrichedProducts.forEach(product => offlineStorage.save(STORES.PRODUCTS, product));
-      });
-      offlineStorage.clear(STORES.VARIANTS).then(() => {
-        variantsData?.forEach(variant => offlineStorage.save(STORES.VARIANTS, variant));
-      });
-      offlineStorage.clear(STORES.SCHEMES).then(() => {
-        schemesData?.forEach(scheme => offlineStorage.save(STORES.SCHEMES, scheme));
-      });
+      // Cache for offline use — BATCH writes (single underlying write per store)
+      // to avoid the multi-second freeze caused by N awaited per-row puts.
+      offlineStorage.replaceAll(STORES.PRODUCTS, enrichedProducts).catch(err =>
+        console.warn('[useOfflineOrderEntry] cache products failed', err));
+      offlineStorage.replaceAll(STORES.VARIANTS, variantsData || []).catch(err =>
+        console.warn('[useOfflineOrderEntry] cache variants failed', err));
+      offlineStorage.replaceAll(STORES.SCHEMES, schemesData || []).catch(err =>
+        console.warn('[useOfflineOrderEntry] cache schemes failed', err));
 
       console.log(`✅ Synced ${enrichedProducts.length} products from network (background)`);
     } catch (error) {
@@ -155,6 +156,9 @@ export function useOfflineOrderEntry() {
       const cachedVariants = await offlineStorage.getAll(STORES.VARIANTS);
       const cachedSchemes = await offlineStorage.getAll(STORES.SCHEMES);
 
+      const cachedCategories = await offlineStorage.getAll<any>(STORES.CATEGORIES);
+      const categoryNameById = new Map((cachedCategories || []).map((c: any) => [c.id, c.name]));
+
       if (cachedProducts.length > 0) {
         // Filter only active products: is_active must be true or null/undefined (never false)
         const activeProducts = (cachedProducts || []).filter((p: any) => p.is_active !== false);
@@ -170,6 +174,9 @@ export function useOfflineOrderEntry() {
         
         const enrichedProducts = activeProducts.map((product: any) => ({
           ...product,
+          category: product.category ?? (product.category_id
+            ? { name: categoryNameById.get(product.category_id) || 'Uncategorized' }
+            : null),
           variants: variantsByProductId.get(product.id) || [],
           schemes: activeSchemes.filter((s: any) => s.product_id === product.id)
         }));
@@ -212,6 +219,9 @@ export function useOfflineOrderEntry() {
         const cachedVariants = await offlineStorage.getAll(STORES.VARIANTS);
         const cachedSchemes = await offlineStorage.getAll(STORES.SCHEMES);
 
+        const cachedCategories = await offlineStorage.getAll<any>(STORES.CATEGORIES);
+        const categoryNameById = new Map((cachedCategories || []).map((c: any) => [c.id, c.name]));
+
         if (cachedProducts.length > 0) {
           const activeProducts = (cachedProducts || []).filter((p: any) => p.is_active !== false);
           const activeVariants = (cachedVariants || []).filter((v: any) => v.is_active !== false && !!v.product_id);
@@ -226,6 +236,9 @@ export function useOfflineOrderEntry() {
           
           const enrichedProducts = activeProducts.map((product: any) => ({
             ...product,
+            category: product.category ?? (product.category_id
+              ? { name: categoryNameById.get(product.category_id) || 'Uncategorized' }
+              : null),
             variants: variantsByProductId.get(product.id) || [],
             schemes: activeSchemes.filter((s: any) => s.product_id === product.id)
           }));
@@ -255,11 +268,31 @@ export function useOfflineOrderEntry() {
     });
   };
 
+  // Force the next fetchProducts() to actually re-read the cache and re-sync,
+  // bypassing the hasFetchedRef de-dupe guard. Used by the "Refresh products"
+  // button so newly-added rows in the cache propagate to the picker.
+  const resetFetchGuard = useCallback(() => {
+    hasFetchedRef.current = false;
+  }, []);
+
+  // Auto-react to a global "masterDataRefreshed" event (dispatched by
+  // useMasterDataCache.forceRefreshMasterData) so background refreshes that
+  // happen elsewhere in the app also update the order-entry product list.
+  useEffect(() => {
+    const handler = () => {
+      hasFetchedRef.current = false;
+      fetchProducts().catch(err => console.warn('[useOfflineOrderEntry] reload after masterDataRefreshed failed', err));
+    };
+    window.addEventListener('masterDataRefreshed', handler);
+    return () => window.removeEventListener('masterDataRefreshed', handler);
+  }, [fetchProducts]);
+
   return {
     products,
     loading,
     isOnline,
     fetchProducts,
+    resetFetchGuard,
     submitOrder
   };
 }

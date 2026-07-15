@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus, Gift, Package, Search, Check, ChevronsUpDown, Star, Sparkles, Tag } from "lucide-react";
+import { Trash2, Plus, Gift, Package, Search, Check, ChevronsUpDown, Star, Sparkles, Tag, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { isFocusedProductActive } from "@/utils/focusedProductChecker";
 import { ApplyOfferSection } from "@/components/ApplyOfferSection";
 import { OrderEntrySchemesModal } from "@/components/OrderEntrySchemesModal";
@@ -18,6 +19,9 @@ import { useOfflineSchemes, ProductScheme } from "@/hooks/useOfflineSchemes";
 import { useAppliedSchemes } from "@/hooks/useAppliedSchemes";
 import { useSchemePolicies } from "@/hooks/useSchemePolicies";
 import { calculateOrderWithSchemes, calculateSchemeDiscountForComparison, SchemeItem, isSchemeActive, isSchemeConditionMet, schemeHasConditions } from "@/utils/schemeEngine";
+import LineItemUomSelect, { type LineItemUomSelection } from "@/components/uom/LineItemUomSelect";
+import { resolveProduct, type ResolvedProduct } from "@/utils/resolveProduct";
+import { useOrderEditPolicy } from "@/hooks/useOrderEditPolicy";
 interface Product {
   id: string;
   sku: string;
@@ -67,7 +71,17 @@ interface OrderRow {
   quantity: number;
   closingStock: number;
   unit: string;
+  uomId?: string | null;
+  uomCode?: string | null;
+  conversionToBase?: number | null;
+  priceBasisUomId?: string | null;
+  priceBasisUomCode?: string | null;
+  priceBasisConversionToBase?: number | null;
   total: number;
+  /** Admin-overridden per-unit price for this line (only set in admin edit context). */
+  editedRate?: number | null;
+  /** True when editedRate differs from the catalog rate. */
+  isPriceEdited?: boolean;
 }
 
 interface TableOrderFormProps {
@@ -77,6 +91,26 @@ interface TableOrderFormProps {
   onReloadProducts?: () => void;
   onStockUpdate?: (productId: string, stockQuantity: number, productName: string) => void;
 }
+
+const normalizeUnitForOrder = (u?: string) => (u || "").toLowerCase().replace(/\./g, "").trim();
+
+const isLegacyWeightDefault = (u?: string) => {
+  const unit = normalizeUnitForOrder(u);
+  return ["kg", "kilogram", "kilograms", "g", "gm", "gram", "grams"].includes(unit);
+};
+
+const getDefaultOrderUnit = (product?: Product, requestedUnit?: string) => {
+  const explicitUnit = normalizeUnitForOrder(requestedUnit);
+  if (explicitUnit && !["kg", "kilogram", "kilograms"].includes(explicitUnit)) {
+    return requestedUnit || product?.unit || "KG";
+  }
+  return product?.unit || product?.base_unit || requestedUnit || "KG";
+};
+
+const shouldReplaceWeightDefault = (unit?: string, product?: Product) => {
+  const masterUnit = normalizeUnitForOrder(product?.unit || product?.base_unit);
+  return Boolean(masterUnit && !isLegacyWeightDefault(masterUnit) && isLegacyWeightDefault(unit));
+};
 
 // Expose this handle type for refs
 export interface TableOrderFormHandle {
@@ -99,6 +133,15 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   const navigate = useNavigate();
   const visitId = searchParams.get("visitId") || '';
   const retailerId = searchParams.get("retailerId") || '';
+  const editOrderId = searchParams.get("editOrderId") || '';
+  const source = searchParams.get("source") || '';
+  const isEditMode = !!editOrderId;
+  const isAdminEdit = source === 'admin' && isEditMode;
+  const editPolicy = useOrderEditPolicy();
+  // When editing an order and the admin has locked pricing, freeze anything
+  // that would change the per-unit rate (product, variant, UOM) — only qty is editable.
+  // Admin edit context always bypasses the price lock (admin is the override authority).
+  const priceLocked = isEditMode && editPolicy.edit_lock_price && !isAdminEdit;
 
   // PERF: disable noisy logs in hot paths
   const DEV_LOG = false;
@@ -107,11 +150,13 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   const validRetailerId = retailerId && retailerId !== '.' && retailerId.length > 1 ? retailerId : null;
   const validVisitId = visitId && visitId.length > 1 ? visitId : null;
   
-  const tableFormStorageKey = validVisitId && validRetailerId 
-    ? `table_form:${validVisitId}:${validRetailerId}`
-    : validRetailerId 
-      ? `table_form:temp:${validRetailerId}`
-      : 'table_form:fallback';
+  const tableFormStorageKey = isEditMode
+    ? `table_form:edit:${editOrderId}`
+    : validVisitId && validRetailerId 
+      ? `table_form:${validVisitId}:${validRetailerId}`
+      : validRetailerId 
+        ? `table_form:temp:${validRetailerId}`
+        : 'table_form:fallback';
 
   // Load initial order rows from localStorage to prevent data loss on navigation
   const getInitialOrderRows = (): OrderRow[] => {
@@ -119,6 +164,10 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       const savedData = localStorage.getItem(tableFormStorageKey);
       if (savedData) {
         const parsedData = JSON.parse(savedData);
+        if (isEditMode) {
+          const hasProductRows = Array.isArray(parsedData) && parsedData.some((row: any) => row?.product?.id);
+          return hasProductRows ? parsedData : [];
+        }
         if (Array.isArray(parsedData) && parsedData.length > 0) {
           DEV_LOG && console.log('[TableOrderForm] Loaded initial rows from storage:', parsedData.length);
           return parsedData;
@@ -127,11 +176,13 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     } catch (error) {
       console.error('[TableOrderForm] Error loading initial rows:', error);
     }
-    return [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "KG", total: 0 }];
+    if (isEditMode) return [];
+    return [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "", total: 0 }];
   };
 
   const [orderRows, setOrderRows] = useState<OrderRow[]>(getInitialOrderRows);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [editSeedApplied, setEditSeedApplied] = useState(false);
   
   // Use ref to always have access to the latest orderRows for addToCart
   const orderRowsRef = useRef<OrderRow[]>(orderRows);
@@ -142,9 +193,20 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProductForVariants, setSelectedProductForVariants] = useState<string>('');
   const [openComboboxes, setOpenComboboxes] = useState<{ [key: string]: boolean }>({});
+  // Per-row search text for the product picker. Only one popover is open at a time,
+  // but we key by row to keep results scoped if multiple rows ever render at once.
+  const [pickerSearch, setPickerSearch] = useState<{ [key: string]: string }>({});
+  const [refreshingProducts, setRefreshingProducts] = useState(false);
+  // How many matches to render at once. The full list can be 8k+ products —
+  // rendering all of them locks the main thread; 50 is responsive + scrollable.
+  const PICKER_RENDER_LIMIT = 50;
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showSchemesModal, setShowSchemesModal] = useState(false);
+  // Per-row raw text for admin price inputs so partial values ("", "18.", "0.") are allowed.
+  // Key = row.id, value = { rate?: rawUnitPriceText, total?: rawLineTotalText }.
+  // Only the field currently being typed holds its own text; the other stays derived.
+  const [priceEditText, setPriceEditText] = useState<Record<string, { rate?: string; total?: string }>>({});
   
   // Load schemes with offline support
   const { schemes, loading: schemesLoading, isOnline } = useOfflineSchemes();
@@ -178,6 +240,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
 
   // Helper to get cart storage key
   const getCartStorageKey = () => {
+    if (isEditMode) return `order_cart:edit:${editOrderId}`;
     const validRetailerIdForStorage = retailerId && retailerId !== '.' && retailerId.length > 1 ? retailerId : null;
     const validVisitIdForStorage = visitId && visitId.length > 1 ? visitId : null;
     return validVisitIdForStorage && validRetailerIdForStorage 
@@ -222,60 +285,85 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   };
 
   // Helper to sync current rows to cart storage
-  // IMPORTANT: Convert KG to Grams for internal storage to maintain integer compatibility
+  // Stores quantity, rate and unit EXACTLY as selected from the unit master.
+  // No hardcoded KG→grams normalization — the unit chosen by the user is the unit saved.
   const syncRowsToCart = (rows: OrderRow[]) => {
     const productRows = rows.filter(row => row.product && row.quantity > 0);
-    const cartItems = productRows.map(row => {
+    const rawItems = productRows.map(row => {
       const displayName = row.variant ? row.variant.variant_name : row.product!.name;
       const stock = row.variant ? row.variant.stock_quantity : row.product!.closing_stock;
       const itemId = row.variant ? `${row.product!.id}_variant_${row.variant.id}` : row.product!.id;
-      const selectedUnit = row.unit || 'KG';
-      const ratePerSelectedUnit = getPricePerUnit(row.product!, row.variant, selectedUnit);
-      
-      // Get original rate (MRP) from variant or product - this is the rate BEFORE any discount
-      const originalRatePerSelectedUnit = row.variant 
-        ? Number(row.variant.price) || ratePerSelectedUnit
-        : Number(row.product!.rate) || ratePerSelectedUnit;
-      
-      // Convert quantity to grams if unit is KG for internal storage
-      const quantityInGrams = selectedUnit.toLowerCase() === 'kg' 
-        ? Math.round(row.quantity * 1000)  // Round to avoid floating point issues
-        : Number(row.quantity) || 0;
-      
-      // Rate per gram for storage (price per kg / 1000)
-      const ratePerGram = selectedUnit.toLowerCase() === 'kg'
-        ? ratePerSelectedUnit / 1000
-        : ratePerSelectedUnit;
-      
-      // Original rate per gram for storage
-      const originalRatePerGram = selectedUnit.toLowerCase() === 'kg'
-        ? originalRatePerSelectedUnit / 1000
-        : originalRatePerSelectedUnit;
-      
+      const selectedUnit = row.uomCode || row.unit || row.product!.unit || 'PC';
+      const catalogRate = getPricePerUnit(
+        row.product!,
+        row.variant,
+        selectedUnit,
+        row.conversionToBase,
+        row.priceBasisConversionToBase,
+      );
+
+      // Admin-edited price overrides the catalog rate on the way to the cart.
+      // original_rate always keeps the catalog value for history.
+      const hasEditedPrice = row.editedRate != null && Number.isFinite(row.editedRate);
+      const effectiveRate = hasEditedPrice ? Number(row.editedRate) : catalogRate;
+      const isPriceEdited = !!row.isPriceEdited && hasEditedPrice
+        && Math.abs(Number(row.editedRate) - catalogRate) > 0.005;
+      const qty = Number(row.quantity) || 0;
+      const lineTotal = hasEditedPrice ? +(effectiveRate * qty).toFixed(2) : (Number(row.total) || 0);
+
       return {
         id: itemId,
         product_id: row.product!.id,
         variant_id: row.variant ? row.variant.id : null,
         name: displayName || 'Unknown Product',
         category: row.product!.category?.name || 'Uncategorized',
-        rate: ratePerGram, // Store rate per gram
-        original_rate: originalRatePerGram, // Store original rate (MRP) per gram
-        unit: 'Grams', // Always store as grams internally
-        base_unit: 'Grams',
-        quantity: quantityInGrams, // Store quantity in grams
-        total: Number(row.total) || 0,
+        rate: effectiveRate,
+        original_rate: catalogRate,
+        is_price_edited: isPriceEdited,
+        unit: selectedUnit,
+        uom_id: row.uomId || null,
+        uom_code: row.uomCode || selectedUnit,
+        conversion_to_base: row.conversionToBase ?? null,
+        base_unit: selectedUnit,
+        quantity: qty,
+        total: lineTotal,
         closingStock: Number(stock) || 0,
         schemes: row.product!.schemes || [],
-        display_unit: selectedUnit, // Keep original unit for display purposes
-        display_quantity: Number(row.quantity) || 0, // Keep original quantity for display
-        hsn_code: (row.product as any)?.hsn_code || null
+        display_unit: selectedUnit,
+        display_quantity: qty,
+        hsn_code: (row.product as any)?.hsn_code || null,
+        gst_percentage: (row.product as any)?.gst_percentage ?? null,
+        tax_master_id: (row.product as any)?.tax_master_id ?? null
       };
+
     });
-    
+
+    // Merge duplicate lines (same product + variant + unit) into a single cart entry.
+    // Multiple rows of the same product in the order-entry table should appear as ONE
+    // line in the cart with the combined quantity/total.
+    const mergedMap = new Map<string, typeof rawItems[number]>();
+    for (const item of rawItems) {
+      const key = `${item.product_id}__${item.variant_id ?? 'novariant'}__${item.uom_code || item.unit}`;
+      const existing = mergedMap.get(key);
+      if (existing) {
+        existing.quantity = Number(existing.quantity) + Number(item.quantity);
+        existing.total = Number(existing.total) + Number(item.total);
+        existing.display_quantity = Number(existing.display_quantity) + Number(item.display_quantity);
+      } else {
+        mergedMap.set(key, { ...item });
+      }
+    }
+    const cartItems = Array.from(mergedMap.values());
+
     onCartUpdate(cartItems);
     localStorage.setItem(getCartStorageKey(), JSON.stringify(cartItems));
-    DEV_LOG && console.log('[syncRowsToCart] Synced to cart:', cartItems.length, 'items (stored as grams)');
+    DEV_LOG && console.log('[syncRowsToCart] Synced to cart:', cartItems.length, 'items (merged from', rawItems.length, 'rows)');
   };
+
+  const hasRealProductRows = (rows: unknown): rows is OrderRow[] => {
+    return Array.isArray(rows) && rows.some((row: any) => row?.product?.id);
+  };
+
 
   // Expose applyVoiceAutoFill to parent via ref
   useImperativeHandle(ref, () => ({
@@ -313,8 +401,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
             return existingKey === rowKey;
           });
           
-          // Normalize unit to KG or Grams
-          const unit = result.unit?.toUpperCase() === 'GRAMS' ? 'Grams' : 'KG';
+          const unit = getDefaultOrderUnit(product, result.unit);
           
           // Calculate total price
           const rate = getPricePerUnit(product, variant, unit);
@@ -373,32 +460,141 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   useEffect(() => {
     // Reset init so we don't immediately overwrite loaded state
     setHasInitialized(false);
+    setEditSeedApplied(false);
 
     // Reset auto-apply tracking for the new context
     autoAppliedSchemesRef.current.clear();
     suppressedSchemesRef.current.clear();
 
     // Load rows for this retailer/visit
-    let rows: OrderRow[] = [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "KG", total: 0 }];
+    let rows: OrderRow[] | null = null;
     try {
       const savedData = localStorage.getItem(tableFormStorageKey);
       const parsedData = savedData ? JSON.parse(savedData) : null;
-      if (Array.isArray(parsedData) && parsedData.length > 0) {
+      if (isEditMode) {
+        if (hasRealProductRows(parsedData)) {
+          rows = parsedData;
+          setEditSeedApplied(true);
+        }
+      } else if (Array.isArray(parsedData) && parsedData.length > 0) {
         rows = parsedData;
       }
     } catch (error) {
       console.error('[TableOrderForm] Error loading rows for key:', tableFormStorageKey, error);
     }
 
+    if (!rows && !isEditMode) {
+      rows = [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "", total: 0 }];
+    }
+
+    if (!rows) {
+      DEV_LOG && console.log('[TableOrderForm] Edit context switched, waiting for seed:', tableFormStorageKey);
+      return;
+    }
+
     setOrderRows(rows);
     syncRowsToCart(rows);
     DEV_LOG && console.log('[TableOrderForm] Context switched, loaded rows:', rows.length, tableFormStorageKey);
-  }, [tableFormStorageKey]);
+  }, [tableFormStorageKey, isEditMode]);
+
+  // EDIT MODE: seed table rows directly from the original order_items in the
+  // database. OrderEntry may still be populating the edit cart asynchronously,
+  // so we bypass the cart and read the source-of-truth line items instead.
+  useEffect(() => {
+    if (!isEditMode || products.length === 0 || !editOrderId) return;
+
+    let cancelled = false;
+
+    const seedFromOriginalOrder = async () => {
+      try {
+        const existingRaw = localStorage.getItem(tableFormStorageKey);
+        const existing = existingRaw ? JSON.parse(existingRaw) : null;
+        const hasRows = Array.isArray(existing) && existing.some((r: any) => r && r.product && r.product.id);
+        if (hasRows) {
+          if (!cancelled) setEditSeedApplied(true);
+          return;
+        }
+
+        const { data: items, error } = await supabase
+          .from('order_items')
+          .select('id, product_id, variant_id, product_name, rate, original_rate, is_price_edited, unit, quantity, total')
+          .eq('order_id', editOrderId);
+
+        if (error) {
+          console.error('[TableOrderForm][edit] failed to load original order items:', error);
+          if (!cancelled) {
+            const fallbackRows: OrderRow[] = [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "", total: 0 }];
+            localStorage.setItem(tableFormStorageKey, JSON.stringify(fallbackRows));
+            setOrderRows(fallbackRows);
+            syncRowsToCart(fallbackRows);
+            setEditSeedApplied(true);
+          }
+          return;
+        }
+        if (!Array.isArray(items) || items.length === 0) {
+          console.error('[TableOrderForm][edit] no original order_items found for order:', editOrderId);
+          if (!cancelled) {
+            const fallbackRows: OrderRow[] = [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "", total: 0 }];
+            localStorage.setItem(tableFormStorageKey, JSON.stringify(fallbackRows));
+            setOrderRows(fallbackRows);
+            syncRowsToCart(fallbackRows);
+            setEditSeedApplied(true);
+          }
+          return;
+        }
+
+        const seeded: OrderRow[] = items.map((it: any, idx: number) => {
+          const pid: string | undefined = it.product_id;
+          const liveProduct = pid ? products.find(p => p.id === pid) : undefined;
+          const liveVariant = liveProduct && it.variant_id
+            ? liveProduct.variants?.find((v: any) => v.id === it.variant_id)
+            : undefined;
+          const qty = Number(it.quantity) || 0;
+          const rate = Number(it.rate) || 0;
+          const originalRate = Number(it.original_rate ?? rate) || rate;
+          const wasEdited = !!it.is_price_edited && Math.abs(rate - originalRate) > 0.005;
+          return {
+            id: String(idx + 1),
+            productCode: (liveVariant as any)?.sku || liveProduct?.sku || pid || '',
+            product: liveProduct,
+            variant: liveVariant,
+            quantity: qty,
+            closingStock: Number((liveVariant as any)?.stock_quantity ?? liveProduct?.closing_stock ?? 0),
+            unit: it.unit || (liveProduct ? getDefaultOrderUnit(liveProduct) : 'pcs'),
+            total: Number(it.total) || qty * rate,
+            editedRate: wasEdited ? rate : null,
+            isPriceEdited: wasEdited,
+          } as OrderRow;
+        });
+
+        if (!cancelled) {
+          localStorage.setItem(tableFormStorageKey, JSON.stringify(seeded));
+          setOrderRows(seeded);
+          syncRowsToCart(seeded);
+          setEditSeedApplied(true);
+          console.log('[TableOrderForm][edit] Seeded', seeded.length, 'rows from original order_items');
+        }
+      } catch (e) {
+        console.error('[TableOrderForm][edit] seed from order_items failed:', e);
+        if (!cancelled) {
+          const fallbackRows: OrderRow[] = [{ id: "1", productCode: "", quantity: 0, closingStock: 0, unit: "", total: 0 }];
+          localStorage.setItem(tableFormStorageKey, JSON.stringify(fallbackRows));
+          setOrderRows(fallbackRows);
+          syncRowsToCart(fallbackRows);
+          setEditSeedApplied(true);
+        }
+      }
+    };
+
+    seedFromOriginalOrder();
+    return () => { cancelled = true; };
+  }, [isEditMode, editOrderId, products.length, tableFormStorageKey]);
 
   // Re-link products from live products array when products load (only once after init)
 
   useEffect(() => {
     if (products.length === 0 || hasInitialized) return; // Wait for products to load, only run once
+    if (isEditMode && !editSeedApplied) return; // Let edit seed become authoritative before re-linking
     
     const savedData = localStorage.getItem(tableFormStorageKey);
     if (savedData) {
@@ -415,10 +611,14 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
               if (row.variant && row.variant.id) {
                 liveVariant = liveProduct.variants?.find(v => v.id === row.variant.id);
               }
+              const relinkedUnit = shouldReplaceWeightDefault(row.unit, liveProduct)
+                ? getDefaultOrderUnit(liveProduct)
+                : row.unit;
               return {
                 ...row,
                 product: liveProduct,
-                variant: liveVariant
+                variant: liveVariant,
+                unit: relinkedUnit
               };
             }
           }
@@ -433,7 +633,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       }
     }
     setHasInitialized(true);
-  }, [tableFormStorageKey, products.length, hasInitialized]);
+  }, [tableFormStorageKey, products.length, hasInitialized, isEditMode, editSeedApplied]);
 
   // Save table form data whenever orderRows change (but only after initialization)
   useEffect(() => {
@@ -457,12 +657,14 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       .filter(row => row.product && row.quantity > 0)
       .map(row => {
         const itemId = row.variant?.id || row.product!.id;
+        const catalog = getPricePerUnit(row.product!, row.variant, row.uomCode || row.unit, row.conversionToBase, row.priceBasisConversionToBase);
+        const eff = (row.editedRate != null && Number.isFinite(row.editedRate)) ? Number(row.editedRate) : catalog;
         return {
           id: itemId,
           product_id: itemId,
           variant_id: row.variant?.id,
           quantity: row.quantity,
-          rate: getPricePerUnit(row.product!, row.variant, row.unit),
+          rate: eff,
           name: row.variant?.variant_name || row.product!.name
         };
       });
@@ -612,6 +814,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       sku: string;
       price: number;
       type: 'product' | 'variant';
+      resolved?: ResolvedProduct;
     }> = [];
 
     // Filter only active products (driven directly by Product Master)
@@ -624,27 +827,33 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
 
     activeProducts.forEach(product => {
       // Always add base product as a selectable option (even if it has variants)
+      const baseResolved = resolveProduct(product);
       options.push({
         value: product.id,
-        label: `${product.name} | ₹${product.rate}`,
+        label: `${baseResolved.display_name} | ₹${baseResolved.rate}`,
         product,
-        sku: product.sku,
-        price: product.rate,
+        sku: baseResolved.sku || product.sku,
+        price: baseResolved.rate,
         type: 'product',
+        resolved: baseResolved,
       });
 
       // Add active variants; null/undefined is treated as active throughout order entry
       if (product.variants && product.variants.length > 0) {
         product.variants.forEach(variant => {
           if (variant.is_active !== false) {
+            // Resolve variant against base — NULL variant fields inherit from base
+            // so a variant with no overrides never renders blank.
+            const r = resolveProduct(product, variant);
             options.push({
               value: `${product.id}_variant_${variant.id}`,
-              label: `${variant.variant_name} | ₹${variant.price}`,
+              label: `${r.display_name} | ₹${r.rate}`,
               product,
               variant,
-              sku: variant.sku,
-              price: variant.price,
+              sku: r.sku || '',
+              price: r.rate,
               type: 'variant',
+              resolved: r,
             });
           }
         });
@@ -669,8 +878,18 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     return u || "";
   };
 
-  const getPricePerUnit = (prod: Product, variant?: any, unit?: string) => {
+  const getPricePerUnit = (
+    prod: Product,
+    variant?: any,
+    unit?: string,
+    conversionToBase?: number | null,
+    priceBasisConversionToBase?: number | null,
+  ) => {
     const baseRate = Number(variant ? variant.price : prod.rate) || 0;
+    if (conversionToBase && priceBasisConversionToBase) {
+      return baseRate * (Number(conversionToBase) / Number(priceBasisConversionToBase));
+    }
+
     const baseUnit = normalizeUnit(prod.base_unit || prod.unit);
     const targetUnit = normalizeUnit(unit || prod.unit);
 
@@ -695,13 +914,19 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       setOrderRows(prev =>
         prev.map(row => {
           if (row.id === rowId) {
-            // Always default to KG when product is selected
+            const defaultUnit = getDefaultOrderUnit(option.product);
             return {
               ...row,
               productCode: option.sku,
               product: option.product,
               variant: option.variant,
-              unit: 'KG',
+              unit: '',
+              uomId: null,
+              uomCode: null,
+              conversionToBase: null,
+              priceBasisUomId: null,
+              priceBasisUomCode: null,
+              priceBasisConversionToBase: null,
               total: 0,
             };
           }
@@ -720,7 +945,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       productCode: "",
       quantity: 0,
       closingStock: 0,
-      unit: "KG",
+      unit: "",
       total: 0,
     };
     setOrderRows([...orderRows, newRow]);
@@ -754,7 +979,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         product: product,
         quantity: quantity || 1,
         closingStock: product.closing_stock,
-        unit: "KG",
+        unit: getDefaultOrderUnit(product),
         total: product.rate * (quantity || 1),
       };
       setOrderRows(prev => [...prev, newRow]);
@@ -773,11 +998,18 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   };
 
   const updateRow = (id: string, field: keyof OrderRow, value: any) => {
-    const computeTotal = (prod?: Product, variant?: any, qty?: number, selectedUnit?: string) => {
+    const computeTotal = (
+      prod?: Product,
+      variant?: any,
+      qty?: number,
+      selectedUnit?: string,
+      conversionToBase?: number | null,
+      priceBasisConversionToBase?: number | null,
+    ) => {
       if (!prod || !qty) return 0;
 
       // Price per selected unit using shared helper
-      let price = getPricePerUnit(prod, variant, selectedUnit);
+      let price = getPricePerUnit(prod, variant, selectedUnit, conversionToBase, priceBasisConversionToBase);
 
       // Apply variant discount if applicable
       if (variant) {
@@ -800,33 +1032,59 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     setOrderRows(prev => {
       const updatedRows = prev.map(row => {
         if (row.id === id) {
-          const updatedRow: OrderRow = { ...row, [field]: value } as OrderRow;
+          const updatedRow: OrderRow = field === "unit" ? { ...row } : ({ ...row, [field]: value } as OrderRow);
           if (field === "productCode") {
             const result = findProductByCode(value);
             if (result) {
               updatedRow.product = result.product;
               updatedRow.variant = result.variant;
-              updatedRow.unit = 'KG'; // Always default to KG when product selected
+              updatedRow.unit = '';
+              updatedRow.uomId = null;
+              updatedRow.uomCode = null;
+              updatedRow.conversionToBase = null;
+              updatedRow.priceBasisUomId = null;
+              updatedRow.priceBasisUomCode = null;
+              updatedRow.priceBasisConversionToBase = null;
               updatedRow.closingStock = result.variant ? result.variant.stock_quantity : result.product.closing_stock;
               updatedRow.total = computeTotal(result.product, result.variant, updatedRow.quantity, updatedRow.unit);
+              // A new product resets any previous admin price override.
+              updatedRow.editedRate = null;
+              updatedRow.isPriceEdited = false;
             } else {
               updatedRow.product = undefined;
               updatedRow.variant = undefined;
               updatedRow.closingStock = 0;
               updatedRow.total = 0;
+              updatedRow.editedRate = null;
+              updatedRow.isPriceEdited = false;
             }
           } else if (field === "quantity") {
             // Use row.unit (current unit) since quantity is being updated
-            updatedRow.total = computeTotal(row.product, row.variant, value, row.unit);
+            updatedRow.total = computeTotal(row.product, row.variant, value, row.uomCode || row.unit, row.conversionToBase, row.priceBasisConversionToBase);
+            // Preserve admin-edited unit price across quantity changes.
+            if (updatedRow.editedRate != null && Number.isFinite(updatedRow.editedRate)) {
+              updatedRow.total = +(Number(updatedRow.editedRate) * (Number(value) || 0)).toFixed(2);
+            }
           } else if (field === "unit") {
+            const sel = value as LineItemUomSelection;
             // When unit changes, convert quantity to the new unit automatically
-            const oldUnit = row.unit;
-            const newUnit = value as string;
+            const oldUnit = row.uomCode || row.unit;
+            const newUnit = sel.uomCode;
+            updatedRow.unit = sel.uomCode;
+            updatedRow.uomId = sel.uomId;
+            updatedRow.uomCode = sel.uomCode;
+            updatedRow.conversionToBase = sel.conversionToBase;
+            updatedRow.priceBasisUomId = sel.priceBasisUomId || null;
+            updatedRow.priceBasisUomCode = sel.priceBasisUomCode || null;
+            updatedRow.priceBasisConversionToBase = sel.priceBasisConversionToBase ?? null;
             if (oldUnit && newUnit && row.quantity > 0) {
               updatedRow.quantity = convertBetweenUnits(row.quantity, oldUnit, newUnit);
             }
-            // Recalculate total with the NEW unit and converted quantity
-            updatedRow.total = computeTotal(row.product, row.variant, updatedRow.quantity, value);
+            // Recalculate total with the NEW unit and converted quantity — clears any admin override,
+            // because the previous override was tied to a different UOM's price basis.
+            updatedRow.total = computeTotal(row.product, row.variant, updatedRow.quantity, sel.uomCode, sel.conversionToBase, sel.priceBasisConversionToBase);
+            updatedRow.editedRate = null;
+            updatedRow.isPriceEdited = false;
           }
           return updatedRow;
         }
@@ -838,6 +1096,104 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       return updatedRows;
     });
   };
+
+  /**
+   * Admin-only: set an overridden per-unit price on a row. Pass mode='rate' with the new
+   * unit price, or mode='total' with the new line total (rate is back-computed from quantity).
+   * Passing an empty/invalid value clears the override so the catalog price returns.
+   */
+  const applyAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
+    if (!isAdminEdit) return;
+    setOrderRows(prev => {
+      const updated = prev.map(row => {
+        if (row.id !== rowId || !row.product) return row;
+        const qty = Number(row.quantity) || 0;
+        const selectedUnit = row.uomCode || row.unit || row.product.unit || 'PC';
+        const catalogRate = getPricePerUnit(
+          row.product,
+          row.variant,
+          selectedUnit,
+          row.conversionToBase,
+          row.priceBasisConversionToBase,
+        );
+
+        // Empty input clears the override.
+        const parsed = Number(rawValue);
+        if (rawValue === '' || !Number.isFinite(parsed) || parsed < 0) {
+          const total = +(catalogRate * qty).toFixed(2);
+          return { ...row, editedRate: null, isPriceEdited: false, total };
+        }
+
+        let nextRate: number;
+        if (mode === 'rate') {
+          nextRate = +parsed.toFixed(2);
+        } else {
+          // total mode: rate = total / qty. Guard qty=0.
+          if (qty <= 0) return row;
+          nextRate = +(parsed / qty).toFixed(2);
+        }
+
+        const restoredToCatalog = Math.abs(nextRate - catalogRate) < 0.005;
+        const total = +(nextRate * qty).toFixed(2);
+        return {
+          ...row,
+          editedRate: restoredToCatalog ? null : nextRate,
+          isPriceEdited: !restoredToCatalog,
+          total,
+        };
+      });
+      syncRowsToCart(updated);
+      return updated;
+    });
+  };
+
+
+  /**
+   * Live typing handler for admin price fields. Updates the raw text buffer so
+   * empty / partial values ("", "18.", "0.") are preserved in the input, and
+   * pushes a parseable number into editedRate WITHOUT clearing the override on
+   * empty/invalid input. Clearing happens on blur only (see onBlurAdminPrice).
+   */
+  const onChangeAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
+    if (!isAdminEdit) return;
+    // Keep only the field being typed in state; the other should recompute.
+    setPriceEditText(prev => ({ ...prev, [rowId]: { [mode]: rawValue } }));
+    const parsed = Number(rawValue);
+    if (rawValue === '' || !Number.isFinite(parsed) || parsed < 0) return; // don't clear mid-typing
+    setOrderRows(prev => {
+      const updated = prev.map(row => {
+        if (row.id !== rowId || !row.product) return row;
+        const qty = Number(row.quantity) || 0;
+        let nextRate: number;
+        if (mode === 'rate') {
+          nextRate = +parsed.toFixed(2);
+        } else {
+          if (qty <= 0) return row;
+          nextRate = +(parsed / qty).toFixed(2);
+        }
+        const total = +(nextRate * qty).toFixed(2);
+        return { ...row, editedRate: nextRate, isPriceEdited: true, total };
+      });
+      syncRowsToCart(updated);
+      return updated;
+    });
+  };
+
+  /** On blur: if the field was left empty, clear the override back to catalog. Always drop the raw text buffer. */
+  const onBlurAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
+    if (!isAdminEdit) return;
+    if (rawValue.trim() === '') {
+      applyAdminPrice(rowId, mode, '');
+    }
+    setPriceEditText(prev => {
+      if (!(rowId in prev)) return prev;
+      const next = { ...prev };
+      delete next[rowId];
+      return next;
+    });
+  };
+
+
 
   const addToCart = () => {
     if (isAddingToCart) return;
@@ -894,12 +1250,14 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       .map(row => {
         // Use variant ID if available for unique identification - each variant is a separate product
         const itemId = row.variant?.id || row.product!.id;
+        const catalog = getPricePerUnit(row.product!, row.variant, row.uomCode || row.unit, row.conversionToBase, row.priceBasisConversionToBase);
+        const eff = (row.editedRate != null && Number.isFinite(row.editedRate)) ? Number(row.editedRate) : catalog;
         return {
           id: itemId,
           product_id: itemId,
           variant_id: row.variant?.id,
           quantity: row.quantity,
-          rate: getPricePerUnit(row.product!, row.variant, row.unit),
+          rate: eff,
           name: row.variant?.variant_name || row.product!.name
         };
       });
@@ -917,6 +1275,24 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   
   const getFinalTotal = () => {
     return parseFloat(orderCalculation.finalTotal.toFixed(2));
+  };
+
+  const getGstAmount = () => {
+    const taxable = orderRows.filter(r => r.product && r.quantity > 0);
+    const subtotal = taxable.reduce((s, r) => {
+      const catalog = getPricePerUnit(r.product!, r.variant, r.uomCode || r.unit, r.conversionToBase, r.priceBasisConversionToBase);
+      const eff = (r.editedRate != null && Number.isFinite(r.editedRate)) ? Number(r.editedRate) : catalog;
+      return s + eff * r.quantity;
+    }, 0);
+    if (subtotal <= 0) return 0;
+    const discountFactor = getFinalTotal() / subtotal;
+    return taxable.reduce((tax, r) => {
+      const catalog = getPricePerUnit(r.product!, r.variant, r.uomCode || r.unit, r.conversionToBase, r.priceBasisConversionToBase);
+      const eff = (r.editedRate != null && Number.isFinite(r.editedRate)) ? Number(r.editedRate) : catalog;
+      const lineTaxable = eff * r.quantity * discountFactor;
+      const gstPct = Number((r.product as any)?.gst_percentage) || 0;
+      return tax + lineTaxable * gstPct / 100;
+    }, 0);
   };
 
   const hasActiveSchemes = (product: Product) => {
@@ -955,12 +1331,14 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
     );
   }
 
+  const isEditSeedLoading = isEditMode && !editSeedApplied && !hasRealProductRows(orderRows);
+
   return (
     <div className="space-y-4">
       <Card>
         <CardContent className="p-0">
-          {/* Category Filter */}
-          <div className="px-2 md:px-4 py-2 md:py-3 border-b border-border bg-background">
+          {/* Category Filter + Refresh Products */}
+          <div className="px-2 md:px-4 py-2 md:py-3 border-b border-border bg-background flex flex-wrap items-center gap-2">
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm w-full md:w-64 bg-background">
                 <SelectValue placeholder="All Categories" />
@@ -974,7 +1352,33 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                 ))}
               </SelectContent>
             </Select>
+            {onReloadProducts && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 md:h-10 text-xs md:text-sm ml-auto"
+                disabled={refreshingProducts}
+                onClick={async () => {
+                  try {
+                    setRefreshingProducts(true);
+                    await onReloadProducts();
+                    toast({ title: 'Products updated', description: 'Latest catalog loaded.' });
+                  } catch (err) {
+                    console.error('[TableOrderForm] Refresh products failed', err);
+                    toast({ title: 'Refresh failed', description: 'Could not update products. Try again.', variant: 'destructive' });
+                  } finally {
+                    setRefreshingProducts(false);
+                  }
+                }}
+                title="Reload products from server"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshingProducts && 'animate-spin')} />
+                {refreshingProducts ? 'Refreshing…' : 'Refresh products'}
+              </Button>
+            )}
           </div>
+
           
           <div className="w-full">
             {/* Table Header - Responsive */}
@@ -988,7 +1392,9 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
               
               {/* Table Rows - Responsive */}
               <div className="divide-y divide-border">
-                {orderRows.map((row, index) => {
+                {isEditSeedLoading ? (
+                  <div className="px-4 py-6 text-sm text-muted-foreground">Loading order…</div>
+                ) : orderRows.map((row, index) => {
                   // Get the item ID for matching free items (variant ID or product ID)
                   const rowItemId = row.variant?.id || row.product?.id;
                   
@@ -1010,15 +1416,18 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                     <div className="flex flex-col min-w-0">
                       <Popover 
                         open={openComboboxes[row.id]} 
-                        onOpenChange={(open) => setOpenComboboxes(prev => ({ ...prev, [row.id]: open }))}
+                        onOpenChange={(open) => { if (priceLocked) return; setOpenComboboxes(prev => ({ ...prev, [row.id]: open })); }}
                       >
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={openComboboxes[row.id]}
+                            disabled={priceLocked}
+                            title={priceLocked ? 'Price is locked for edited orders — only quantity can be changed' : undefined}
                             className="w-full min-w-0 justify-start h-9 md:h-11 text-xs md:text-sm font-normal bg-background px-2"
                           >
+
                             {row.product ? (
                               <div className="flex items-center gap-1.5 w-full overflow-hidden">
                                 {(row.variant ? isFocusedProductActive(row.variant) : isFocusedProductActive(row.product)) && (
@@ -1044,70 +1453,138 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-[280px] md:w-[320px] p-0 bg-background z-50" align="start">
-                          <Command className="bg-background">
-                            <CommandInput placeholder="Search products..." className="h-9 md:h-10 text-xs md:text-sm" />
-                            <CommandList className="bg-background max-h-[250px] md:max-h-[300px]">
-                              <CommandEmpty>No product found.</CommandEmpty>
-                              <CommandGroup className="bg-background">
-                                {productOptions.map((option) => (
-                                  <CommandItem
-                                    key={option.value}
-                                    value={option.label}
-                                    onSelect={() => handleProductSelect(row.id, option.value)}
-                                    className="text-xs md:text-sm bg-background hover:bg-accent py-2"
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-3 w-3 md:h-4 md:w-4",
-                                        row.product?.id === option.product.id && 
-                                        (!row.variant && !option.variant || row.variant?.id === option.variant?.id)
-                                          ? "opacity-100"
-                                          : "opacity-0"
-                                      )}
-                                    />
-                                    <div className="flex-1 flex items-center gap-1.5">
-                                      {(option.variant ? isFocusedProductActive(option.variant) : isFocusedProductActive(option.product)) && (
-                                        <Star size={12} className="fill-yellow-500 text-yellow-500 flex-shrink-0" />
-                                      )}
-                                      {hasActiveSchemes(option.product) && (
-                                        <Sparkles size={12} className="fill-orange-500 text-orange-500 flex-shrink-0" />
-                                      )}
-                                      <div className="flex-1">
-                                        <div className="font-medium">{option.label}</div>
-                                        <div className="text-[10px] md:text-xs text-muted-foreground">
-                                          SKU: {option.sku} | ₹{option.variant ? option.variant.price : option.product.rate}
+                          {(() => {
+                            const search = (pickerSearch[row.id] || '').trim().toLowerCase();
+                            const matches = search
+                              ? productOptions.filter(o =>
+                                  o.label.toLowerCase().includes(search) ||
+                                  (o.sku || '').toLowerCase().includes(search)
+                                )
+                              : productOptions;
+                            const visible = matches.slice(0, PICKER_RENDER_LIMIT);
+                            return (
+                              <Command className="bg-background" shouldFilter={false}>
+                                <CommandInput
+                                  placeholder="Search products..."
+                                  className="h-9 md:h-10 text-xs md:text-sm"
+                                  value={pickerSearch[row.id] || ''}
+                                  onValueChange={(v) => setPickerSearch(prev => ({ ...prev, [row.id]: v }))}
+                                />
+                                <CommandList className="bg-background max-h-[250px] md:max-h-[300px]">
+                                  <CommandEmpty>No product found.</CommandEmpty>
+                                  <CommandGroup className="bg-background">
+                                    {visible.map((option) => (
+                                      <CommandItem
+                                        key={option.value}
+                                        value={option.value}
+                                        onSelect={() => handleProductSelect(row.id, option.value)}
+                                        className="text-xs md:text-sm bg-background hover:bg-accent py-2"
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-3 w-3 md:h-4 md:w-4",
+                                            row.product?.id === option.product.id &&
+                                            (!row.variant && !option.variant || row.variant?.id === option.variant?.id)
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        <div className="flex-1 flex items-center gap-1.5">
+                                          {(option.variant ? isFocusedProductActive(option.variant) : isFocusedProductActive(option.product)) && (
+                                            <Star size={12} className="fill-yellow-500 text-yellow-500 flex-shrink-0" />
+                                          )}
+                                          {hasActiveSchemes(option.product) && (
+                                            <Sparkles size={12} className="fill-orange-500 text-orange-500 flex-shrink-0" />
+                                          )}
+                                          <div className="flex-1">
+                                            <div className="font-medium">{option.label}</div>
+                                            <div className="text-[10px] md:text-xs text-muted-foreground">
+                                              SKU: {option.sku} | ₹{option.variant ? option.variant.price : option.product.rate}
+                                            </div>
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                  <div className="px-2 py-1.5 text-[10px] md:text-xs text-muted-foreground border-t bg-muted/30">
+                                    Showing {visible.length} of {matches.length}
+                                    {matches.length > visible.length ? ' — type to search' : ''}
+                                  </div>
+                                </CommandList>
+                              </Command>
+                            );
+                          })()}
                         </PopoverContent>
                       </Popover>
+
                        {row.product && (() => {
-                         const originalRate = getPricePerUnit(row.product, row.variant, row.unit);
+                         const displayUnit = row.uomCode || row.unit;
+                         const catalogRate = getPricePerUnit(row.product, row.variant, displayUnit, row.conversionToBase, row.priceBasisConversionToBase);
                          const itemId = row.variant?.id || row.product.id;
                          const itemSchemes = orderCalculation.itemSchemeDetails?.[itemId] || [];
                          const totalDiscount = itemSchemes.reduce((s, x) => s + (x.discountAmount || 0), 0);
                          const hasDiscount = totalDiscount > 0 && row.quantity > 0;
                          const perUnitDiscount = hasDiscount ? totalDiscount / row.quantity : 0;
-                         const effectiveRate = Math.max(0, originalRate - perUnitDiscount);
+                         const hasEdited = row.editedRate != null && Number.isFinite(row.editedRate);
+                         const shownRate = hasEdited ? Number(row.editedRate) : catalogRate;
+                         const effectiveRate = Math.max(0, shownRate - perUnitDiscount);
                          return (
                            <>
-                             {hasDiscount ? (
+                              {isAdminEdit ? (() => {
+                                const buf = priceEditText[row.id] || {};
+                                const qtyNum = Number(row.quantity) || 0;
+                                const rateDisplay = buf.rate !== undefined
+                                  ? buf.rate
+                                  : (hasEdited ? String(row.editedRate) : catalogRate.toFixed(2));
+                                const totalDisplay = buf.total !== undefined
+                                  ? buf.total
+                                  : (shownRate * qtyNum).toFixed(2);
+                                return (
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <label className="text-[9px] text-muted-foreground">Unit ₹</label>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={rateDisplay}
+                                    onChange={(e) => onChangeAdminPrice(row.id, 'rate', e.target.value)}
+                                    onBlur={(e) => onBlurAdminPrice(row.id, 'rate', e.target.value)}
+                                    className="h-6 w-20 text-[10px] px-1.5"
+                                  />
+                                  <label className="text-[9px] text-muted-foreground">Line ₹</label>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={totalDisplay}
+                                    onChange={(e) => onChangeAdminPrice(row.id, 'total', e.target.value)}
+                                    onBlur={(e) => onBlurAdminPrice(row.id, 'total', e.target.value)}
+                                    className="h-6 w-24 text-[10px] px-1.5"
+                                    disabled={!(qtyNum > 0)}
+                                  />
+                                  <span className="text-[9px] text-muted-foreground">per {displayUnit}</span>
+                                 {row.isPriceEdited && (
+                                   <>
+                                     <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-amber-500/15 text-amber-700 border-amber-500/30">
+                                       edited
+                                     </Badge>
+                                     <span className="text-[9px] text-muted-foreground">
+                                       list ₹{catalogRate.toFixed(2)}
+                                     </span>
+                                   </>
+                                 )}
+                                </div>
+                                );
+                              })() : hasDiscount ? (
                                <span className="text-[9px] mt-0.5 flex items-center gap-1 flex-wrap">
                                  <span className="line-through text-muted-foreground">
-                                   ₹{originalRate.toFixed(2)}
+                                   ₹{catalogRate.toFixed(2)}
                                  </span>
                                  <span className="text-green-600 font-medium">
-                                   ₹{effectiveRate.toFixed(2)} per {row.unit}
+                                    ₹{effectiveRate.toFixed(2)} per {displayUnit}
                                  </span>
                                </span>
                              ) : (
                                <span className="text-[9px] text-muted-foreground mt-0.5">
-                                 ₹{originalRate.toFixed(2)} per {row.unit}
+                                  ₹{catalogRate.toFixed(2)} per {displayUnit}
                                </span>
                              )}
                              {itemSchemes.length > 0 && row.quantity > 0 && (
@@ -1140,18 +1617,20 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                     
                     {/* Unit Column */}
                     <div>
-                      <Select
-                        value={row.unit}
-                        onValueChange={(value) => updateRow(row.id, "unit", value)}
-                      >
-                        <SelectTrigger className="h-9 md:h-11 text-xs md:text-sm w-full bg-background px-2 [&>svg]:hidden">
-                          <SelectValue placeholder="Unit" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background z-50">
-                          <SelectItem value="KG" className="text-xs md:text-sm">KG</SelectItem>
-                          <SelectItem value="Grams" className="text-xs md:text-sm">Grams</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {row.product ? (
+                        <LineItemUomSelect
+                          productId={row.product.id}
+                          value={row.uomCode || row.unit}
+                          context="sales"
+                          hideWhenSingle={false}
+                          disabled={priceLocked}
+                          className="h-9 md:h-11 text-xs md:text-sm w-full bg-background px-2"
+                          onChange={(sel) => updateRow(row.id, "unit", sel)}
+                        />
+
+                      ) : (
+                        <div className="h-9 md:h-11 flex items-center text-xs text-muted-foreground">—</div>
+                      )}
                     </div>
                     
                     {/* Qty Column */}
@@ -1161,13 +1640,13 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                         placeholder="0"
                         value={row.quantity || ""}
                         onChange={(e) => updateRow(row.id, "quantity", parseFloat(e.target.value) || 0)}
-                        step={row.unit?.toLowerCase() === 'kg' ? '0.1' : '1'}
+                        step={(row.uomCode || row.unit)?.toLowerCase() === 'kg' ? '0.1' : '1'}
                         className="h-9 md:h-11 text-xs md:text-sm text-center bg-background px-1 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
                         disabled={!row.product}
                       />
                       {row.quantity > 0 && (
                         <span className="text-[9px] text-muted-foreground text-center mt-0.5">
-                          {getUnitEquivalent(row.quantity, row.unit)}
+                          {getUnitEquivalent(row.quantity, row.uomCode || row.unit)}
                         </span>
                       )}
                     </div>
@@ -1272,7 +1751,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
             <p className="text-lg font-bold">₹{getFinalTotal().toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
           </div>
           <p className="text-xs text-muted-foreground">
-            (incl. GST: ₹{(getFinalTotal() * 1.05).toLocaleString('en-IN', { maximumFractionDigits: 2 })})
+            (incl. GST: ₹{(getFinalTotal() + getGstAmount()).toLocaleString('en-IN', { maximumFractionDigits: 2 })})
           </p>
         </div>
       </div>

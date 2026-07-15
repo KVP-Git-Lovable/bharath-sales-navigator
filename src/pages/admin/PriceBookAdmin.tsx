@@ -17,6 +17,7 @@ import { ArrowLeft, Plus, Search, BookOpen, Calendar, Copy, Edit, MoreVertical, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { fetchAllPaginated } from '@/utils/fetchAllPaginated';
 
 interface PriceBook {
   id: string;
@@ -184,10 +185,13 @@ const PriceBookAdmin = () => {
       if (error) throw error;
 
       // Auto-add all products to the price book
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, rate, product_variants(id, price)')
-        .eq('is_active', true);
+      const products = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('products')
+          .select('id, rate, product_variants(id, price)')
+          .eq('is_active', true)
+          .range(from, to)
+      );
 
       if (products && products.length > 0) {
         const entries: any[] = [];
@@ -615,9 +619,6 @@ const PriceBookAdmin = () => {
       <div className="container mx-auto px-4 py-6 max-w-5xl pb-24">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/admin-controls')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div>
               <h1 className="text-2xl font-bold">Price Book Management</h1>
               <p className="text-muted-foreground text-sm">{filteredPriceBooks.length} price books</p>

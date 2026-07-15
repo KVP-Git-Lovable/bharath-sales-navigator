@@ -3,7 +3,6 @@ import { GamificationManagement } from "@/components/GamificationManagement";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { Navigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function GamificationAdmin() {
   const { hasAdminAccess, loading } = useAdminAccess();
@@ -24,13 +23,10 @@ export default function GamificationAdmin() {
 
   return (
     <Layout>
-      <div className="container mx-auto p-4 sm:p-6 space-y-6">
-        <AdminPageHeader 
-          title="Gamification Admin"
-          subtitle="Configure badges, rewards, and engagement features"
-        />
+      <div className="w-full px-2 sm:px-4 py-4 sm:py-6">
         <GamificationManagement />
       </div>
+
     </Layout>
   );
 }

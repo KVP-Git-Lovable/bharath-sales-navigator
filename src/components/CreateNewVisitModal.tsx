@@ -14,6 +14,8 @@ import { format } from "date-fns";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { updateBeatPlanInSnapshot, addRetailerToSnapshot } from "@/lib/myVisitsSnapshot";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { getMyBeats } from "@/services/beatService";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface Beat {
   id: string;
@@ -39,8 +41,25 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
   const [jointSalesMember, setJointSalesMember] = useState<string>("");
   const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string; role: string }>>([]);
   const { user } = useAuth();
+  const { can } = usePermissions();
   const connectivityStatus = useConnectivity();
   const isOnline = connectivityStatus === 'online';
+  const [backdateCfg, setBackdateCfg] = useState<{ enabled: boolean; maxDays: number }>({ enabled: false, maxDays: 0 });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      const { data } = await supabase
+        .from('operations_config')
+        .select('backdate_enabled, backdate_max_days')
+        .eq('id', 1)
+        .maybeSingle();
+      setBackdateCfg({
+        enabled: !!data?.backdate_enabled,
+        maxDays: Number(data?.backdate_max_days ?? 0),
+      });
+    })();
+  }, [isOpen]);
 
   // Reset date and joint sales state when modal opens/closes
   useEffect(() => {
@@ -88,21 +107,27 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
 
       // If online, fetch fresh data
       if (isOnline) {
-        // Get all beats created by this user
-        const { data: beatsData, error: beatsError } = await supabase
-          .from('beats')
-          .select('id, beat_id, beat_name, category')
-          .eq('created_by', user.id)
-          .eq('is_active', true);
+        // Get all beats accessible to this user (owned + shared + coverage)
+        const myBeats = await getMyBeats(user.id);
+        const beatsData = (myBeats || [])
+          .filter((b: any) => b.is_active !== false)
+          .map((b: any) => ({
+            id: b.id ?? b.beat_id,
+            beat_id: b.beat_id,
+            beat_name: b.beat_name,
+            category: b.category,
+            accessType: b.accessType,
+          }));
 
-        if (beatsError) throw beatsError;
-
-        // Get all retailers grouped by beat
-        const { data: retailers, error } = await supabase
-          .from('retailers')
-          .select('beat_id, category, priority')
-          .eq('user_id', user.id)
-          .eq('status', 'active');
+        // Get all retailers grouped by beat (by beat_id to include shared beats)
+        const beatIdList = beatsData.map(b => b.beat_id).filter(Boolean);
+        const { data: retailers, error } = beatIdList.length
+          ? await supabase
+              .from('retailers')
+              .select('beat_id, category, priority')
+              .in('beat_id', beatIdList)
+              .eq('status', 'active')
+          : { data: [], error: null } as any;
 
         if (error) throw error;
 
@@ -395,7 +420,15 @@ export const CreateNewVisitModal = ({ isOpen, onClose, onVisitCreated, initialDa
               mode="single"
               selected={selectedDate}
               onSelect={(date) => date && setSelectedDate(date)}
-              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+              disabled={(date) => {
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                if (date >= today) return false;
+                const canBackdate = backdateCfg.enabled && can('order_backdate', 'create');
+                if (!canBackdate) return true;
+                const minDate = new Date(today);
+                minDate.setDate(minDate.getDate() - Math.max(0, backdateCfg.maxDays));
+                return date < minDate;
+              }}
               className="rounded-md border"
             />
           </div>

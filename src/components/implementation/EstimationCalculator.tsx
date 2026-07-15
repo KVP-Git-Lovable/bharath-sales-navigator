@@ -266,9 +266,9 @@ export function EstimationCalculator({ data, onUpdate }: EstimationCalculatorPro
       </div>
 
       {/* Estimation Results */}
-      <Card className="bg-slate-900/70 border-amber-500/40">
+      <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30">
         <CardHeader>
-          <CardTitle className="text-amber-300 flex items-center gap-2">
+          <CardTitle className="text-amber-400 flex items-center gap-2">
             <Calculator className="w-5 h-5" />
             Estimation Summary
           </CardTitle>
@@ -276,19 +276,19 @@ export function EstimationCalculator({ data, onUpdate }: EstimationCalculatorPro
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="text-center p-4 bg-white/5 rounded-xl">
-              <p className="text-white/80 text-sm mb-1">Total Effort</p>
+              <p className="text-white/60 text-sm mb-1">Total Effort</p>
               <p className="text-4xl font-bold text-white">{estimation.totalEffort}</p>
-              <p className="text-white/70 text-sm">Person-Days</p>
+              <p className="text-white/60 text-sm">Person-Days</p>
             </div>
             <div className="text-center p-4 bg-white/5 rounded-xl">
-              <p className="text-white/80 text-sm mb-1">Timeline</p>
-              <p className="text-4xl font-bold text-amber-300">{estimation.timeline}</p>
-              <p className="text-white/70 text-sm">Weeks</p>
+              <p className="text-white/60 text-sm mb-1">Timeline</p>
+              <p className="text-4xl font-bold text-amber-400">{estimation.timeline}</p>
+              <p className="text-white/60 text-sm">Weeks</p>
             </div>
             <div className="text-center p-4 bg-white/5 rounded-xl">
-              <p className="text-white/80 text-sm mb-1">Recommended Tier</p>
-              <p className="text-4xl font-bold text-green-300">{estimation.pricing}</p>
-              <p className="text-white/70 text-sm">Package</p>
+              <p className="text-white/60 text-sm mb-1">Recommended Tier</p>
+              <p className="text-4xl font-bold text-green-400">{estimation.pricing}</p>
+              <p className="text-white/60 text-sm">Package</p>
             </div>
           </div>
 

@@ -8,7 +8,10 @@ import { monitoring } from '@/services/MonitoringService';
 import { Preferences } from '@capacitor/preferences';
 import { offlineStorage } from '@/lib/offlineStorage';
 import { clearRetailerIndex } from '@/lib/retailerIndex';
+import { clearUserScopedCaches } from '@/utils/userScopedCache';
 import { requestLocationPermission, requestStoragePermission } from '@/utils/permissions';
+import { registerNativePush, unregisterNativePush } from '@/utils/pushRegistration';
+import { Capacitor } from '@capacitor/core';
 import i18n from '@/i18n/config';
 
 interface AuthContextType {
@@ -67,6 +70,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [securityProfileName, setSecurityProfileName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [mustChangePassword, setMustChangePassword] = useState(false);
+
+  /**
+   * SECURITY: Purge per-user IndexedDB stores when the authenticated user changes.
+   * Without this, beats/beat_plans/retailers/visits cached from the previous user
+   * leak into the new user's My Visits screen (e.g. wrong beat shown in header).
+   * Only runs when the new user id differs from the previously-seen one.
+   */
+  const purgeStaleUserDataIfIdentityChanged = async (newUserId: string) => {
+    try {
+      const prev = localStorage.getItem('cached_user_id');
+      if (prev && prev !== newUserId) {
+        devLog('[Auth] User identity changed', prev, '→', newUserId, '— purging stale per-user caches');
+        await clearUserScopedCaches({ previousUserId: prev, preserveUnsynced: true });
+      }
+    } catch (e) {
+      devError('[Auth] Error purging stale user data on identity change:', e);
+    }
+  };
+
 
   const onPasswordChanged = () => {
     setMustChangePassword(false);
@@ -135,13 +157,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         // If profile doesn't exist, return a basic profile with user data
         if (error.code === 'PGRST116') {
+          const meta: any = user?.user_metadata || {};
+          const emailBase = user?.email?.split('@')[0]
+            ?.replace(/[._-]+/g, ' ')
+            ?.replace(/\b\w/g, (c) => c.toUpperCase()) || null;
           return {
             id: userId,
-            username: user?.email?.split('@')[0] || 'User',
-            full_name: user?.user_metadata?.full_name || 'Unknown User',
-            phone_number: user?.user_metadata?.phone_number,
-            recovery_email: user?.user_metadata?.recovery_email,
-            profile_picture_url: user?.user_metadata?.profile_picture_url
+            username: meta.username || user?.email?.split('@')[0] || null,
+            full_name: meta.full_name || meta.name || emailBase || null,
+            phone_number: meta.phone_number || null,
+            recovery_email: meta.recovery_email || null,
+            profile_picture_url: meta.profile_picture_url || null,
           };
         }
         devError('Error fetching user profile:', error);
@@ -225,6 +251,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const currentUser = session?.user ?? null;
         
         if (currentUser) {
+          await purgeStaleUserDataIfIdentityChanged(currentUser.id);
+          setUserProfile(null);
+          setUserRole(null);
+          setSecurityProfileName(null);
           setUser(currentUser);
           setCachedUser(currentUser);
           localStorage.setItem('cached_user_id', currentUser.id);
@@ -243,6 +273,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const secProfile = await fetchSecurityProfileName(currentUser.id);
               setSecurityProfileName(secProfile);
               if (secProfile) localStorage.setItem('cached_security_profile', secProfile);
+
+              // Register native push token on Android/iOS after login
+              if (Capacitor.isNativePlatform()) {
+                registerNativePush(currentUser.id, (route) => {
+                  window.location.assign(route);
+                });
+              }
             } catch (err) {
               devError('Error loading user data in auth change:', err);
               const basicProfile: UserProfile = {
@@ -272,11 +309,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
       
       if (session?.user) {
+        await purgeStaleUserDataIfIdentityChanged(session.user.id);
+        setUserProfile(null);
+        setUserRole(null);
+        setSecurityProfileName(null);
+        setUser(currentUser);
         setCachedUser(session.user);
         localStorage.setItem('cached_user_id', session.user.id);
+      } else {
+        setUser(null);
         
         try {
           const role = await fetchUserRole(session.user.id);
@@ -506,6 +549,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     monitoring.logout();
     try {
+      // Unregister push token before clearing session
+      await unregisterNativePush().catch(() => {});
       // Sign out from Supabase (no longer auto-cancels visits)
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) {

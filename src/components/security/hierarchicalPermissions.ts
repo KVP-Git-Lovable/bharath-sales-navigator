@@ -60,6 +60,8 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       { name: 'field_visit_distributor', label: 'Distributor' },
     ],
     actions: [
+      { name: 'action_visit_create', label: 'Create Visit' },
+      { name: 'action_visit_edit', label: 'Edit Visit' },
       { name: 'action_visit_auto_plan', label: 'Auto Plan' },
       { name: 'action_visit_all_beat', label: 'All Beat' },
       { name: 'action_visit_retailers', label: 'Retailers' },
@@ -68,6 +70,7 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       { name: 'action_visit_gps_track', label: 'GPS Track' },
       { name: 'action_visit_van_stock', label: 'Van Stock' },
       { name: 'action_visit_activity', label: 'Activity' },
+      { name: 'action_activity_create', label: 'Log / configure activity' },
     ],
     widgets: [
       { name: 'widget_visit_todays_progress', label: "Today's Progress" },
@@ -99,7 +102,7 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       { name: 'field_retailer_potential', label: 'Potential' },
     ],
     actions: [
-      { name: 'action_retailer_add', label: 'Add Retailer' },
+      { name: 'action_retailer_create', label: 'Add / Create Retailer' },
       { name: 'action_retailer_edit', label: 'Edit Retailer' },
       { name: 'action_retailer_delete', label: 'Delete Retailer' },
       { name: 'action_retailer_bulk_import', label: 'Bulk Import' },
@@ -130,8 +133,13 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
     actions: [
       { name: 'action_beat_create', label: 'Create Beat' },
       { name: 'action_beat_edit', label: 'Edit Beat' },
-      { name: 'action_beat_delete', label: 'Delete Beat' },
+      { name: 'action_beat_delete', label: 'Delete / Deactivate Beat' },
       { name: 'action_beat_assign_retailers', label: 'Assign Retailers' },
+      { name: 'action_beat_share', label: 'Share Beat (Co-owner / Operational / View Only)' },
+      { name: 'action_beat_coverage', label: 'Assign Leave Coverage' },
+      { name: 'action_beat_transfer', label: 'Transfer Beat Ownership' },
+      { name: 'action_beat_reactivate', label: 'Reactivate Inactive Beat' },
+      { name: 'action_beat_clone', label: 'Clone Beat' },
     ],
     widgets: [
       { name: 'widget_beat_list', label: 'Beat List' },
@@ -246,6 +254,7 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
     ],
     actions: [
       { name: 'action_order_create', label: 'Create Order' },
+      { name: 'action_order_edit', label: 'Edit Order' },
       { name: 'action_order_view_details', label: 'View Details' },
       { name: 'action_order_inventory_sync', label: 'Inventory Sync' },
     ],
@@ -366,6 +375,9 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       { name: 'field_scheme_discount', label: 'Discount / Benefit' },
     ],
     actions: [
+      { name: 'action_scheme_create', label: 'Create Scheme' },
+      { name: 'action_scheme_edit', label: 'Edit Scheme' },
+      { name: 'action_scheme_delete', label: 'Delete Scheme' },
       { name: 'action_scheme_view_details', label: 'View Details' },
       { name: 'action_scheme_apply', label: 'Apply Scheme' },
     ],
@@ -806,6 +818,34 @@ export const HIERARCHICAL_MODULES: HierarchicalModule[] = [
       // Tax Master
       { name: 'widget_admin_tax_list', label: 'Tax Master - List' },
       { name: 'widget_admin_tax_detail', label: 'Tax Master - Detail' },
+    ],
+  },
+  {
+    name: 'beat_coordinator',
+    label: 'Beat Coordinator',
+    fields: [],
+    actions: [
+      { name: 'action_bc_view_team_calendar', label: 'View Team Calendar' },
+      { name: 'action_bc_plan_team_beat', label: 'Plan Beats for Team Members' },
+      { name: 'action_bc_assign_coverage', label: 'Assign Leave Coverage for Team' },
+      { name: 'action_bc_transfer_rep_beat', label: 'Transfer Beats Between Reps' },
+      { name: 'action_bc_share_rep_beat', label: 'Share Beats on Behalf of Reps' },
+      { name: 'action_bc_reschedule_missed', label: 'Reschedule Missed Beat Visits' },
+      { name: 'action_bc_ai_route', label: 'AI Route Optimization' },
+    ],
+    widgets: [],
+  },
+  {
+    name: 'operations',
+    label: 'Operations',
+    fields: [],
+    widgets: [],
+    actions: [
+      { name: 'order_backdate', label: 'Place backdated orders' },
+      { name: 'order_on_behalf', label: 'Place order on behalf' },
+      { name: 'order_out_of_beat', label: 'Place out-of-beat orders' },
+      { name: 'order_edit', label: 'Edit placed orders' },
+      { name: 'operations_config', label: 'Operations configuration' },
     ],
   },
 ];

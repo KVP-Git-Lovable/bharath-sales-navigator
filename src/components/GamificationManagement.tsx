@@ -9,12 +9,28 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Pencil, Trophy } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, Trophy, UserPlus, Target, Star, CheckCircle2, Repeat, TrendingUp, Search, MessageSquare, Megaphone, Footprints, Sparkles, Gift, Award, Coins } from "lucide-react";
 import { BadgeManagement } from "./BadgeManagement";
 import { MetricConfigFields } from "./MetricConfigFields";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const METRIC_VISUALS: Record<string, { icon: any; tint: string; bar: string; iconBg: string; accent: string; ring: string }> = {
+  first_order_new_retailer: { icon: UserPlus,     tint: "bg-fuchsia-50",  bar: "bg-fuchsia-200",  iconBg: "bg-fuchsia-100 text-fuchsia-600",   accent: "text-fuchsia-600", ring: "ring-fuchsia-100" },
+  daily_target:             { icon: Target,       tint: "bg-blue-50",     bar: "bg-blue-200",     iconBg: "bg-blue-100 text-blue-600",         accent: "text-blue-600",    ring: "ring-blue-100" },
+  focused_product_sales:    { icon: Star,         tint: "bg-amber-50",    bar: "bg-amber-200",    iconBg: "bg-amber-100 text-amber-600",       accent: "text-amber-600",   ring: "ring-amber-100" },
+  productive_visit:         { icon: CheckCircle2, tint: "bg-emerald-50",  bar: "bg-emerald-200",  iconBg: "bg-emerald-100 text-emerald-600",   accent: "text-emerald-600", ring: "ring-emerald-100" },
+  order_frequency:          { icon: Repeat,       tint: "bg-violet-50",   bar: "bg-violet-200",   iconBg: "bg-violet-100 text-violet-600",     accent: "text-violet-600",  ring: "ring-violet-100" },
+  beat_growth:              { icon: TrendingUp,   tint: "bg-green-50",    bar: "bg-green-200",    iconBg: "bg-green-100 text-green-600",       accent: "text-green-600",   ring: "ring-green-100" },
+  competition_insight:      { icon: Search,       tint: "bg-rose-50",     bar: "bg-rose-200",     iconBg: "bg-rose-100 text-rose-600",         accent: "text-rose-600",    ring: "ring-rose-100" },
+  retailer_feedback:        { icon: MessageSquare,tint: "bg-cyan-50",     bar: "bg-cyan-200",     iconBg: "bg-cyan-100 text-cyan-600",         accent: "text-cyan-600",    ring: "ring-cyan-100" },
+  branding_request:         { icon: Megaphone,    tint: "bg-orange-50",   bar: "bg-orange-200",   iconBg: "bg-orange-100 text-orange-600",     accent: "text-orange-600",  ring: "ring-orange-100" },
+  total_visits:             { icon: Footprints,   tint: "bg-indigo-50",   bar: "bg-indigo-200",   iconBg: "bg-indigo-100 text-indigo-600",     accent: "text-indigo-600",  ring: "ring-indigo-100" },
+};
+const DEFAULT_VISUAL = { icon: Sparkles, tint: "bg-slate-50", bar: "bg-slate-200", iconBg: "bg-slate-100 text-slate-600", accent: "text-slate-600", ring: "ring-slate-100" };
+
+
 
 interface Game {
   id: string;
@@ -169,6 +185,8 @@ export function GamificationManagement() {
   const [rewardPoints, setRewardPoints] = useState("");
   const [metricConfig, setMetricConfig] = useState<any>({});
   const [isActive, setIsActive] = useState(true);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [actionToDelete, setActionToDelete] = useState<GameAction | null>(null);
   const [pointsToRupeeConversion, setPointsToRupeeConversion] = useState("1");
@@ -640,167 +658,213 @@ export function GamificationManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold">Gamification Management</h2>
-          <p className="text-muted-foreground">Configure activities and manage redemptions</p>
-        </div>
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create New Activity
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Activity</DialogTitle>
+      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-slate-50 via-white to-indigo-50/40 p-6 sm:p-8 shadow-sm">
+        <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-indigo-100/50 blur-3xl" />
+        <div className="absolute -bottom-16 -left-10 h-48 w-48 rounded-full bg-amber-100/40 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="hidden sm:flex h-14 w-14 items-center justify-center rounded-xl bg-white ring-1 ring-indigo-100 shadow-sm">
+              <Trophy className="h-7 w-7 text-amber-500" />
+            </div>
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Gamification Management</h2>
+              <p className="text-slate-500 text-sm sm:text-base mt-1">Configure activities, badges & rewards to keep your team engaged</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setActivityFilter('all')}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${activityFilter === 'all' ? 'bg-indigo-600 text-white ring-1 ring-indigo-600 shadow-sm' : 'bg-white ring-1 ring-slate-200 text-slate-700 hover:ring-indigo-300'}`}
+                >
+                  <Sparkles className={`h-3 w-3 ${activityFilter === 'all' ? 'text-white' : 'text-indigo-500'}`} /> {actions.length} Total
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityFilter('active')}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${activityFilter === 'active' ? 'bg-emerald-600 text-white ring-1 ring-emerald-600 shadow-sm' : 'bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 hover:ring-emerald-400'}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${activityFilter === 'active' ? 'bg-white' : 'bg-emerald-500'}`} />
+                  {actions.filter(a => a.is_enabled).length} Active
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityFilter('inactive')}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition ${activityFilter === 'inactive' ? 'bg-slate-700 text-white ring-1 ring-slate-700 shadow-sm' : 'bg-slate-50 ring-1 ring-slate-200 text-slate-600 hover:ring-slate-400'}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${activityFilter === 'inactive' ? 'bg-white' : 'bg-slate-400'}`} />
+                  {actions.filter(a => !a.is_enabled).length} Inactive
+                </button>
+
+              </div>
+            </div>
+
+          </div>
+          <div className="hidden lg:flex flex-1 items-center justify-center pointer-events-none select-none" aria-hidden="true">
+            <div className="relative h-24 w-64">
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl animate-party-shake drop-shadow-md">🎉</span>
+              <span className="absolute left-4 top-2 h-2 w-2 rounded-full bg-pink-400 animate-confetti-1" />
+              <span className="absolute left-12 top-8 h-2 w-2 rounded-sm bg-amber-400 animate-confetti-2" />
+              <span className="absolute right-10 top-3 h-2 w-2 rounded-full bg-indigo-500 animate-confetti-3" />
+              <span className="absolute right-4 top-10 h-2 w-2 rounded-sm bg-emerald-500 animate-confetti-4" />
+              <span className="absolute left-20 bottom-2 h-2 w-2 rounded-full bg-sky-500 animate-confetti-5" />
+              <span className="absolute right-16 bottom-1 h-2 w-2 rounded-sm bg-rose-500 animate-confetti-6" />
+            </div>
+          </div>
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+            <DialogTrigger asChild>
+              <Button onClick={openCreateDialog} size="lg" className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Create New Activity
+              </Button>
+            </DialogTrigger>
+
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-slate-50">
+            <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-indigo-50 to-sky-50 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-white border border-indigo-100 flex items-center justify-center shadow-sm">
+                  <Plus className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-semibold text-slate-800">Create New Activity</DialogTitle>
+                  <p className="text-xs text-slate-500 mt-0.5">Configure a new gamification activity for your team</p>
+                </div>
+              </div>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="activityName">Activity Name *</Label>
-                <Select value={selectedActivity} onValueChange={(value) => {
-                  setSelectedActivity(value);
-                  const activity = METRIC_TYPES.find(a => a.value === value);
-                  setRewardPoints(activity?.defaultPoints.toString() || "");
-                }}>
-                  <SelectTrigger id="activityName">
-                    <SelectValue placeholder="Select an activity" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background">
-                    {METRIC_TYPES.map((activity) => (
-                      <SelectItem key={activity.value} value={activity.value}>
-                        {activity.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Activity Details</div>
+                <div>
+                  <Label htmlFor="activityName" className="text-slate-700">Activity Name *</Label>
+                  <Select value={selectedActivity} onValueChange={(value) => {
+                    setSelectedActivity(value);
+                    const activity = METRIC_TYPES.find(a => a.value === value);
+                    setRewardPoints(activity?.defaultPoints.toString() || "");
+                  }}>
+                    <SelectTrigger id="activityName" className="mt-1 bg-white">
+                      <SelectValue placeholder="Select an activity" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background">
+                      {METRIC_TYPES.map((activity) => (
+                        <SelectItem key={activity.value} value={activity.value}>
+                          {activity.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="gameDescription" className="text-slate-700">Description</Label>
+                  <Textarea
+                    id="gameDescription"
+                    value={gameDescription}
+                    onChange={(e) => setGameDescription(e.target.value)}
+                    placeholder="Describe the activity objectives..."
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+                  <div>
+                    <Label htmlFor="gameActive" className="text-slate-700 font-medium">Game Active</Label>
+                    <p className="text-xs text-slate-500">Enable this activity for participants</p>
+                  </div>
+                  <Switch id="gameActive" checked={isActive} onCheckedChange={setIsActive} />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="rewardPoints">Reward Points per Activity *</Label>
-                <Input
-                  id="rewardPoints"
-                  type="number"
-                  value={rewardPoints}
-                  onChange={(e) => setRewardPoints(e.target.value)}
-                  placeholder="Enter points"
-                  min="0"
-                />
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rewards & Conversion</div>
+                <div>
+                  <Label htmlFor="rewardPoints" className="text-slate-700">Reward Points per Activity *</Label>
+                  <Input
+                    id="rewardPoints"
+                    type="number"
+                    value={rewardPoints}
+                    onChange={(e) => setRewardPoints(e.target.value)}
+                    placeholder="Enter points"
+                    min="0"
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pointsConversion" className="text-slate-700">Points to Rupee Conversion</Label>
+                  <Input
+                    id="pointsConversion"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={pointsToRupeeConversion}
+                    onChange={(e) => setPointsToRupeeConversion(e.target.value)}
+                    placeholder="1 point = ? rupees (e.g., 1 or 0.5)"
+                    className="mt-1 bg-white"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    1 point = ₹{pointsToRupeeConversion || "1"}
+                  </p>
+                </div>
               </div>
 
               {selectedActivity && (
-                <MetricConfigFields
-                  metricType={selectedActivity}
-                  config={metricConfig}
-                  onConfigChange={setMetricConfig}
-                />
+                <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Metric Configuration</div>
+                  <MetricConfigFields
+                    metricType={selectedActivity}
+                    config={metricConfig}
+                    onConfigChange={setMetricConfig}
+                  />
+                </div>
               )}
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="gameActive"
-                  checked={isActive}
-                  onCheckedChange={setIsActive}
-                />
-                <Label htmlFor="gameActive">Game Active</Label>
-              </div>
-
-              <div>
-                <Label htmlFor="gameDescription">Description</Label>
-                <Textarea
-                  id="gameDescription"
-                  value={gameDescription}
-                  onChange={(e) => setGameDescription(e.target.value)}
-                  placeholder="Describe the activity objectives..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="pointsConversion">Points to Rupee Conversion</Label>
-                <Input
-                  id="pointsConversion"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={pointsToRupeeConversion}
-                  onChange={(e) => setPointsToRupeeConversion(e.target.value)}
-                  placeholder="1 point = ? rupees (e.g., 1 or 0.5)"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Set how many rupees equals 1 point (e.g., 1 point = ₹{pointsToRupeeConversion || "1"})
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="allTerritories"
-                  checked={isAllTerritories}
-                  onCheckedChange={setIsAllTerritories}
-                />
-                <Label htmlFor="allTerritories">Apply to all territories</Label>
-              </div>
-
-              {!isAllTerritories && (
-                <div>
-                  <Label>Select Territories *</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {territories.map((territory) => (
-                      <div key={territory} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`territory-${territory}`}
-                          checked={selectedTerritories.includes(territory)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedTerritories([...selectedTerritories, territory]);
-                            } else {
-                              setSelectedTerritories(
-                                selectedTerritories.filter((t) => t !== territory)
-                              );
-                            }
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <Label htmlFor={`territory-${territory}`} className="font-normal">
-                          {territory}
-                        </Label>
-                      </div>
-                    ))}
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Schedule</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="startDate" className="text-slate-700">Start Date</Label>
+                    <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1 bg-white" />
+                  </div>
+                  <div>
+                    <Label htmlFor="endDate" className="text-slate-700">End Date</Label>
+                    <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1 bg-white" />
                   </div>
                 </div>
-              )}
+              </div>
 
-              <div className="flex gap-2">
-                <Button onClick={createActivity} className="flex-1">
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Territory Scope</div>
+                <div className="flex items-center justify-between rounded-lg bg-sky-50 border border-sky-100 px-3 py-2">
+                  <Label htmlFor="allTerritories" className="text-slate-700 font-medium">Apply to all territories</Label>
+                  <Switch id="allTerritories" checked={isAllTerritories} onCheckedChange={setIsAllTerritories} />
+                </div>
+                {!isAllTerritories && (
+                  <div>
+                    <Label className="text-slate-700">Select Territories *</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {territories.map((territory) => (
+                        <div key={territory} className="flex items-center space-x-2 rounded-md border border-slate-200 px-2 py-1.5 bg-slate-50">
+                          <input
+                            type="checkbox"
+                            id={`territory-${territory}`}
+                            checked={selectedTerritories.includes(territory)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTerritories([...selectedTerritories, territory]);
+                              } else {
+                                setSelectedTerritories(selectedTerritories.filter((t) => t !== territory));
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor={`territory-${territory}`} className="font-normal text-sm">{territory}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button onClick={createActivity} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white">
                   Create Activity
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCreateDialog(false)}
-                  className="flex-1"
-                >
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
                   Cancel
                 </Button>
               </div>
@@ -809,161 +873,163 @@ export function GamificationManagement() {
         </Dialog>
 
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Edit Activity</DialogTitle>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-slate-50">
+            <DialogHeader className="px-6 pt-6 pb-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-white border border-amber-100 flex items-center justify-center shadow-sm">
+                  <Pencil className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-semibold text-slate-800">Edit Activity</DialogTitle>
+                  <p className="text-xs text-slate-500 mt-0.5">Update the configuration for this activity</p>
+                </div>
+              </div>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="editActivityName">Activity Name *</Label>
-                <Select value={selectedActivity} onValueChange={(value) => {
-                  setSelectedActivity(value);
-                  const activity = METRIC_TYPES.find(a => a.value === value);
-                  setRewardPoints(activity?.defaultPoints.toString() || "");
-                }}>
-                  <SelectTrigger id="editActivityName">
-                    <SelectValue placeholder="Select an activity" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background">
-                    {METRIC_TYPES.map((activity) => (
-                      <SelectItem key={activity.value} value={activity.value}>
-                        {activity.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Activity Details</div>
+                <div>
+                  <Label htmlFor="editActivityName" className="text-slate-700">Activity Name *</Label>
+                  <Select value={selectedActivity} onValueChange={(value) => {
+                    setSelectedActivity(value);
+                    const activity = METRIC_TYPES.find(a => a.value === value);
+                    setRewardPoints(activity?.defaultPoints.toString() || "");
+                  }}>
+                    <SelectTrigger id="editActivityName" className="mt-1 bg-white">
+                      <SelectValue placeholder="Select an activity" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background">
+                      {METRIC_TYPES.map((activity) => (
+                        <SelectItem key={activity.value} value={activity.value}>
+                          {activity.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="editGameDescription" className="text-slate-700">Description</Label>
+                  <Textarea
+                    id="editGameDescription"
+                    value={gameDescription}
+                    onChange={(e) => setGameDescription(e.target.value)}
+                    placeholder="Describe the activity objectives..."
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2">
+                  <div>
+                    <Label htmlFor="editGameActive" className="text-slate-700 font-medium">Game Active</Label>
+                    <p className="text-xs text-slate-500">Enable this activity for participants</p>
+                  </div>
+                  <Switch id="editGameActive" checked={isActive} onCheckedChange={setIsActive} />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="editRewardPoints">Reward Points per Activity *</Label>
-                <Input
-                  id="editRewardPoints"
-                  type="number"
-                  value={rewardPoints}
-                  onChange={(e) => setRewardPoints(e.target.value)}
-                  placeholder="Enter points"
-                  min="0"
-                />
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rewards & Conversion</div>
+                <div>
+                  <Label htmlFor="editRewardPoints" className="text-slate-700">Reward Points per Activity *</Label>
+                  <Input
+                    id="editRewardPoints"
+                    type="number"
+                    value={rewardPoints}
+                    onChange={(e) => setRewardPoints(e.target.value)}
+                    placeholder="Enter points"
+                    min="0"
+                    className="mt-1 bg-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editPointsConversion" className="text-slate-700">Points to Rupee Conversion</Label>
+                  <Input
+                    id="editPointsConversion"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={pointsToRupeeConversion}
+                    onChange={(e) => setPointsToRupeeConversion(e.target.value)}
+                    placeholder="1 point = ? rupees (e.g., 1 or 0.5)"
+                    className="mt-1 bg-white"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    1 point = ₹{pointsToRupeeConversion || "1"}
+                  </p>
+                </div>
               </div>
 
               {selectedActivity && (
-                <MetricConfigFields
-                  metricType={selectedActivity}
-                  config={metricConfig}
-                  onConfigChange={setMetricConfig}
-                />
+                <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Metric Configuration</div>
+                  <MetricConfigFields
+                    metricType={selectedActivity}
+                    config={metricConfig}
+                    onConfigChange={setMetricConfig}
+                  />
+                </div>
               )}
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="editGameActive"
-                  checked={isActive}
-                  onCheckedChange={setIsActive}
-                />
-                <Label htmlFor="editGameActive">Game Active</Label>
-              </div>
-
-              <div>
-                <Label htmlFor="editGameDescription">Description</Label>
-                <Textarea
-                  id="editGameDescription"
-                  value={gameDescription}
-                  onChange={(e) => setGameDescription(e.target.value)}
-                  placeholder="Describe the activity objectives..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="editStartDate">Start Date</Label>
-                  <Input
-                    id="editStartDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="editEndDate">End Date</Label>
-                  <Input
-                    id="editEndDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="editPointsConversion">Points to Rupee Conversion</Label>
-                <Input
-                  id="editPointsConversion"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={pointsToRupeeConversion}
-                  onChange={(e) => setPointsToRupeeConversion(e.target.value)}
-                  placeholder="1 point = ? rupees (e.g., 1 or 0.5)"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Set how many rupees equals 1 point (e.g., 1 point = ₹{pointsToRupeeConversion || "1"})
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="editAllTerritories"
-                  checked={isAllTerritories}
-                  onCheckedChange={setIsAllTerritories}
-                />
-                <Label htmlFor="editAllTerritories">Apply to all territories</Label>
-              </div>
-
-              {!isAllTerritories && (
-                <div>
-                  <Label>Select Territories *</Label>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {territories.map((territory) => (
-                      <div key={territory} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`edit-territory-${territory}`}
-                          checked={selectedTerritories.includes(territory)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedTerritories([...selectedTerritories, territory]);
-                            } else {
-                              setSelectedTerritories(
-                                selectedTerritories.filter((t) => t !== territory)
-                              );
-                            }
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <Label htmlFor={`edit-territory-${territory}`} className="font-normal">
-                          {territory}
-                        </Label>
-                      </div>
-                    ))}
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Schedule</div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editStartDate" className="text-slate-700">Start Date</Label>
+                    <Input id="editStartDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="mt-1 bg-white" />
+                  </div>
+                  <div>
+                    <Label htmlFor="editEndDate" className="text-slate-700">End Date</Label>
+                    <Input id="editEndDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1 bg-white" />
                   </div>
                 </div>
-              )}
+              </div>
 
-              <div className="flex gap-2">
-                <Button onClick={updateActivity} className="flex-1">
+              <div className="rounded-xl bg-white border border-slate-200 p-4 space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Territory Scope</div>
+                <div className="flex items-center justify-between rounded-lg bg-sky-50 border border-sky-100 px-3 py-2">
+                  <Label htmlFor="editAllTerritories" className="text-slate-700 font-medium">Apply to all territories</Label>
+                  <Switch id="editAllTerritories" checked={isAllTerritories} onCheckedChange={setIsAllTerritories} />
+                </div>
+                {!isAllTerritories && (
+                  <div>
+                    <Label className="text-slate-700">Select Territories *</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {territories.map((territory) => (
+                        <div key={territory} className="flex items-center space-x-2 rounded-md border border-slate-200 px-2 py-1.5 bg-slate-50">
+                          <input
+                            type="checkbox"
+                            id={`edit-territory-${territory}`}
+                            checked={selectedTerritories.includes(territory)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTerritories([...selectedTerritories, territory]);
+                              } else {
+                                setSelectedTerritories(selectedTerritories.filter((t) => t !== territory));
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor={`edit-territory-${territory}`} className="font-normal text-sm">{territory}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button onClick={updateActivity} className="flex-1 bg-amber-600 hover:bg-amber-700 text-white">
                   Update Activity
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowEditDialog(false)}
-                  className="flex-1"
-                >
+                <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">
                   Cancel
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
+
+
+
 
         <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <DialogContent>
@@ -992,7 +1058,11 @@ export function GamificationManagement() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+          </div>
+        </div>
+
+
+
 
       <Tabs defaultValue="activities" className="space-y-4">
         <TabsList>
@@ -1004,158 +1074,258 @@ export function GamificationManagement() {
         </TabsList>
 
         <TabsContent value="activities" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Activities</CardTitle>
-              <CardDescription>Click on an activity to edit</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Activity Name</TableHead>
-                    <TableHead>Game</TableHead>
-                    <TableHead>Reward</TableHead>
-                    <TableHead>Points to Rs.</TableHead>
-                    <TableHead>Configuration</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {actions.map((action) => {
-                    const game = games.find(g => g.id === action.game_id);
-                    return (
-                    <TableRow
-                      key={action.id}
-                      className="cursor-pointer hover:bg-muted"
-                      onClick={() => openEditDialog(action)}
-                    >
-                      <TableCell className="font-medium">{action.action_name}</TableCell>
-                      <TableCell className="text-sm">
-                        {game?.name || "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="default">{action.points} points</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">1 pt = ₹{game?.points_to_rupee_conversion || 1}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {getConfigSummary(action)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={action.is_enabled ? "default" : "secondary"}>
-                          {action.is_enabled ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
+          {actions.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-4">
+                  <Trophy className="h-8 w-8 text-indigo-500" />
+                </div>
+                <h3 className="text-lg font-semibold">No activities yet</h3>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                  Create your first gamification activity to start rewarding your team.
+                </p>
+                <Button onClick={openCreateDialog} className="mt-4">
+                  <Plus className="mr-2 h-4 w-4" /> Create Activity
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {actions.filter(a => activityFilter === 'all' ? true : activityFilter === 'active' ? a.is_enabled : !a.is_enabled).map((action) => {
+                const visual = METRIC_VISUALS[action.action_type] || DEFAULT_VISUAL;
+                const Icon = visual.icon;
+                const game = games.find(g => g.id === action.game_id);
+                const conversion = game?.points_to_rupee_conversion || 1;
+                return (
+                  <div
+                    key={action.id}
+                    onClick={() => openEditDialog(action)}
+                    className={`group relative overflow-hidden rounded-2xl border bg-white shadow-sm hover:shadow-md transition-all cursor-pointer ${
+                      action.is_enabled ? "border-slate-200" : "border-dashed border-slate-200 bg-slate-50/50"
+                    }`}
+                  >
+                    {/* Top tint bar */}
+                    <div className={`h-1.5 ${action.is_enabled ? visual.bar : "bg-slate-200"}`} />
+
+                    {/* Status ribbon */}
+                    <div className="absolute top-4 right-4 z-10">
+                      {action.is_enabled ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-1 text-xs font-semibold ring-1 ring-emerald-200">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2.5 py-1 text-xs font-semibold ring-1 ring-slate-200">
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-5 pt-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${visual.iconBg} ring-1 ${visual.ring} shrink-0`}>
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <div className="min-w-0 pr-16">
+                          <h3 className="font-semibold text-base leading-tight truncate text-slate-900">{action.action_name}</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                            {getConfigSummary(action)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Reward pills */}
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className={`rounded-xl ${visual.tint} ring-1 ${visual.ring} p-3`}>
+                          <div className={`flex items-center gap-1 text-[10px] uppercase tracking-wide font-medium ${visual.accent}`}>
+                            <Award className="h-3 w-3" /> Reward
+                          </div>
+                          <div className={`text-xl font-bold leading-tight mt-0.5 ${visual.accent}`}>
+                            {action.points} <span className="text-xs font-medium">pts</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-muted/60 p-3">
+                          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <Coins className="h-3 w-3" /> Value
+                          </div>
+                          <div className={`text-xl font-bold leading-tight mt-0.5 ${visual.accent}`}>
+                            ₹{conversion}
+                            <span className="text-xs font-medium text-muted-foreground"> /pt</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="mt-4 flex items-center justify-between pt-3 border-t">
+                        <span className="text-xs text-muted-foreground truncate max-w-[60%]">
+                          {game?.name?.split(" - ")[0] || "Standalone"}
+                        </span>
+                        <div className="flex gap-1">
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               openEditDialog(action);
                             }}
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={(e) => {
                               e.stopPropagation();
                               setActionToDelete(action);
                               setShowDeleteDialog(true);
                             }}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
         </TabsContent>
 
         <TabsContent value="badges" className="space-y-4">
+
           <BadgeManagement />
         </TabsContent>
 
         <TabsContent value="redemptions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Redemption Requests</CardTitle>
-              <CardDescription>Review and process user redemption requests</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {redemptions.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No redemption requests
-                  </p>
-                ) : (
-                  redemptions.map((redemption) => (
-                    <div
-                      key={redemption.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium">{redemption.profiles.full_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {redemption.points_redeemed} points → ₹{redemption.voucher_amount}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(redemption.requested_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        {redemption.status === "pending" && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                const code = prompt("Enter voucher code:");
-                                if (code) processRedemption(redemption.id, "approved", code);
-                              }}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                const reason = prompt("Enter rejection reason:");
-                                if (reason)
-                                  processRedemption(redemption.id, "rejected", undefined, reason);
-                              }}
-                            >
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                        {redemption.status !== "pending" && (
-                          <Badge
-                            variant={
-                              redemption.status === "approved" ? "default" : "destructive"
-                            }
-                          >
-                            {redemption.status}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
+          <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 p-6 shadow-sm">
+            <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-100/40 blur-3xl" />
+            <div className="relative flex items-start gap-4">
+              <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-xl bg-white ring-1 ring-emerald-100 shadow-sm">
+                <Gift className="h-6 w-6 text-emerald-500" />
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-slate-900">Redemption Requests</h3>
+                <p className="text-slate-500 text-sm mt-0.5">Review and process user reward redemptions</p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white ring-1 ring-slate-200 px-3 py-1 text-xs font-medium text-slate-700">
+                    {redemptions.length} Total
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 ring-1 ring-amber-200 px-3 py-1 text-xs font-medium text-amber-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    {redemptions.filter(r => r.status === "pending").length} Pending
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 ring-1 ring-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700">
+                    {redemptions.filter(r => r.status === "approved").length} Approved
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {redemptions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-white py-16 flex flex-col items-center justify-center text-center">
+              <div className="h-16 w-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4 ring-1 ring-emerald-100">
+                <Gift className="h-8 w-8 text-emerald-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900">No redemption requests</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm">Approved redemptions will appear here once users start converting points.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {redemptions.map((redemption) => {
+                const isPending = redemption.status === "pending";
+                const isApproved = redemption.status === "approved";
+                const statusStyle = isPending
+                  ? { bar: "bg-amber-200", tint: "bg-amber-50", ring: "ring-amber-100", accent: "text-amber-700", pill: "bg-amber-50 text-amber-700 ring-amber-200", dot: "bg-amber-500 animate-pulse" }
+                  : isApproved
+                  ? { bar: "bg-emerald-200", tint: "bg-emerald-50", ring: "ring-emerald-100", accent: "text-emerald-700", pill: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" }
+                  : { bar: "bg-rose-200", tint: "bg-rose-50", ring: "ring-rose-100", accent: "text-rose-700", pill: "bg-rose-50 text-rose-700 ring-rose-200", dot: "bg-rose-500" };
+                return (
+                  <div
+                    key={redemption.id}
+                    className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className={`h-1.5 ${statusStyle.bar}`} />
+                    <div className="absolute top-4 right-4 z-10">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 capitalize ${statusStyle.pill}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
+                        {redemption.status}
+                      </span>
+                    </div>
+
+                    <div className="p-5">
+                      <div className="flex items-start gap-3">
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${statusStyle.tint} ring-1 ${statusStyle.ring} shrink-0`}>
+                          <Gift className={`h-6 w-6 ${statusStyle.accent}`} />
+                        </div>
+                        <div className="min-w-0 pr-20">
+                          <h3 className="font-semibold text-base leading-tight text-slate-900 truncate">
+                            {redemption.profiles.full_name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {new Date(redemption.requested_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl bg-slate-50 ring-1 ring-slate-100 p-3">
+                          <div className="flex items-center gap-1 text-[10px] uppercase tracking-wide font-medium text-slate-500">
+                            <Coins className="h-3 w-3" /> Points
+                          </div>
+                          <div className="text-xl font-bold leading-tight mt-0.5 text-slate-800">
+                            {redemption.points_redeemed}
+                          </div>
+                        </div>
+                        <div className={`rounded-xl ${statusStyle.tint} ring-1 ${statusStyle.ring} p-3`}>
+                          <div className={`flex items-center gap-1 text-[10px] uppercase tracking-wide font-medium ${statusStyle.accent}`}>
+                            <Award className="h-3 w-3" /> Voucher
+                          </div>
+                          <div className={`text-xl font-bold leading-tight mt-0.5 ${statusStyle.accent}`}>
+                            ₹{redemption.voucher_amount}
+                          </div>
+                        </div>
+                      </div>
+
+                      {isPending && (
+                        <div className="mt-4 flex gap-2 pt-3 border-t">
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                            onClick={() => {
+                              const code = prompt("Enter voucher code:");
+                              if (code) processRedemption(redemption.id, "approved", code);
+                            }}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            onClick={() => {
+                              const reason = prompt("Enter rejection reason:");
+                              if (reason) processRedemption(redemption.id, "rejected", undefined, reason);
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
+
       </Tabs>
     </div>
   );

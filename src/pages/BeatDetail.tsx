@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { BeatVisitCalendar } from "@/components/BeatVisitCalendar";
 import { useBeatMetrics } from "@/hooks/useBeatMetrics";
 import { moveToRecycleBin } from "@/utils/recycleBinUtils";
+import { useBeatLifecycle } from "@/hooks/useBeatLifecycle";
 import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
 import { BeatAuditTimeline } from "@/components/BeatAuditTimeline";
 import { EditBeatModal } from "@/components/EditBeatModal";
@@ -22,6 +23,7 @@ import { RetailerDetailModal } from "@/components/RetailerDetailModal";
 import { BeatRetailerExport } from "@/components/BeatRetailerExport";
 import { TargetVsActualCard } from "@/components/performance/TargetVsActualCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface BeatDetailData {
   id?: string; // Database UUID
@@ -34,6 +36,8 @@ interface BeatDetailData {
   average_time_minutes?: number;
   territory_id?: string;
   territory_name?: string;
+  owner_user_id?: string | null;
+  owner_name?: string | null;
   retailers: Array<{
     id: string;
     name: string;
@@ -44,6 +48,7 @@ interface BeatDetailData {
     last_visit_date?: string;
     order_value?: number;
     fyOrderValue?: number;
+    user_id?: string;
   }>;
 }
 
@@ -58,6 +63,7 @@ export const BeatDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const beatLifecycle = useBeatLifecycle();
   const [beatData, setBeatData] = useState<BeatDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,6 +81,8 @@ export const BeatDetail = () => {
   const [upcomingVisitsCount, setUpcomingVisitsCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [showHealthInsight, setShowHealthInsight] = useState(false);
+  const [cannotDeleteOpen, setCannotDeleteOpen] = useState(false);
+  const [cannotDeleteReasons, setCannotDeleteReasons] = useState<string[]>([]);
 
   const filteredRetailers = useMemo(() => {
     if (!beatData?.retailers) return [];
@@ -171,12 +179,13 @@ export const BeatDetail = () => {
           territoryName = territory?.name;
         }
 
-        // Get retailers for this beat
+        // Get retailers for this beat — NO user_id filter.
+        // Retailers under a beat can belong to any user (owner, shared/coverage recipients).
+        // RLS already enforces correct access via user_has_beat_access().
         const { data: retailers, error: retailersError } = await supabase
           .from('retailers')
-          .select('id, name, address, phone, category, priority, last_visit_date, order_value')
-          .eq('beat_id', resolvedBeatId)
-          .eq('user_id', user.id);
+          .select('id, name, address, phone, category, priority, last_visit_date, order_value, user_id, created_at')
+          .eq('beat_id', resolvedBeatId);
 
         if (retailersError) {
           console.error('Error fetching retailers:', retailersError);
@@ -232,6 +241,8 @@ export const BeatDetail = () => {
           average_time_minutes: beat?.average_time_minutes,
           territory_id: beat?.territory_id,
           territory_name: territoryName,
+          owner_user_id: (beat as any)?.user_id ?? null,
+          owner_name: (beat as any)?.owner_name ?? null,
           retailers: retailersWithFY
         });
 
@@ -260,22 +271,21 @@ export const BeatDetail = () => {
       const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
       // Count beat visits from beat_plans (how many times this beat was planned/visited)
+      // NO user_id filter — counts across all users with access so shared beats show full activity.
       const { data: beatPlans } = await supabase
         .from('beat_plans')
         .select('plan_date')
         .eq('beat_id', beatId)
-        .eq('user_id', userId)
         .gte('plan_date', threeMonthsAgo.toISOString().split('T')[0])
         .lte('plan_date', now.toISOString().split('T')[0]);
 
       const beatVisitCount = beatPlans?.length || 0;
 
-      // Get last visited date for this beat
+      // Get last visited date for this beat (across all users)
       const { data: lastBeatPlan } = await supabase
         .from('beat_plans')
         .select('plan_date')
         .eq('beat_id', beatId)
-        .eq('user_id', userId)
         .lte('plan_date', now.toISOString().split('T')[0])
         .order('plan_date', { ascending: false })
         .limit(1);
@@ -508,23 +518,66 @@ export const BeatDetail = () => {
     setSwot({ strengths, weaknesses, opportunities, threats });
   };
 
+  const handleConfirmDeactivate = async () => {
+    if (!beatData || !user) return;
+    setIsDeleting(true);
+    try {
+      const { error: deactivateError } = await supabase
+        .from('beats')
+        .update({
+          is_active: false,
+          deactivated_at: new Date().toISOString(),
+          deactivated_by: user.id,
+        } as any)
+        .eq('beat_id', beatData.beat_id);
+      if (deactivateError) throw deactivateError;
+      toast.success(`"${beatData.beat_name}" has been deactivated`);
+      window.dispatchEvent(new CustomEvent('beatDeleted', { detail: { beatId: beatData.beat_id } }));
+      setCannotDeleteOpen(false);
+      navigate('/my-beats');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to deactivate beat');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
   const handleDeleteClick = async () => {
     if (!beatData || !user) return;
-    
+
+    // Pre-check: does this beat have historical references?
+    const { data: check, error: checkError } = await supabase
+      .rpc('can_delete_beat' as any, { p_beat_id: beatData.beat_id });
+
+    if (checkError) {
+      console.error('can_delete_beat error', checkError);
+      toast.error('Could not check beat data. Please try again.');
+      return;
+    }
+
+    const checkResult: any = check || {};
+    if (!checkResult.deletable) {
+      const reasons: string[] = Array.isArray(checkResult.reasons) ? checkResult.reasons : [];
+      setCannotDeleteReasons(reasons);
+      setCannotDeleteOpen(true);
+      return;
+    }
+
     try {
       // Fetch available beats
       const { data: allBeats } = await supabase
         .from('beats')
         .select('beat_id, beat_name')
         .eq('is_active', true)
-        .eq('created_by', user.id)
+        .eq('user_id', user.id)
         .neq('beat_id', beatData.beat_id);
 
       if (allBeats) {
         const { data: retailerCounts } = await supabase
           .from('retailers')
           .select('beat_id')
-          .eq('user_id', user.id)
           .in('beat_id', allBeats.map(b => b.beat_id));
 
         const countMap = new Map<string, number>();
@@ -593,21 +646,10 @@ export const BeatDetail = () => {
           .eq('user_id', user.id);
 
         if (retailersToDelete && retailersToDelete.length > 0) {
+          const { deactivateOrDeleteRetailer } = await import('@/utils/safeRetailerBeatDelete');
           for (const retailer of retailersToDelete) {
-            await moveToRecycleBin({
-              tableName: 'retailers',
-              recordId: retailer.id,
-              recordData: retailer,
-              moduleName: 'Retailers',
-              recordName: retailer.name || 'Unknown Retailer'
-            });
+            await deactivateOrDeleteRetailer(retailer.id, retailer);
           }
-
-          await supabase
-            .from('retailers')
-            .delete()
-            .eq('beat_id', beatData.beat_id)
-            .eq('user_id', user.id);
         }
       } else if (deleteOption === 'transfer' && targetBeatId) {
         const targetBeat = availableBeats.find(b => b.id === targetBeatId);
@@ -654,11 +696,12 @@ export const BeatDetail = () => {
           .eq('user_id', user.id);
       }
 
-      // Deactivate the beat
-      await supabase
-        .from('beats')
-        .update({ is_active: false })
-        .eq('beat_id', beatData.beat_id);
+      // Route the final beat removal through the shared guard so history is never destroyed.
+      {
+        const { deactivateOrDeleteBeat } = await import('@/utils/safeRetailerBeatDelete');
+        const res = await deactivateOrDeleteBeat(beatData.beat_id);
+        if (res.action === 'failed') throw new Error('Failed to delete or deactivate beat');
+      }
 
       // Insert audit log
       try {
@@ -785,6 +828,17 @@ export const BeatDetail = () => {
             </Button>
           </div>
         </div>
+
+        {/* Shared / Coverage ownership banner */}
+        {beatData.owner_user_id && user?.id && beatData.owner_user_id !== user.id && (
+          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-700">
+              Shared with you by <span className="font-semibold">{beatData.owner_name || 'another user'}</span>. You are viewing this beat's full activity across all users with access.
+            </div>
+          </div>
+        )}
+
 
         {/* Key Performance Highlights */}
         <Card className="shadow-card bg-gradient-to-br from-primary/5 to-primary/10">
@@ -1348,6 +1402,52 @@ export const BeatDetail = () => {
         onConfirm={handleConfirmDelete}
         isLoading={isDeleting}
       />
+
+      {/* Cannot-delete (deactivate instead) Dialog */}
+      <AlertDialog open={cannotDeleteOpen} onOpenChange={(o) => !isDeleting && setCannotDeleteOpen(o)}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle size={18} />
+              Cannot permanently delete this beat
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 flex gap-2">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <div>
+              <div className="font-medium mb-1">Historical data is preserved</div>
+              <div>
+                "{beatData?.beat_name}" has activity records that cannot be deleted. You can
+                deactivate it instead — the beat will be hidden from active views but all
+                historical reports stay intact.
+              </div>
+            </div>
+          </div>
+
+          {cannotDeleteReasons.length > 0 && (
+            <div className="space-y-1 rounded-md border bg-muted/40 p-3 text-sm">
+              <div className="font-medium mb-1">Why it can't be deleted:</div>
+              <ul className="list-disc pl-5 space-y-0.5 text-muted-foreground">
+                {cannotDeleteReasons.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmDeactivate(); }}
+              disabled={isDeleting}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {isDeleting ? 'Deactivating...' : 'Deactivate beat'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };

@@ -38,8 +38,11 @@ import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { clearMyVisitsSnapshot } from "@/lib/myVisitsSnapshot";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { BeatDeleteDialog } from "@/components/BeatDeleteDialog";
+import { DuplicateBeatWarningDialog } from "@/components/DuplicateBeatWarningDialog";
 import { BeatTransferDialog } from "@/components/BeatTransferDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
+import { useBeatLifecycle } from "@/hooks/useBeatLifecycle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import {
@@ -52,6 +55,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePermissions } from "@/hooks/usePermissions";
+import * as beatService from "@/services/beatService";
+import type { BeatWithAccess, BeatStats } from "@/services/beatService";
+import { DeactivateBeatWizard } from "@/components/DeactivateBeatWizard";
+import { ShareBeatModal } from "@/components/ShareBeatModal";
+import { CoverageModal } from "@/components/CoverageModal";
+import { TransferOwnershipModal } from "@/components/TransferOwnershipModal";
+import { BeatHistoryDrawer } from "@/components/BeatHistoryDrawer";
+
+
 
 
 interface Beat {
@@ -70,6 +83,7 @@ interface Beat {
   territory_id?: string;
   territory_name?: string;
   owner_name?: string;
+  is_active?: boolean;
 }
 
 interface Retailer {
@@ -89,6 +103,70 @@ interface Retailer {
     avgOrderPerVisit: number;
     visitsIn3Months: number;
   };
+}
+
+// Levenshtein distance for near-match detection
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  return dp[m][n];
+}
+
+type DuplicateMatch = {
+  matchType: 'exact_own' | 'exact_other' | 'near_own' | 'near_other';
+  existingOwnerName?: string;
+  matchedBeatName?: string;
+};
+
+async function checkBeatNameDuplicate(
+  name: string,
+  currentUserId: string,
+  distributorId: string | null
+): Promise<DuplicateMatch | null> {
+  const normalized = name.trim().toLowerCase();
+
+  const { data: orgBeats, error } = await (supabase as any)
+    .rpc('get_org_beat_names', { p_distributor_id: distributorId ?? null });
+  if (error) { console.error('checkBeatNameDuplicate:', error); return null; }
+  if (!orgBeats || orgBeats.length === 0) return null;
+
+  for (const b of orgBeats as any[]) {
+    const bName = (b.beat_name || '').toLowerCase();
+    if (bName === normalized) {
+      const isOwn = b.user_id === currentUserId;
+      const ownerName = b.full_name || b.username || 'Another user';
+      return {
+        matchType: isOwn ? 'exact_own' : 'exact_other',
+        existingOwnerName: ownerName,
+        matchedBeatName: b.beat_name,
+      };
+    }
+  }
+
+  for (const b of orgBeats as any[]) {
+    const bName = (b.beat_name || '').toLowerCase();
+    if (!bName) continue;
+    const dist = levenshtein(normalized, bName);
+    const contains = normalized.length >= 4 && (bName.includes(normalized) || normalized.includes(bName));
+    if (dist <= 2 || contains) {
+      const isOwn = b.user_id === currentUserId;
+      const ownerName = b.full_name || b.username || 'Another user';
+      return {
+        matchType: isOwn ? 'near_own' : 'near_other',
+        existingOwnerName: ownerName,
+        matchedBeatName: b.beat_name,
+      };
+    }
+  }
+
+  return null;
 }
 
 export const MyBeats = () => {
@@ -180,12 +258,35 @@ export const MyBeats = () => {
   const [transferBeat, setTransferBeat] = useState<{id: string; name: string; retailerCount: number} | null>(null);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   
-  // Deactivate state
-  const [deactivateBeat, setDeactivateBeat] = useState<{id: string; name: string} | null>(null);
+  // Deactivate state (wizard)
+  const [deactivateBeat, setDeactivateBeat] = useState<{id: string; beat_id: string; name: string; retailerCount: number} | null>(null);
+  const [shareBeat, setShareBeat] = useState<{id: string; beat_id: string; name: string} | null>(null);
+  const [coverageBeat, setCoverageBeat] = useState<{id: string; beat_id: string; name: string} | null>(null);
+  const [ownershipTransferBeat, setOwnershipTransferBeat] = useState<{id: string; beat_id: string; name: string; retailer_count: number} | null>(null);
+  const [historyBeat, setHistoryBeat] = useState<{id: string; beat_id: string; name: string} | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    matchType: 'exact_own' | 'exact_other' | 'near_own' | 'near_other';
+    existingOwnerName?: string;
+    matchedBeatName?: string;
+    proceedCallback: () => void;
+  } | null>(null);
   
   // Stats detail dialog state
   const [statsDetailDialog, setStatsDetailDialog] = useState<'beats' | 'retailers' | 'unassigned' | 'average' | null>(null);
-  
+
+  // Beat lifecycle (Active / Inactive / All)
+  const [beatStatusFilter, setBeatStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
+  const [deletabilityMap, setDeletabilityMap] = useState<Record<string, boolean>>({});
+  const beatLifecycle = useBeatLifecycle();
+
+  // Access-aware tab + service data
+  const [accessTab, setAccessTab] = useState<'mine' | 'shared' | 'covering' | 'inactive' | 'all' | 'empty'>('mine');
+  const [myBeatsRaw, setMyBeatsRaw] = useState<BeatWithAccess[]>([]);
+  const [sharedRetailerCounts, setSharedRetailerCounts] = useState<Map<string, number>>(new Map());
+  const [beatStats, setBeatStats] = useState<BeatStats | null>(null);
+  const { can } = usePermissions();
+
+
   // Delete confirmation dialog
   const { isOpen: isDeleteOpen, itemId: deleteItemId, itemName: deleteItemName, openDeleteDialog, closeDeleteDialog, setOpen: setDeleteOpen } = useDeleteConfirm();
 
@@ -205,15 +306,36 @@ export const MyBeats = () => {
       if (effectiveUserIds.length > 0) {
         await loadBeats();
         await loadAllRetailers();
-        
+
         if (isOnline) {
           await loadTerritories();
         }
       }
     };
-    
+
     loadData();
   }, [effectiveUserIds, isOnline]);
+
+  // Access-aware load: pull merged beats + stats for the signed-in user
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [mine, stats] = await Promise.all([
+          beatService.getMyBeats(user.id),
+          beatService.getBeatStats(user.id),
+        ]);
+        if (cancelled) return;
+        setMyBeatsRaw(mine);
+        setBeatStats(stats);
+      } catch (e) {
+        console.error('[MyBeats] beatService load failed', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, beats.length]);
+
 
   // Auto-populate retailers list when allRetailers loads and create modal is open
   useEffect(() => {
@@ -258,6 +380,20 @@ export const MyBeats = () => {
           loadAllRetailers();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'beats',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Beat row changed, reloading beats:', payload);
+          loadBeats();
+          loadAllRetailers();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -280,23 +416,24 @@ export const MyBeats = () => {
       const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
       
       // Filter cached beats by selected users
-      const userCachedBeats = cachedBeats.filter((b: any) => 
-        effectiveUserIds.includes(b.user_id) ||
-        effectiveUserIds.includes(b.owner_id) ||
-        effectiveUserIds.includes(b.created_by)
+      const userCachedBeats = cachedBeats.filter((b: any) =>
+        effectiveUserIds.includes(b.user_id)
       );
       
       if (userCachedBeats.length > 0) {
-        // Display cached data IMMEDIATELY
-        const cachedRetailersData = cachedRetailers.filter((r: any) => 
-          effectiveUserIds.includes(r.user_id) && r.beat_id && r.beat_id !== '' && r.beat_id !== 'unassigned'
+        // Count retailers by beat_id (text) WITHOUT user scoping —
+        // a beat's retailers may belong to different users.
+        const beatIdSet = new Set(userCachedBeats.map((b: any) => b.beat_id));
+        const cachedRetailersData = cachedRetailers.filter((r: any) =>
+          r.beat_id && r.beat_id !== '' && r.beat_id !== 'unassigned' && beatIdSet.has(r.beat_id)
         ).map((r: any) => ({ beat_id: r.beat_id }));
-        
+
         const retailerCountMap = new Map<string, number>();
         cachedRetailersData.forEach((item: any) => {
           const beatId = item.beat_id;
           retailerCountMap.set(beatId, (retailerCountMap.get(beatId) || 0) + 1);
         });
+        
         
         const beatsArray = userCachedBeats.map((beat: any, index) => ({
           id: beat.beat_id,
@@ -309,7 +446,8 @@ export const MyBeats = () => {
           average_km: beat.average_km || 0,
           average_time_minutes: beat.average_time_minutes || 0,
           beat_number: index + 1,
-          retailers: []
+          retailers: [],
+          is_active: beat.is_active !== false,
         })).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         
         setBeats(beatsArray);
@@ -321,15 +459,10 @@ export const MyBeats = () => {
       // STEP 2: If online, fetch fresh data in BACKGROUND and update cache
       if (navigator.onLine) {
         try {
-          const ownershipFilter = effectiveUserIds
-            .flatMap((id) => [`user_id.eq.${id}`, `owner_id.eq.${id}`, `created_by.eq.${id}`])
-            .join(',');
-
           const { data: onlineBeats, error: beatsError } = await supabase
             .from('beats')
             .select('*')
-            .eq('is_active', true)
-            .or(ownershipFilter)
+            .in('user_id', effectiveUserIds)
             .order('created_at', { ascending: true });
 
           if (!beatsError && onlineBeats) {
@@ -349,13 +482,13 @@ export const MyBeats = () => {
             const territoriesMap = new Map();
             territoriesData?.forEach(t => territoriesMap.set(t.id, t.name));
 
+            // Count retailers per beat WITHOUT user_id scoping —
+            // retailers under a beat can belong to any user.
+            const beatTextIds = beatsData.map((b: any) => b.beat_id).filter(Boolean);
             const { data: onlineRetailers, error: retailersError } = await supabase
               .from('retailers')
               .select('beat_id')
-              .in('user_id', effectiveUserIds)
-              .not('beat_id', 'is', null)
-              .neq('beat_id', '')
-              .neq('beat_id', 'unassigned');
+              .in('beat_id', beatTextIds.length > 0 ? beatTextIds : ['__none__']);
 
             if (!retailersError && onlineRetailers) {
               const retailersData = onlineRetailers || [];
@@ -381,7 +514,8 @@ export const MyBeats = () => {
                 retailers: [],
                 territory_id: beat.territory_id,
                 territory_name: beat.territory_id ? territoriesMap.get(beat.territory_id) : null,
-                owner_name: beat.owner_name || null
+                owner_name: beat.owner_name || null,
+                is_active: beat.is_active !== false,
               })).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
               setBeats(beatsArray);
@@ -578,44 +712,13 @@ export const MyBeats = () => {
     })));
   };
 
-  const handleSaveBeat = async () => {
-    if (!beatName.trim()) {
-      toast.error('Please enter a beat name');
-      return;
-    }
-
-    // Check for duplicate beat name
-    const duplicateBeat = beats.find(
-      beat => beat.name.toLowerCase() === beatName.trim().toLowerCase()
-    );
-    
-    if (duplicateBeat) {
-      toast.error(`Beat name "${beatName.trim()}" already exists. Please use a different name.`);
-      return;
-    }
-
-    if (repeatEnabled && repeatType === 'weekly' && repeatDays.length === 0) {
-      toast.error("Please select at least one day for weekly repeat");
-      return;
-    }
-
-    if (repeatEnabled && repeatType === 'custom' && (!customIntervalDays || customIntervalDays < 1)) {
-      toast.error("Please enter a valid number of days (minimum 1) for custom interval");
-      return;
-    }
-
-    if (repeatEnabled && repeatUntilMode === "date" && !repeatEndDate) {
-      toast.error("Please select an end date for the recurring beat");
-      return;
-    }
-
+  const proceedWithBeatCreation = async () => {
     if (!user) return;
-
     setIsCreating(true);
     try {
       // Generate unique beat ID
       const beatId = `beat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const beatData = {
         beat_id: beatId,
         beat_name: beatName.trim(),
@@ -625,29 +728,39 @@ export const MyBeats = () => {
         average_time_minutes: parseInt(averageTimeMinutes) || 0,
         created_by: user.id,
         owner_id: user.id,
+        owner_name: (user as any).user_metadata?.full_name
+          || (user as any).user_metadata?.name
+          || null,
         user_id: user.id,
         is_active: true,
         territory_id: selectedTerritoryId || null,
         created_at: new Date().toISOString()
       };
-      
+
       // Insert beat into database
       const { error: beatError } = await supabase
         .from('beats')
         .insert([beatData]);
-      
-      if (beatError) throw beatError;
-      
+
+      if (beatError) {
+        // DB unique-index safety net for exact duplicates
+        if ((beatError as any).code === '23505') {
+          toast.error(`Beat name "${beatName.trim()}" already exists. Please choose a different name.`);
+          return;
+        }
+        throw beatError;
+      }
+
       // Update selected retailers with beat information (only if retailers are selected)
       if (selectedRetailers.size > 0) {
         const { error: retailerError } = await supabase
           .from('retailers')
-          .update({ 
+          .update({
             beat_id: beatId,
             beat_name: beatName.trim()
           })
           .in('id', Array.from(selectedRetailers));
-        
+
         if (retailerError) throw retailerError;
       }
 
@@ -663,7 +776,7 @@ export const MyBeats = () => {
         average_time_minutes: parseInt(averageTimeMinutes) || 0,
         created_at: new Date().toISOString()
       };
-      
+
       try {
         await supabase.from('beat_allowances').insert(allowanceData);
       } catch (error) {
@@ -699,6 +812,57 @@ export const MyBeats = () => {
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleSaveBeat = async () => {
+    if (!beatName.trim()) {
+      toast.error('Please enter a beat name');
+      return;
+    }
+
+    if (repeatEnabled && repeatType === 'weekly' && repeatDays.length === 0) {
+      toast.error("Please select at least one day for weekly repeat");
+      return;
+    }
+
+    if (repeatEnabled && repeatType === 'custom' && (!customIntervalDays || customIntervalDays < 1)) {
+      toast.error("Please enter a valid number of days (minimum 1) for custom interval");
+      return;
+    }
+
+    if (repeatEnabled && repeatUntilMode === "date" && !repeatEndDate) {
+      toast.error("Please select an end date for the recurring beat");
+      return;
+    }
+
+    if (!user) return;
+
+    // Async duplicate check across the org
+    const duplicateResult = await checkBeatNameDuplicate(
+      beatName.trim(),
+      user.id,
+      (user as any).distributor_id ?? null
+    );
+
+    if (duplicateResult) {
+      const isExact =
+        duplicateResult.matchType === 'exact_own' || duplicateResult.matchType === 'exact_other';
+      setIsCreateBeatOpen(false);
+      setTimeout(() => {
+        setDuplicateWarning({
+          ...duplicateResult,
+          proceedCallback: isExact
+            ? () => setDuplicateWarning(null)
+            : async () => {
+                setDuplicateWarning(null);
+                await proceedWithBeatCreation();
+              },
+        });
+      }, 150);
+      return;
+    }
+
+    await proceedWithBeatCreation();
   };
 
   const generateBeatPlans = async (beatId: string, endDate: Date, beatNameParam?: string) => {
@@ -883,8 +1047,21 @@ export const MyBeats = () => {
   };
 
   const handleDeleteBeatClick = async (beatId: string, beatName: string) => {
+    // Check whether the beat has any historical references.
+    const check = await beatLifecycle.canDelete(beatId);
+    setDeletabilityMap((prev) => ({ ...prev, [beatId]: check.deletable }));
+
+    if (!check.deletable) {
+      const reasons = check.reasons.length ? check.reasons.join(', ') : 'has historical references';
+      toast.error(
+        `"${beatName}" cannot be permanently deleted — it has historical records (${reasons}). Use Deactivate to hide it instead.`,
+        { duration: 6000 }
+      );
+      return;
+    }
+
     try {
-      // Fetch retailer count
+      // Beat is hard-deletable; still gather counts for the dialog (will be zero).
       const { count: retailerCount } = await supabase
         .from('retailers')
         .select('id', { count: 'exact', head: true })
@@ -892,7 +1069,6 @@ export const MyBeats = () => {
         .eq('user_id', user?.id);
       setAffectedRetailerCount(retailerCount || 0);
 
-      // Fetch upcoming visits count
       const today = new Date().toISOString().split('T')[0];
       const { count: visitsCount } = await supabase
         .from('beat_plans')
@@ -901,7 +1077,6 @@ export const MyBeats = () => {
         .gte('plan_date', today);
       setUpcomingVisitsCount(visitsCount || 0);
 
-      // Fetch pending orders count
       const { count: ordersCount } = await supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })
@@ -909,7 +1084,6 @@ export const MyBeats = () => {
         .eq('status', 'pending');
       setPendingOrdersCount(ordersCount || 0);
 
-      // Fetch available users
       const { data: users } = await supabase.rpc('get_profiles_for_selector');
       setAvailableUsersForDialog(
         (users || []).filter((u: any) => u.id !== user?.id).map((u: any) => ({ id: u.id, full_name: u.full_name }))
@@ -953,23 +1127,10 @@ export const MyBeats = () => {
           .eq('user_id', user.id);
 
         if (retailersToDelete && retailersToDelete.length > 0) {
+          const { deactivateOrDeleteRetailer } = await import('@/utils/safeRetailerBeatDelete');
           for (const retailer of retailersToDelete) {
-            await moveToRecycleBin({
-              tableName: 'retailers',
-              recordId: retailer.id,
-              recordData: retailer,
-              moduleName: 'Retailers',
-              recordName: retailer.name || 'Unknown Retailer'
-            });
+            await deactivateOrDeleteRetailer(retailer.id, retailer);
           }
-
-          const { error: deleteRetailersError } = await supabase
-            .from('retailers')
-            .delete()
-            .eq('beat_id', deleteItemId)
-            .eq('user_id', user.id);
-
-          if (deleteRetailersError) throw deleteRetailersError;
 
           const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
           const retailerIdsToDelete = new Set(retailersToDelete.map(r => r.id));
@@ -1058,14 +1219,12 @@ export const MyBeats = () => {
 
       if (allowanceError) console.error('Error deleting beat allowance:', allowanceError);
 
-      // Mark beat as inactive (soft delete)
-      const { error: beatError } = await supabase
-        .from('beats')
-        .update({ is_active: false })
-        .eq('beat_id', deleteItemId)
-        .or(`user_id.eq.${user.id},created_by.eq.${user.id}`);
-
-      if (beatError) throw beatError;
+      // Route the final beat removal through the shared guard so history is never destroyed.
+      {
+        const { deactivateOrDeleteBeat } = await import('@/utils/safeRetailerBeatDelete');
+        const res = await deactivateOrDeleteBeat(deleteItemId);
+        if (res.action === 'failed') throw new Error('Failed to delete or deactivate beat');
+      }
 
       // Insert audit log
       try {
@@ -1147,36 +1306,10 @@ export const MyBeats = () => {
   };
 
   const handleDeactivateBeat = (beatId: string, beatName: string) => {
-    setDeactivateBeat({ id: beatId, name: beatName });
+    const rc = beats.find(b => b.id === beatId)?.retailer_count ?? 0;
+    setDeactivateBeat({ id: beatId, beat_id: beatId, name: beatName, retailerCount: rc });
   };
 
-  const confirmDeactivateBeat = async () => {
-    if (!deactivateBeat || !user) return;
-    try {
-      await supabase
-        .from('beats')
-        .update({ is_active: false })
-        .eq('beat_id', deactivateBeat.id)
-        .or(`user_id.eq.${user.id},created_by.eq.${user.id}`);
-
-      await supabase.from('beat_audit_log' as any).insert({
-        beat_id: deactivateBeat.id,
-        action: 'deactivate',
-        old_user_id: user.id,
-        metadata: { beat_name: deactivateBeat.name },
-        performed_by: user.id,
-      });
-
-      setBeats(prev => prev.filter(b => b.id !== deactivateBeat.id));
-      toast.success(`Beat "${deactivateBeat.name}" deactivated`);
-      window.dispatchEvent(new CustomEvent('visitDataChanged'));
-    } catch (error) {
-      console.error('Error deactivating beat:', error);
-      toast.error('Failed to deactivate beat');
-    } finally {
-      setDeactivateBeat(null);
-    }
-  };
 
 
   const handleAddBeats = () => {
@@ -1211,9 +1344,144 @@ export const MyBeats = () => {
     retailer.phone.includes(searchTerm)
   );
 
-  const filteredBeats = beats.filter((beat) =>
-    beat.name.toLowerCase().includes(beatSearchTerm.toLowerCase())
+  // Access lookup keyed by the text beat_id (which matches Beat.id in this page).
+  const accessByBeatId = useMemo(() => {
+    const map = new Map<string, BeatWithAccess>();
+    for (const b of myBeatsRaw) {
+      if ((b as any).beat_id) map.set((b as any).beat_id, b);
+    }
+    return map;
+  }, [myBeatsRaw]);
+
+  // Fetch retailer counts for shared/coverage beats (not owned, so not covered by `beats`)
+  useEffect(() => {
+    const ownedIds = new Set(beats.map((b) => b.id));
+    const sharedIds = myBeatsRaw
+      .map((r) => r.beat_id)
+      .filter((bid): bid is string => !!bid && !ownedIds.has(bid));
+
+    if (sharedIds.length === 0) {
+      if (sharedRetailerCounts.size > 0) setSharedRetailerCounts(new Map());
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('retailers')
+        .select('beat_id')
+        .in('beat_id', sharedIds);
+      if (cancelled || error || !data) return;
+      const map = new Map<string, number>();
+      for (const row of data as any[]) {
+        if (!row.beat_id) continue;
+        map.set(row.beat_id, (map.get(row.beat_id) || 0) + 1);
+      }
+      setSharedRetailerCounts(map);
+    })();
+    return () => { cancelled = true; };
+  }, [beats, myBeatsRaw]);
+
+  // Merge owned beats with shared/coverage beats from beatService (myBeatsRaw)
+  const displayBeats = useMemo(() => {
+    const byId = new Map<string, Beat>();
+    beats.forEach((b) => byId.set(b.id, b));
+
+    myBeatsRaw.forEach((raw, index) => {
+      if (!raw.beat_id || byId.has(raw.beat_id)) return;
+      const count = sharedRetailerCounts.get(raw.beat_id) || 0;
+      byId.set(raw.beat_id, {
+        id: raw.beat_id,
+        name: raw.beat_name,
+        retailer_count: count,
+        total_retailers: count,
+        category: raw.category || 'General',
+        created_at: raw.created_at,
+        travel_allowance: raw.travel_allowance || 0,
+        average_km: raw.average_km || 0,
+        average_time_minutes: raw.average_time_minutes || 0,
+        beat_number: beats.length + index + 1,
+        retailers: [] as any,
+        territory_id: raw.territory_id || undefined,
+        owner_name: raw.owner_name || undefined,
+        is_active: raw.is_active !== false,
+      } as Beat);
+    });
+
+    return Array.from(byId.values()).sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [beats, myBeatsRaw, sharedRetailerCounts]);
+
+  // Annotate beats with their accessType for filtering / rendering.
+  const annotatedBeats = useMemo(() => {
+    return displayBeats.map((b) => {
+      const acc = accessByBeatId.get(b.id);
+      const accessType = (acc?.accessType ?? 'OWNED') as 'OWNED' | 'CO_OWNER' | 'OPERATIONAL' | 'VIEW_ONLY' | 'COVERAGE';
+      return {
+        ...b,
+        accessType,
+        coverageStartDate: (acc as any)?.effective_from ?? null,
+        coverageEndDate: (acc as any)?.effective_to ?? null,
+        sharedByName: (acc as any)?.owner_name ?? null,
+      };
+    });
+  }, [displayBeats, accessByBeatId]);
+
+  useEffect(() => {
+    const hasActiveOwnedBeat = annotatedBeats.some((beat) => beat.accessType === 'OWNED' && beat.is_active !== false);
+    const hasActiveSharedBeat = annotatedBeats.some((beat) =>
+      ['CO_OWNER', 'OPERATIONAL', 'VIEW_ONLY'].includes(beat.accessType) && beat.is_active !== false
+    );
+
+    if (!hasActiveOwnedBeat && hasActiveSharedBeat) {
+      setAccessTab('shared');
+    }
+  }, [annotatedBeats]);
+
+
+  const filteredBeats = annotatedBeats.filter((beat) => {
+    // Tab filter
+    const isActive = beat.is_active !== false;
+    const beatTextId = (beat as any).beat_id ?? beat.id;
+    if (accessTab === 'mine' && !(beat.accessType === 'OWNED' && isActive)) return false;
+    if (accessTab === 'shared' && !((beat.accessType === 'CO_OWNER' || beat.accessType === 'OPERATIONAL' || beat.accessType === 'VIEW_ONLY') && isActive)) return false;
+    if (accessTab === 'covering') {
+      if (beat.accessType !== 'COVERAGE') return false;
+      if (beat.coverageEndDate && new Date(beat.coverageEndDate) < new Date(new Date().toDateString())) return false;
+    }
+    if (accessTab === 'inactive' && isActive) return false;
+    if (accessTab === 'empty' && !(beat.accessType === 'OWNED' && isActive && (beat.retailer_count ?? 0) === 0)) return false;
+
+    // 'all' = no tab filter
+    return beat.name.toLowerCase().includes(beatSearchTerm.toLowerCase());
+  });
+
+
+  // Lazily resolve which beats are hard-deletable (no historical references)
+  const unknownDeletabilityIds = useMemo(
+    () => filteredBeats.filter((b) => deletabilityMap[b.id] === undefined).slice(0, 12).map((b) => b.id),
+    [filteredBeats, deletabilityMap]
   );
+  const unknownKey = unknownDeletabilityIds.join(',');
+  useEffect(() => {
+    if (unknownDeletabilityIds.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        unknownDeletabilityIds.map(async (id) => [id, (await beatLifecycle.canDelete(id)).deletable] as const)
+      );
+      if (!cancelled) {
+        setDeletabilityMap((prev) => {
+          const next = { ...prev };
+          entries.forEach(([id, val]) => { next[id] = val; });
+          return next;
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unknownKey]);
 
   // Pagination for beats - 10 items per page
   const {
@@ -1292,51 +1560,51 @@ export const MyBeats = () => {
           </CardHeader>
         </Card>
 
-        {/* Stats Dashboard */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card 
-            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-primary"
-            onClick={() => setStatsDetailDialog('beats')}
-          >
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-primary">{beats.length}</div>
-              <div className="text-sm text-muted-foreground">Total Beats</div>
-            </CardContent>
-          </Card>
-          <Card 
-            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-green-500"
-            onClick={() => setStatsDetailDialog('retailers')}
-          >
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-green-600">
-                {beats.reduce((sum, beat) => sum + beat.retailer_count, 0)}
-              </div>
-              <div className="text-sm text-muted-foreground">Total Retailers</div>
-            </CardContent>
-          </Card>
-          <Card 
-            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-orange-500"
-            onClick={() => setStatsDetailDialog('unassigned')}
-          >
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-orange-600">
-                {allRetailers.filter(r => !r.beat_id || r.beat_id === 'unassigned').length}
-              </div>
-              <div className="text-sm text-muted-foreground">Unassigned</div>
-            </CardContent>
-          </Card>
-          <Card 
-            className="text-center cursor-pointer hover:shadow-md transition-shadow hover:border-blue-500"
-            onClick={() => setStatsDetailDialog('average')}
-          >
-            <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {beats.length > 0 ? Math.round(beats.reduce((sum, beat) => sum + beat.retailer_count, 0) / beats.length) : 0}
-              </div>
-              <div className="text-sm text-muted-foreground">Avg per Beat</div>
-            </CardContent>
-          </Card>
-        </div>
+
+        {/* Compact stat cards (6) */}
+        {(() => {
+          type Tab = 'mine' | 'shared' | 'covering' | 'inactive' | 'all' | 'empty';
+          const cards: Array<{ key: string; value: number; label: string; color: string; tab: Tab }> = [
+            { key: 'mine', value: beatStats?.total ?? 0, label: 'My Beats', color: 'blue', tab: 'mine' },
+            { key: 'active', value: beatStats?.active ?? 0, label: 'Active', color: 'emerald', tab: 'mine' },
+            { key: 'inactive', value: beatStats?.inactive ?? 0, label: 'Inactive', color: 'slate', tab: 'inactive' },
+            { key: 'shared', value: beatStats?.sharedWithMe ?? 0, label: 'Shared With Me', color: 'indigo', tab: 'shared' },
+            { key: 'covering', value: beatStats?.covering ?? 0, label: 'Covering Today', color: 'amber', tab: 'covering' },
+            { key: 'empty', value: beatStats?.emptyBeats ?? 0, label: 'Empty Beats', color: 'rose', tab: 'empty' },
+          ];
+          const colorMap: Record<string, { border: string; text: string; ring: string }> = {
+            blue:    { border: 'border-l-blue-500',    text: 'text-blue-600',    ring: 'ring-blue-500' },
+            emerald: { border: 'border-l-emerald-500', text: 'text-emerald-600', ring: 'ring-emerald-500' },
+            slate:   { border: 'border-l-slate-500',   text: 'text-slate-600',   ring: 'ring-slate-500' },
+            indigo:  { border: 'border-l-indigo-500',  text: 'text-indigo-600',  ring: 'ring-indigo-500' },
+            amber:   { border: 'border-l-amber-500',   text: 'text-amber-600',   ring: 'ring-amber-500' },
+            rose:    { border: 'border-l-rose-500',    text: 'text-rose-600',    ring: 'ring-rose-500' },
+          };
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {cards.map((c) => {
+                const col = colorMap[c.color];
+                const active = accessTab === c.tab;
+                return (
+                  <Card
+                    key={c.key}
+                    className={`text-center border-l-2 ${col.border} transition-shadow cursor-pointer hover:shadow-md ${
+                      active ? `ring-2 ${col.ring}` : ''
+                    }`}
+                    onClick={() => setAccessTab(c.tab)}
+                  >
+                    <CardContent className="p-2.5">
+                      <div className={`text-lg font-bold ${col.text} leading-tight`}>{c.value}</div>
+                      <div className="text-[11px] font-medium leading-tight mt-0.5">{c.label}</div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+
 
         {/* Stats Detail Dialog */}
         <Dialog open={statsDetailDialog !== null} onOpenChange={(open) => !open && setStatsDetailDialog(null)}>
@@ -1618,7 +1886,7 @@ export const MyBeats = () => {
         {/* Beats Section */}
         <div className="mt-6">
             {/* Beats Grid */}
-            {beats.length === 0 ? (
+            {displayBeats.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <div className="space-y-4">
@@ -1636,16 +1904,36 @@ export const MyBeats = () => {
               </Card>
             ) : (
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <h2 className="text-lg font-semibold">Your Beats ({filteredBeats.length} of {beats.length})</h2>
+                <Tabs value={accessTab} onValueChange={(v) => setAccessTab(v as typeof accessTab)}>
+                  <TabsList className="flex w-full overflow-x-auto md:grid md:grid-cols-5 md:w-auto gap-1 h-auto p-1 no-scrollbar">
+                    <TabsTrigger value="mine" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-3">My Beats</TabsTrigger>
+                    <TabsTrigger value="shared" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-3">Shared</TabsTrigger>
+                    <TabsTrigger value="covering" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-3">Covering</TabsTrigger>
+                    <TabsTrigger value="inactive" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-3">Inactive</TabsTrigger>
+                    <TabsTrigger value="all" className="flex-shrink-0 whitespace-nowrap text-xs sm:text-sm px-3">All</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">
+                    {accessTab === 'mine' ? 'My Beats' :
+                     accessTab === 'shared' ? 'Shared With Me' :
+                     accessTab === 'covering' ? 'Covering' :
+                     accessTab === 'inactive' ? 'Inactive Beats' :
+                     accessTab === 'empty' ? 'Empty Beats' : 'All Beats'}
+                    {' '}({filteredBeats.length})
+                  </h2>
                 </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {paginatedBeats.map((beat) => (
+              {paginatedBeats.map((beat: any) => (
                 <BeatCard
                   key={beat.id}
                   beat={beat}
                   userId={user?.id || ''}
+                  accessType={beat.accessType}
+                  coverageStartDate={beat.coverageStartDate}
+                  coverageEndDate={beat.coverageEndDate}
+                  sharedByName={beat.sharedByName}
                   onEdit={() => handleEditBeat(beat)}
                   onDelete={() => handleDeleteBeatClick(beat.id, beat.name)}
                   onDetails={() => setSelectedBeatForAnalytics(beat)}
@@ -1655,9 +1943,30 @@ export const MyBeats = () => {
                   }}
                   onTransfer={() => handleTransferBeat(beat.id, beat.name)}
                   onDeactivate={() => handleDeactivateBeat(beat.id, beat.name)}
+                  onReactivate={async () => {
+                    const ok = await beatLifecycle.reactivate(beat.id, beat.name);
+                    if (ok) loadBeats();
+                  }}
+                  onShare={() => setShareBeat({ id: beat.id, beat_id: beat.id, name: beat.name })}
+                  onAssignCoverage={() => setCoverageBeat({ id: beat.id, beat_id: beat.id, name: beat.name })}
+                  onTransferOwnership={() => setOwnershipTransferBeat({ id: beat.id, beat_id: beat.id, name: beat.name, retailer_count: beat.retailer_count })}
+                  onClone={async () => {
+                    const newName = window.prompt(`Clone "${beat.name}" — enter new beat name:`, `${beat.name} (Copy)`);
+                    if (!newName?.trim()) return;
+                    try {
+                      await beatService.cloneBeat(beat.id, newName.trim(), user!.id);
+                      toast.success(`Beat cloned as "${newName.trim()}"`);
+                      loadBeats();
+                    } catch (err: any) {
+                      toast.error(err?.message || 'Failed to clone beat');
+                    }
+                  }}
+                  onHistory={() => setHistoryBeat({ id: beat.id, beat_id: beat.id, name: beat.name })}
+                  isHardDeletable={deletabilityMap[beat.id] === true}
                 />
               ))}
             </div>
+
             
             {/* Beats Pagination */}
             <PaginationControls
@@ -2275,26 +2584,84 @@ export const MyBeats = () => {
           />
         )}
 
-        {/* Deactivate Confirmation */}
-        <AlertDialog open={!!deactivateBeat} onOpenChange={(v) => { if (!v) setDeactivateBeat(null); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <Power size={18} className="text-orange-500" />
-                Deactivate Beat
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Deactivate "{deactivateBeat?.name}"? It will be hidden from daily planning but remain in reports.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeactivateBeat} className="bg-orange-500 hover:bg-orange-600">
-                Deactivate
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Deactivate Beat Wizard */}
+        {deactivateBeat && user && (
+          <DeactivateBeatWizard
+            open={!!deactivateBeat}
+            onOpenChange={(o) => { if (!o) setDeactivateBeat(null); }}
+            beat={{
+              id: deactivateBeat.id,
+              beat_id: deactivateBeat.beat_id,
+              beat_name: deactivateBeat.name,
+            }}
+            retailerCount={deactivateBeat.retailerCount}
+            userId={user.id}
+            onSuccess={() => {
+              setBeats((prev) => prev.map((b) => (b.id === deactivateBeat.id ? { ...b, is_active: false } : b)));
+              window.dispatchEvent(new CustomEvent('visitDataChanged'));
+              loadBeats();
+            }}
+          />
+        )}
+
+        {shareBeat && user && (
+          <ShareBeatModal
+            open={!!shareBeat}
+            onOpenChange={(o) => { if (!o) setShareBeat(null); }}
+            beat={{ id: shareBeat.id, beat_id: shareBeat.beat_id, beat_name: shareBeat.name }}
+            grantedBy={user.id}
+          />
+        )}
+
+        {coverageBeat && user && (
+          <CoverageModal
+            open={!!coverageBeat}
+            onOpenChange={(o) => { if (!o) setCoverageBeat(null); }}
+            beat={{ id: coverageBeat.id, beat_id: coverageBeat.beat_id, beat_name: coverageBeat.name }}
+            primaryUserId={user.id}
+            assignedBy={user.id}
+          />
+        )}
+
+        {ownershipTransferBeat && user && (
+          <TransferOwnershipModal
+            open={!!ownershipTransferBeat}
+            onOpenChange={(o) => { if (!o) setOwnershipTransferBeat(null); }}
+            beat={{
+              id: ownershipTransferBeat.id,
+              beat_id: ownershipTransferBeat.beat_id,
+              beat_name: ownershipTransferBeat.name,
+              retailer_count: ownershipTransferBeat.retailer_count,
+            }}
+            currentUserId={user.id}
+            onSuccess={() => {
+              setBeats((prev) => prev.filter((b) => b.id !== ownershipTransferBeat.id));
+              loadBeats();
+            }}
+          />
+        )}
+
+        {historyBeat && (
+          <BeatHistoryDrawer
+            open={!!historyBeat}
+            onOpenChange={(o) => { if (!o) setHistoryBeat(null); }}
+            beat={{ id: historyBeat.id, beat_id: historyBeat.beat_id, beat_name: historyBeat.name }}
+          />
+        )}
+
+        {duplicateWarning && (
+          <DuplicateBeatWarningDialog
+            open={!!duplicateWarning}
+            onOpenChange={(o) => { if (!o) setDuplicateWarning(null); }}
+            beatName={beatName}
+            matchType={duplicateWarning.matchType}
+            existingOwnerName={duplicateWarning.existingOwnerName}
+            matchedBeatName={duplicateWarning.matchedBeatName}
+            onConfirm={duplicateWarning.proceedCallback}
+            onCancel={() => setDuplicateWarning(null)}
+          />
+        )}
+
       </div>
     </Layout>
   );

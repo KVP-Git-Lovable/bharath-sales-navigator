@@ -28,6 +28,7 @@ interface UserOrderSummary {
   full_name: string;
   total_order_value: number;
   total_kg: number;
+  user_id?: string;
 }
 
 interface UserOrderDetails {
@@ -53,6 +54,19 @@ interface SupervisorReportProps {
 }
 
 const COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#84cc16'];
+
+const toKgQuantity = (quantity: unknown, unit?: unknown) => {
+  // Normalize every order line to KG so kg + gram orders sum correctly.
+  // Active selling units are KG and grams (no piece): grams convert at /1000;
+  // kg / kilogram / kilo / unspecified count as-is (kg).
+  const qty = Number(quantity || 0);
+  if (!Number.isFinite(qty)) return 0;
+  const u = String(unit ?? '').trim().toLowerCase();
+  if (u === 'grams' || u === 'gram' || u === 'g') return qty / 1000;
+  return qty;
+};
+
+const formatKg = (value: number) => `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} KG`;
 
 export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeReady = true }: SupervisorReportProps) => {
   const isMobile = useIsMobile();
@@ -97,12 +111,16 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
     products: number;
     totalKg: number;
     productivityPercent: number | null;
+    quantityByUnit: { [unit: string]: number }; // Track quantities by actual unit
+    totalPieces?: number;
+
   } | null>(null);
   const [allUsersSummary, setAllUsersSummary] = useState<{
     retailers: number;
     beats: number;
     products: number;
     totalKg: number;
+    quantityByUnit: { [unit: string]: number };
   } | null>(null);
   const [expandedBox, setExpandedBox] = useState<string | null>(null);
   const [retailersList, setRetailersList] = useState<{
@@ -296,8 +314,11 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
     
     const fetchKey = `${userIdsKey}-${dateRangeKey}-${usersKey}`;
     
-    // Skip if already fetching, if the key hasn't changed, if users not loaded, or if scope not ready
-    if (isFetchingRef.current || fetchKey === prevFetchKeyRef.current || users.length === 0 || !isScopeReady) {
+    // Skip if already fetching, if the key hasn't changed, or if scope not ready.
+    // NOTE: Do NOT gate on `users.length` — the orders fetch only needs `selectedUserIds`,
+    // and the profiles list can arrive later. Gating on users caused the dashboard to
+    // stay at 0 when the profiles request hadn't resolved before scope became ready.
+    if (isFetchingRef.current || fetchKey === prevFetchKeyRef.current || !isScopeReady) {
       return;
     }
     
@@ -366,12 +387,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       while (hasMore) {
         let query = supabase
           .from('orders')
-          .select(`
-            id,
-            user_id,
-            total_amount,
-            order_items(quantity, unit)
-          `)
+          .select('id, user_id, total_amount')
           .eq('status', 'confirmed')
           .gte('order_date', fromDate)
           .lte('order_date', toDate)
@@ -441,6 +457,25 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         userNameMap[p.id] = p.full_name || 'Unknown';
       });
 
+      const orderIds = ordersData.map(o => o.id).filter(Boolean);
+      const orderItemsByOrderId: Record<string, any[]> = {};
+      for (let i = 0; i < orderIds.length; i += 200) {
+        const { data: items, error: itemsError } = await supabase
+          .from('order_items')
+          .select('order_id, quantity, unit')
+          .in('order_id', orderIds.slice(i, i + 200));
+
+        if (itemsError) {
+          console.error('Error fetching order items for summary:', itemsError);
+          continue;
+        }
+
+        (items || []).forEach((item: any) => {
+          if (!orderItemsByOrderId[item.order_id]) orderItemsByOrderId[item.order_id] = [];
+          orderItemsByOrderId[item.order_id].push(item);
+        });
+      }
+
       // Group by user and calculate totals (total_amount and total_kg)
       const userTotals: Record<string, { total_order_value: number; total_kg: number }> = {};
       ordersData.forEach((order) => {
@@ -451,16 +486,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         
         // Calculate KG from order_items
         let orderKg = 0;
-        (order.order_items as any[])?.forEach((item: any) => {
-          const qty = Number(item.quantity || 0);
-          const unit = (item.unit || '').toLowerCase().trim();
-          
-          if (unit === 'kg' || unit.includes('kilo')) {
-            orderKg += qty;
-          } else if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-            orderKg += qty / 1000;
-          }
-          // Ignore pieces/pcs - not included in KG
+        (orderItemsByOrderId[order.id] || []).forEach((item: any) => {
+          orderKg += toKgQuantity(item.quantity, item.unit);
         });
         
         if (!userTotals[userName]) {
@@ -477,7 +504,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           total_order_value: data.total_order_value,
           total_kg: Math.round(data.total_kg * 100) / 100 
         }))
-        .sort((a, b) => b.total_kg - a.total_kg);
+        .sort((a, b) => (b.total_kg - a.total_kg) || (b.total_order_value - a.total_order_value));
 
       setSummaryData(summaryArray);
       setSelectedUserDetails(null);
@@ -528,7 +555,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       const userId = userProfile.id;
 
       // Fetch all data in parallel using the user's SQL query logic
-      const [retailersResult, beatsResult, ordersResult, productRevenueResult, productivityResult] = await Promise.all([
+      const [retailersResult, beatsResult, ordersResult, productivityResult] = await Promise.all([
         // Retailers created by user in date range
         supabase
           .from('retailers')
@@ -562,13 +589,6 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           .lte('order_date', toDate)
           .order('order_date', { ascending: true }),
         
-        // Use the same RPC as Product and Revenue Performance report
-        (supabase as any).rpc('get_product_revenue_performance', {
-          user_full_name: userName,
-          start_date: fromDate,
-          end_date: toDate
-        }),
-        
         // Get productivity summary using the RPC
         (supabase as any).rpc('get_productivity_summary', {
           user_full_name: userName,
@@ -580,21 +600,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       // Get beats count from beats table
       const totalBeatsCreated = beatsResult.count || 0;
 
-      // Calculate products and total KG from the RPC result (same logic as SQL Report)
-      const productData = productRevenueResult.data || [];
-      const totalProductsSold = productData.length; // Count of distinct products
-      let totalQuantityKgFromRpc = 0;
-      
-      productData.forEach((row: any) => {
-        const qty = Number(row.quantity_sold || 0);
-        const unit = (row.unit || '').toLowerCase();
-        // Same conversion logic as Analytics.tsx line 2391-2393
-        if (unit === 'grams') {
-          totalQuantityKgFromRpc += qty / 1000;
-        } else {
-          totalQuantityKgFromRpc += qty;
-        }
-      });
+      // Quantity is calculated from order_items DB units. Grams/Gram/G display as KG.
 
       // Calculate Overall Productivity % (productive / planned) using beat_plans
       const productivityData = productivityResult.data || [];
@@ -718,17 +724,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
             allProducts.add(item.product_id);
           }
           
-          const qty = Number(item.quantity || 0);
-          const unit = (item.unit || '').toLowerCase();
-          let kg = 0;
-          
-          // Match SQL logic: if unit is 'Grams', divide by 1000
-          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-            kg = qty / 1000;
-          } else {
-            // For KG or other units, use quantity directly
-            kg = qty;
-          }
+          const kg = toKgQuantity(item.quantity, item.unit);
           
           dateGroups[dateKey].totalKg += kg;
           totalQuantityKg += kg;
@@ -750,9 +746,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       setDetailsSummary({
         retailers: totalRetailersCreated,
         beats: totalBeatsCreated,
-        products: totalProductsSold, // Use RPC result count
-        totalKg: Math.round(totalQuantityKgFromRpc * 100) / 100, // Use RPC calculated KG, round to 2 decimals
-        productivityPercent
+        products: allProducts.size,
+        totalKg: Math.round(totalQuantityKg * 100) / 100,
+        productivityPercent,
+        quantityByUnit: {},
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -814,7 +811,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           retailers: retailersCount || 0,
           beats: beatsCount || 0,
           products: 0,
-          totalKg: 0
+          totalKg: 0,
+          quantityByUnit: {},
         });
         return;
       }
@@ -824,6 +822,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       const BATCH_SIZE = 200;
       const productSet = new Set<string>();
       let totalKg = 0;
+      const quantityByUnit: { [unit: string]: number } = {};
 
       for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
         const batchIds = orderIds.slice(i, i + BATCH_SIZE);
@@ -842,10 +841,16 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
             productSet.add(item.product_name);
           }
           const qty = Number(item.quantity || 0);
-          const unit = (item.unit || '').toLowerCase().trim();
-          if (unit === 'kg' || unit.includes('kilo')) {
+          const unit = (item.unit || 'Unknown').trim();
+          
+          // Track quantity by actual unit
+          quantityByUnit[unit] = (quantityByUnit[unit] || 0) + qty;
+          
+          // Also calculate KG for backward compatibility
+          const unitLower = unit.toLowerCase();
+          if (unitLower === 'kg' || unitLower.includes('kilo')) {
             totalKg += qty;
-          } else if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+          } else if (unitLower === 'grams' || unitLower === 'gram' || unitLower === 'g') {
             totalKg += qty / 1000;
           }
           // Ignore pieces/pcs - not included in KG calculation
@@ -856,7 +861,8 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         retailers: retailersCount || 0,
         beats: beatsCount || 0,
         products: productSet.size,
-        totalKg: Math.round(totalKg * 100) / 100
+        totalKg: Math.round(totalKg * 100) / 100,
+        quantityByUnit
       });
     } catch (error) {
       console.error('Error fetching all users summary:', error);
@@ -1012,19 +1018,27 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         .select(`
           id,
           retailer_id,
+          beat_id,
+          beat_name_snapshot,
           total_amount,
-          retailers!inner(id, beat_name)
+          retailers(id, beat_name)
         `)
         .eq('user_id', userProfile.id)
         .eq('status', 'confirmed')
-        .gte('created_at', `${fromDate}T00:00:00`)
-        .lt('created_at', `${nextDay}T00:00:00`);
+        .gte('order_date', fromDate)
+        .lte('order_date', toDate);
 
       if (ordersError || !orders || orders.length === 0) {
         setOrderDetailsBeatBreakdown([]);
         setOrderDetailsBeatLoading(false);
         return;
       }
+
+      const orderBeatIds = [...new Set((orders || []).map((order: any) => order.beat_id).filter(Boolean))];
+      const { data: beats } = orderBeatIds.length > 0
+        ? await supabase.from('beats').select('beat_id, beat_name').in('beat_id', orderBeatIds)
+        : { data: [] as any[] };
+      const beatNameById = new Map((beats || []).map((beat: any) => [beat.beat_id, beat.beat_name]));
 
       // Group by beat_name and calculate: order_count, total_retailers, total_value
       const beatGroups: Record<string, { 
@@ -1034,7 +1048,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       }> = {};
       
       orders.forEach((order: any) => {
-        const beatName = order.retailers?.beat_name || 'Unassigned';
+        const beatName = order.beat_name_snapshot || beatNameById.get(order.beat_id) || order.retailers?.beat_name || 'Unassigned';
         const retailerId = order.retailers?.id || order.retailer_id;
         // Use total_amount directly (includes taxes and charges)
         const orderTotal = Number(order.total_amount || 0);
@@ -1126,12 +1140,12 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
     // Fetch orders with order_items for confirmed orders
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
-      .select('id, created_at')
+      .select('id, order_date, total_amount')
       .eq('user_id', userProfile.id)
       .eq('status', 'confirmed')
-      .gte('created_at', `${fromDate}T00:00:00`)
-      .lt('created_at', `${format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd')}T00:00:00`)
-      .order('created_at', { ascending: true });
+      .gte('order_date', fromDate)
+      .lte('order_date', toDate)
+      .order('order_date', { ascending: true });
 
     if (ordersError || !orders || orders.length === 0) {
       setProductKgList([]);
@@ -1151,16 +1165,23 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       return;
     }
 
-    // Create a map of order_id to created_at date
+    // Create a map of order_id to order_date and revenue from the order header
     const orderDateMap: Record<string, string> = {};
     orders.forEach(o => {
-      orderDateMap[o.id] = format(new Date(o.created_at), 'yyyy-MM-dd');
+      orderDateMap[o.id] = o.order_date;
     });
 
     // Group by date
     const dateGroups: Record<string, { quantity_kg: number; revenue: number }> = {};
     let grandTotalKg = 0;
-    let grandTotalRevenue = 0;
+    let grandTotalRevenue = orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+    orders.forEach(o => {
+      if (!dateGroups[o.order_date]) {
+        dateGroups[o.order_date] = { quantity_kg: 0, revenue: 0 };
+      }
+      dateGroups[o.order_date].revenue += Number(o.total_amount || 0);
+    });
 
     orderItems.forEach(item => {
       const dateKey = orderDateMap[item.order_id];
@@ -1170,20 +1191,10 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         dateGroups[dateKey] = { quantity_kg: 0, revenue: 0 };
       }
 
-      const qty = Number(item.quantity || 0);
-      const unit = (item.unit || '').toLowerCase();
-      let kg = 0;
-
-      if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-        kg = qty / 1000;
-      } else {
-        kg = qty;
-      }
+      const kg = toKgQuantity(item.quantity, item.unit);
 
       dateGroups[dateKey].quantity_kg += kg;
-      dateGroups[dateKey].revenue += Number(item.total || 0);
       grandTotalKg += kg;
-      grandTotalRevenue += Number(item.total || 0);
     });
 
     // Convert to array and add total row
@@ -1237,17 +1248,13 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         return;
       }
 
-      // Calculate next day for date range query (matches SQL: created_at < date + 1 day)
-      const nextDay = format(new Date(new Date(rawDate).getTime() + 86400000), 'yyyy-MM-dd');
-
       // Fetch orders for that specific date
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('id')
         .eq('user_id', userProfile.id)
         .eq('status', 'confirmed')
-        .gte('created_at', `${rawDate}T00:00:00`)
-        .lt('created_at', `${nextDay}T00:00:00`);
+        .eq('order_date', rawDate);
 
       if (ordersError || !orders || orders.length === 0) {
         setProductDayDetails([]);
@@ -1269,7 +1276,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         return;
       }
 
-      // Group by product_name and convert to KG (matching SQL query)
+      // Group by product_name and show stored weight quantities as KG.
       const productGroups: Record<string, { 
         product_name: string; 
         quantity: number; 
@@ -1289,27 +1296,12 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
           };
         }
 
-        // Convert Grams to KG, otherwise use quantity directly (matching SQL: CASE WHEN unit = 'Grams' THEN quantity / 1000.0 ELSE quantity END)
-        const qty = Number(item.quantity || 0);
-        const unit = (item.unit || '').toLowerCase();
-        let kgQty = 0;
-        
-        if (unit === 'grams' || unit === 'gram' || unit === 'g') {
-          kgQty = qty / 1000;
-        } else {
-          kgQty = qty;
-        }
-
-        productGroups[productName].quantity += kgQty;
+        productGroups[productName].quantity += toKgQuantity(item.quantity, item.unit);
         productGroups[productName].total += Number(item.total || 0);
       });
 
-      // Round to 2 decimal places and sort by revenue DESC
+      // Sort by revenue DESC (quantity is now item count, no decimals needed)
       const productArray = Object.values(productGroups)
-        .map(p => ({
-          ...p,
-          quantity: Math.round(p.quantity * 100) / 100
-        }))
         .sort((a, b) => b.total - a.total);
 
       setProductDayDetails(productArray);
@@ -1341,33 +1333,38 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         return;
       }
 
-      // Calculate next day for date range query
-      const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
-
       // Fetch orders with retailer beat info and total_amount
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
           retailer_id,
+          beat_id,
+          beat_name_snapshot,
           total_amount,
-          retailers!inner(beat_name, beat_id)
+          retailers(beat_name, beat_id)
         `)
         .eq('user_id', userProfile.id)
         .eq('status', 'confirmed')
-        .gte('created_at', `${fromDate}T00:00:00`)
-        .lt('created_at', `${nextDay}T00:00:00`);
+        .gte('order_date', fromDate)
+        .lte('order_date', toDate);
 
       if (ordersError || !orders || orders.length === 0) {
         setBeatBreakdownData([]);
         return;
       }
 
+      const orderBeatIds = [...new Set((orders || []).map((order: any) => order.beat_id).filter(Boolean))];
+      const { data: beats } = orderBeatIds.length > 0
+        ? await supabase.from('beats').select('beat_id, beat_name').in('beat_id', orderBeatIds)
+        : { data: [] as any[] };
+      const beatNameById = new Map((beats || []).map((beat: any) => [beat.beat_id, beat.beat_name]));
+
       // Group by beat_name and calculate totals using total_amount directly
       const beatTotals: Record<string, { total_value: number; order_count: number }> = {};
       
       orders.forEach((order: any) => {
-        const beatName = order.retailers?.beat_name || 'Unassigned';
+        const beatName = order.beat_name_snapshot || beatNameById.get(order.beat_id) || order.retailers?.beat_name || 'Unassigned';
         // Use total_amount directly (includes taxes and charges)
         const orderTotal = Number(order.total_amount || 0);
         
@@ -1438,31 +1435,36 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         return;
       }
 
-      // Calculate next day for date range query
-      const nextDay = format(new Date(new Date(toDate).getTime() + 86400000), 'yyyy-MM-dd');
-
       // Fetch orders with retailer info and total_amount for this beat
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select(`
           id,
           retailer_id,
+          beat_id,
+          beat_name_snapshot,
           total_amount,
-          retailers!inner(id, name, beat_name)
+          retailers(id, name, beat_name)
         `)
         .eq('user_id', userProfile.id)
         .eq('status', 'confirmed')
-        .gte('created_at', `${fromDate}T00:00:00`)
-        .lt('created_at', `${nextDay}T00:00:00`);
+        .gte('order_date', fromDate)
+        .lte('order_date', toDate);
 
       if (ordersError || !orders || orders.length === 0) {
         setRetailerDetailsData([]);
         return;
       }
 
+      const orderBeatIds = [...new Set((orders || []).map((order: any) => order.beat_id).filter(Boolean))];
+      const { data: beats } = orderBeatIds.length > 0
+        ? await supabase.from('beats').select('beat_id, beat_name').in('beat_id', orderBeatIds)
+        : { data: [] as any[] };
+      const beatNameById = new Map((beats || []).map((beat: any) => [beat.beat_id, beat.beat_name]));
+
       // Filter orders for this specific beat
       const beatOrders = orders.filter((order: any) => {
-        const orderBeatName = order.retailers?.beat_name || 'Unassigned';
+        const orderBeatName = order.beat_name_snapshot || beatNameById.get(order.beat_id) || order.retailers?.beat_name || 'Unassigned';
         return orderBeatName === beatName;
       });
 
@@ -1564,7 +1566,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       pdf.setTextColor(100, 100, 100);
       pdf.text(`Period: ${format(dateRange.from, 'MMM dd, yyyy')} – ${format(dateRange.to, 'MMM dd, yyyy')}`, margin, y);
       y += 14;
-      const userFilterText = selectedUserIds.length === 0
+      const userFilterText = selectedUsers.length === 0
         ? 'All Users'
         : selectedUsers.length <= 5
           ? selectedUsers.join(', ')
@@ -1575,8 +1577,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       // --- Section 1: Business Summary ---
       addSectionHeader('Business Summary');
       addKeyValue('Total Order Value', `₹${businessSummary.totalRevenue.toLocaleString()}`);
-      addKeyValue('Total Quantity (KG)', `${businessSummary.totalKg.toLocaleString()} KG`);
-      addKeyValue('Total Pieces', businessSummary.totalPieces.toLocaleString());
+      addKeyValue('Total Quantity (KG)', formatKg(businessSummary.totalKg));
       addKeyValue('Total Orders', businessSummary.totalOrders.toLocaleString());
       addKeyValue('Total Beats', businessSummary.totalBeats.toLocaleString());
       addKeyValue('Total Retailers', businessSummary.totalRetailers.toLocaleString());
@@ -1613,37 +1614,49 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
-      // Fetch SKU data for all selected users
-      const skuAllData: { product_name: string; unit: string; quantity_sold: number; revenue: number }[] = [];
-      const userNamesForSku = selectedUsers.length > 0 ? selectedUsers : summaryData.map(u => u.full_name);
+      // Get selected user IDs
+      const selectedUserIds = selectedUsers.length > 0 
+        ? summaryData.filter(u => selectedUsers.includes(u.full_name)).map(u => u.user_id)
+        : summaryData.map(u => u.user_id);
 
-      // Batch RPC calls
-      const skuPromises = userNamesForSku.map(name =>
-        (supabase as any).rpc('get_product_revenue_performance', {
-          user_full_name: name,
-          start_date: fromDate,
-          end_date: toDate
-        })
-      );
-      const skuResults = await Promise.all(skuPromises);
-      
-      // Aggregate SKU data across users
-      const skuMap = new Map<string, { unit: string; quantity_sold: number; revenue: number }>();
-      skuResults.forEach(({ data }: any) => {
-        if (data) {
-          (data as any[]).forEach((row: any) => {
-            const key = `${row.product_name}||${row.unit}`;
-            const existing = skuMap.get(key);
-            if (existing) {
-              existing.quantity_sold += Number(row.quantity_sold || 0);
-              existing.revenue += Number(row.revenue || 0);
-            } else {
-              skuMap.set(key, {
-                unit: row.unit || '',
-                quantity_sold: Number(row.quantity_sold || 0),
-                revenue: Number(row.revenue || 0)
-              });
-            }
+      // Step 1: Fetch orders for selected users and date range
+      let ordersQuery = supabase
+        .from('orders')
+        .select('id')
+        .gte('order_date', fromDate)
+        .lte('order_date', toDate)
+        .eq('status', 'confirmed');
+
+      if (selectedUserIds.length > 0) {
+        ordersQuery = ordersQuery.in('user_id', selectedUserIds);
+      }
+
+      const { data: orders = [] } = await ordersQuery;
+      const orderIds = orders.map((o: any) => o.id);
+
+      // Step 2: Fetch order_items for these orders
+      let allOrderItems: any[] = [];
+      if (orderIds.length > 0) {
+        const { data: items = [] } = await supabase
+          .from('order_items')
+          .select('product_name, quantity, unit, total')
+          .in('order_id', orderIds);
+        allOrderItems = items;
+      }
+
+      // Group by product and show stored weight quantities as KG.
+      const skuMap = new Map<string, { unit: string; quantityKg: number; revenue: number }>();
+      allOrderItems.forEach((item: any) => {
+        const key = `${item.product_name}||KG`;
+        const existing = skuMap.get(key);
+        if (existing) {
+          existing.quantityKg += toKgQuantity(item.quantity, item.unit);
+          existing.revenue += Number(item.total || 0);
+        } else {
+          skuMap.set(key, {
+            unit: 'KG',
+            quantityKg: toKgQuantity(item.quantity, item.unit),
+            revenue: Number(item.total || 0)
           });
         }
       });
@@ -1653,7 +1666,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
         .map(([key, v]) => [
           key.split('||')[0],
           v.unit,
-          v.quantity_sold.toLocaleString(),
+          v.quantityKg.toLocaleString(undefined, { maximumFractionDigits: 2 }),
           `₹${v.revenue.toLocaleString()}`
         ]);
 
@@ -1929,15 +1942,15 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
                <div>
                  <p className="text-[10px] md:text-sm opacity-90">Total Quantity</p>
                  <p className="text-xl md:text-3xl lg:text-4xl font-bold">
-                   {businessSummary.totalKg.toFixed(1)} KG
+                    {businessSummary.totalOrders > 0 ? formatKg(businessSummary.totalKg) : 'No Data'}
                  </p>
                  <p className="text-[8px] md:text-xs opacity-75 mt-0.5 md:mt-1">
                    {format(dateRange.from, 'MMM dd')} - {format(dateRange.to, 'MMM dd, yyyy')}
                  </p>
                </div>
                <div className="md:text-right space-y-0.5 md:space-y-1 mt-1 md:mt-0">
-                 {businessSummary.totalPieces > 0 && (
-                   <p className="text-[9px] md:text-sm opacity-90">+ {businessSummary.totalPieces} pcs</p>
+                  {businessSummary.totalOrders > 0 && (
+                    <p className="text-[9px] md:text-sm opacity-90">{businessSummary.totalOrders} confirmed orders</p>
                  )}
                  <p className="text-[9px] md:text-sm opacity-90">{businessSummary.totalBeats} Beats</p>
                </div>
@@ -2205,7 +2218,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
                                 </div>
                               </td>
                               <td className={cn("text-right font-semibold text-primary align-middle whitespace-nowrap", isMobile ? "py-0.5 px-2" : "p-4")}>
-                                {row.total_kg.toLocaleString()}
+                                {formatKg(row.total_kg)}
                               </td>
                               <td className={cn("text-right font-semibold align-middle whitespace-nowrap", isMobile ? "py-0.5 px-2" : "p-4")}>
                                 ₹{row.total_order_value.toLocaleString()}
@@ -2561,7 +2574,7 @@ export const SupervisorReport = ({ users, selectedUserIds, dateRange, isScopeRea
                         <Scale className="h-3 w-3 sm:h-4 sm:w-4" />
                         Total KG
                       </div>
-                      <div className="text-sm sm:text-2xl font-bold">{detailsSummary.totalKg.toFixed(1)}</div>
+                      <div className="text-sm sm:text-2xl font-bold">{formatKg(detailsSummary.totalKg)}</div>
                     </Card>
                     <Card 
                       className="p-1.5 sm:p-4 cursor-pointer transition-colors hover:bg-muted/50"

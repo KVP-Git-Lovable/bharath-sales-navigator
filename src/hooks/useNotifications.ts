@@ -12,16 +12,19 @@ export interface Notification {
   created_at: string;
   related_table: string | null;
   related_id: string | null;
+  metadata?: Record<string, any> | null;
 }
 
 export function useNotifications() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [pendingBanner, setPendingBanner] = useState<Notification | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.id) {
       setNotifications([]);
+      setPendingBanner(null);
       setIsLoading(false);
       return;
     }
@@ -32,6 +35,7 @@ export function useNotifications() {
         .select('*')
         .eq('user_id', user.id)
         .eq('is_read', false)
+        .or('target_portal.is.null,target_portal.eq.field_sales_app')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -40,7 +44,11 @@ export function useNotifications() {
         return;
       }
 
-      setNotifications(data || []);
+      const all = (data || []) as Notification[];
+      const banners = all.filter(n => n.type === 'leaderboard_banner');
+      const rest = all.filter(n => n.type !== 'leaderboard_banner');
+      setNotifications(rest);
+      setPendingBanner(banners[0] ?? null);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -63,7 +71,6 @@ export function useNotifications() {
         return;
       }
 
-      // Remove the notification from the list
       setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (error) {
       console.error('Error marking notification as read:', error);
@@ -85,10 +92,29 @@ export function useNotifications() {
         return;
       }
 
-      // Remove all notifications from the list
       setNotifications([]);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+    }
+  }, [user?.id]);
+
+  const dismissBanner = useCallback(async () => {
+    setPendingBanner(null);
+    if (!user?.id) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user.id)
+        .eq('type', 'leaderboard_banner')
+        .eq('is_read', false)
+        .or('target_portal.is.null,target_portal.eq.field_sales_app');
+
+      if (error) {
+        console.error('Error dismissing banner:', error);
+      }
+    } catch (e) {
+      console.error('Error dismissing banner:', e);
     }
   }, [user?.id]);
 
@@ -98,12 +124,12 @@ export function useNotifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Set up real-time subscription for new notifications
+  // Real-time subscription
   useEffect(() => {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('notifications-changes')
+      .channel(`notifications-changes-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -113,7 +139,12 @@ export function useNotifications() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          setNotifications(prev => [payload.new as Notification, ...prev]);
+          const n = payload.new as Notification;
+          if (n.type === 'leaderboard_banner') {
+            setPendingBanner(n);
+          } else {
+            setNotifications(prev => [n, ...prev]);
+          }
         }
       )
       .subscribe();
@@ -129,6 +160,8 @@ export function useNotifications() {
     isLoading,
     markAsRead,
     markAllAsRead,
+    pendingBanner,
+    dismissBanner,
     refetch: fetchNotifications,
   };
 }

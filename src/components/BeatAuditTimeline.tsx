@@ -30,7 +30,6 @@ const actionConfig: Record<string, { icon: React.ElementType; label: string; col
   deactivate: { icon: Power, label: "Deactivated", color: "text-orange-600" },
   reassign: { icon: UserPlus, label: "Reassigned", color: "text-purple-600" },
   unassign: { icon: Unlink, label: "Unassigned retailers", color: "text-amber-600" },
-  external_delete: { icon: Trash2, label: "Deleted externally", color: "text-destructive" },
 };
 
 export const BeatAuditTimeline = ({ beatId }: BeatAuditTimelineProps) => {
@@ -52,28 +51,6 @@ export const BeatAuditTimeline = ({ beatId }: BeatAuditTimelineProps) => {
 
         const logs = (data || []) as any[];
 
-        // Fallback: pull external/destructive deletions (Supabase dashboard, SQL, service role)
-        const { data: destructive } = await supabase
-          .from("destructive_audit_log" as any)
-          .select("id, row_pk, row_data, application_name, db_user, occurred_at")
-          .eq("table_name", "beats")
-          .or(`row_pk.eq.${beatId},row_pk.eq.${(logs[0] as any)?.beat_id || beatId}`);
-
-        const externalEntries: any[] = ((destructive as any[]) || []).map((d) => ({
-          id: `ext-${d.id}`,
-          beat_id: beatId,
-          action: "external_delete",
-          old_user_id: null,
-          new_user_id: null,
-          performed_by: null,
-          created_at: d.occurred_at,
-          metadata: {
-            application_name: d.application_name,
-            db_user: d.db_user,
-            row_data: d.row_data,
-          },
-        }));
-
         // Fetch profile names for all user IDs
         const userIds = new Set<string>();
         logs.forEach((l) => {
@@ -92,18 +69,14 @@ export const BeatAuditTimeline = ({ beatId }: BeatAuditTimelineProps) => {
           profiles?.forEach((p) => profileMap.set(p.id, p.full_name || "Unknown"));
         }
 
-        const merged = [...logs, ...externalEntries]
-          .map((l: any) => ({
+        setEntries(
+          logs.map((l) => ({
             ...l,
-            performer_name: l.performed_by
-              ? profileMap.get(l.performed_by) || "Unknown"
-              : `${l.metadata?.application_name || "external"} (${l.metadata?.db_user || "system"})`,
+            performer_name: profileMap.get(l.performed_by) || "Unknown",
             old_user_name: l.old_user_id ? profileMap.get(l.old_user_id) : null,
             new_user_name: l.new_user_id ? profileMap.get(l.new_user_id) : null,
           }))
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-        setEntries(merged);
+        );
       } catch (error) {
         console.error("Error fetching audit log:", error);
       } finally {
@@ -128,8 +101,6 @@ export const BeatAuditTimeline = ({ beatId }: BeatAuditTimelineProps) => {
         return `Beat deleted (${entry.metadata?.delete_option || "unknown"} option)`;
       case "create":
         return "Beat created";
-      case "external_delete":
-        return `Hard-deleted from ${entry.metadata?.application_name || "external source"} (db user: ${entry.metadata?.db_user || "unknown"})`;
       default:
         return entry.action;
     }

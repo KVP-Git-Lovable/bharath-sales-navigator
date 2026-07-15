@@ -41,6 +41,7 @@ import {
 } from "@/components/analytics";
 import { RetailerMonthlyProductivitySection } from "@/components/analytics/RetailerMonthlyProductivitySection";
 import { SupervisorReport } from "@/components/analytics/SupervisorReport";
+import { FieldActivitySection } from "@/components/analytics/FieldActivitySection";
 import { CoverageMapSection } from "@/components/analytics/CoverageMapSection";
 import { useSubordinates } from "@/hooks/useSubordinates";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,6 +63,7 @@ const Analytics = () => {
   const showProductivityTab = canShowTab('analytics_business_summary');
   const showTargetTab = canShowTab('analytics_order_details');
   const showProductsTab = canShowTab('analytics_product_breakdown');
+  const showFieldActivityTab = hasSecurityProfile && hasFeaturePermission('analytics_field_activity', 'can_read');
   
   const { subordinateIds, isLoading: subordinatesLoading } = useSubordinates();
   const [hasLiked, setHasLiked] = useState(false);
@@ -706,7 +708,7 @@ const Analytics = () => {
 
       const { data: orders } = await supabase
         .from('orders')
-        .select('*, order_items(*)')
+        .select('*, order_items!order_items_order_id_fkey(*)')
         .eq('user_id', user.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
@@ -1177,14 +1179,6 @@ const Analytics = () => {
           <div className="relative p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate(-1)}
-                  className="text-primary-foreground hover:bg-primary-foreground/20"
-                >
-                  <ArrowLeft size={20} />
-                </Button>
                 <div>
                   <h1 className="text-2xl font-bold">Analytics & Insights</h1>
                   <p className="text-primary-foreground/80 text-sm">Real-time business analytics</p>
@@ -1615,6 +1609,7 @@ const Analytics = () => {
                   {showTargetTab && <TabsTrigger value="kpi" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Target</TabsTrigger>}
                   {/* Calendar tab hidden per user request */}
                   {showProductsTab && <TabsTrigger value="products" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Products</TabsTrigger>}
+                  {showFieldActivityTab && <TabsTrigger value="field-activity" className="text-xs sm:text-sm px-2 sm:px-3 whitespace-nowrap">Field Activity</TabsTrigger>}
                   {/* Coverage tab hidden per user request */}
                 </TabsList>
               </div>
@@ -1833,7 +1828,19 @@ const Analytics = () => {
                 isScopeReady={isScopeReady}
               />
             </TabsContent>
+
+            {/* Field Activity Tab */}
+            {showFieldActivityTab && (
+              <TabsContent value="field-activity" className="space-y-4">
+                <FieldActivitySection
+                  userIds={effectiveUserIds}
+                  dateRange={stableDashboardDateRange}
+                  isScopeReady={isScopeReady}
+                />
+              </TabsContent>
+            )}
           </Tabs>
+
 
           {/* Detail Dialogs */}
           <BeatDetailsDialog

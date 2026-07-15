@@ -4,6 +4,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useConnectivity } from './useConnectivity';
 import { toast } from './use-toast';
 import { isSlowConnection } from '@/utils/internetSpeedCheck';
+import { addRetailerToSnapshot, updateBeatPlanInSnapshot } from '@/lib/myVisitsSnapshot';
+import { getLocalTodayDate } from '@/utils/dateUtils';
+
+const stripRetailerClientFields = (payload: any) => {
+  const clientOnlyFields = new Set([
+    'quality_status',
+    'verification_status',
+    'syncState',
+    'lastError',
+    'errorType',
+    '_synced',
+    'cached_at',
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(payload || {}).filter(([key, value]) => !clientOnlyFields.has(key) && value !== undefined)
+  );
+};
 
 /**
  * Hook for managing retailers with offline support
@@ -35,6 +53,29 @@ export function useOfflineRetailers() {
       // Save to local cache immediately
       await offlineStorage.save(STORES.RETAILERS, localRetailer);
 
+      try {
+        const uid = localRetailer.user_id;
+        const beatId = localRetailer.beat_id;
+        if (uid && beatId && beatId !== 'unassigned') {
+          const today = getLocalTodayDate();
+          const cachedBeatPlans = await offlineStorage.getAll<any>(STORES.BEAT_PLANS);
+          const todaysPlan = cachedBeatPlans.find((bp: any) =>
+            bp.user_id === uid && bp.plan_date === today && bp.beat_id === beatId);
+          if (todaysPlan) {
+            const beatData = todaysPlan.beat_data || {};
+            const ids = Array.isArray(beatData.retailer_ids) ? beatData.retailer_ids : [];
+            if (!ids.includes(localRetailer.id)) {
+              const updatedPlan = { ...todaysPlan,
+                beat_data: { ...beatData, retailer_ids: [...ids, localRetailer.id] },
+                updated_at: new Date().toISOString() };
+              await offlineStorage.save(STORES.BEAT_PLANS, updatedPlan);
+              await updateBeatPlanInSnapshot(uid, today, updatedPlan);
+            }
+          }
+          await addRetailerToSnapshot(uid, today, localRetailer);
+        }
+      } catch (e) { console.error('[createRetailer] join-to-today failed:', e); }
+
       // Dispatch retailerAdded event immediately for instant UI update
       window.dispatchEvent(new CustomEvent('retailerAdded', { 
         detail: { retailer: localRetailer } 
@@ -55,30 +96,25 @@ export function useOfflineRetailers() {
         return { success: true, offline: true, data: localRetailer };
       }
 
-      // STEP 3: Online with good connection - sync in background (non-blocking)
-      setTimeout(async () => {
-        try {
-          const { data, error } = await supabase
-            .from('retailers')
-            .insert({ ...retailerData, id: retailerId })
-            .select()
-            .single();
+      // STEP 3: Online with good connection - persist before returning so post-save WhatsApp can find the retailer
+      const sanitizedData = stripRetailerClientFields(retailerData);
+      const { data, error } = await supabase
+        .from('retailers')
+        .insert({ ...sanitizedData, id: retailerId })
+        .select()
+        .maybeSingle();
 
-          if (error) {
-            console.warn('Background sync failed, queuing:', error.message);
-            await offlineStorage.addToSyncQueue('CREATE_RETAILER', localRetailer);
-          } else {
-            // Update cache with server response
-            await offlineStorage.save(STORES.RETAILERS, data);
-            console.log('✅ Retailer synced successfully:', retailerId);
-          }
-        } catch (syncError) {
-          console.warn('Background sync error:', syncError);
-          await offlineStorage.addToSyncQueue('CREATE_RETAILER', localRetailer);
-        }
-      }, 0);
+      if (error) {
+        console.warn('Retailer sync failed, queuing:', error.message);
+        await offlineStorage.addToSyncQueue('CREATE_RETAILER', localRetailer);
+        return { success: true, offline: true, data: localRetailer };
+      }
 
-      return { success: true, offline: false, data: localRetailer };
+      // Update cache with server response
+      if (data) await offlineStorage.save(STORES.RETAILERS, data);
+      console.log('✅ Retailer synced successfully:', retailerId);
+
+      return { success: true, offline: false, data: data || localRetailer };
     } catch (error: any) {
       console.error('Error creating retailer:', error);
       toast({
@@ -136,9 +172,12 @@ export function useOfflineRetailers() {
       // STEP 4: Sync in background (non-blocking)
       setTimeout(async () => {
         try {
+          // Sanitize updates - remove non-existent columns
+          const { quality_status, verification_status, ...sanitizedUpdates } = updates;
+          
           const { data, error } = await supabase
             .from('retailers')
-            .update(updates)
+            .update(sanitizedUpdates)
             .eq('id', retailerId)
             .select()
             .single();
@@ -183,20 +222,61 @@ export function useOfflineRetailers() {
       setLoading(true);
 
       if (isOnline) {
-        // Online: Fetch from server and cache
-        const { data, error } = await supabase
-          .from('retailers')
-          .select('*')
-          .order('name');
+        const { data: { user } } = await supabase.auth.getUser();
+        const userId = user?.id;
 
-        if (error) throw error;
+        // Own retailers
+        const ownQuery = userId
+          ? supabase.from('retailers').select('*')
+              // RLS handles access - includes owned + shared beat retailers
+              // Old: .eq('user_id', userId) -- was missing shared beat retailers
+          : supabase.from('retailers').select('*');
 
-        // Update cache (single merge write)
-        if (data) {
-          await offlineStorage.mergeData(STORES.RETAILERS, data as any);
+        // Accessible (shared) beats via beat_user_access
+        const nowIso = new Date().toISOString();
+        const accessQuery = userId
+          ? supabase
+              .from('beat_user_access')
+              .select('beat_id')
+              .eq('user_id', userId)
+              .eq('is_active', true)
+              .or(`effective_to.is.null,effective_to.gt.${nowIso}`)
+          : Promise.resolve({ data: [] as any[], error: null });
+
+        const [ownRes, accessRes] = await Promise.all([ownQuery, accessQuery as any]);
+
+        if (ownRes.error) throw ownRes.error;
+        const ownRetailers = ownRes.data || [];
+
+        let sharedRetailers: any[] = [];
+        if (accessRes && !accessRes.error && Array.isArray(accessRes.data) && accessRes.data.length > 0) {
+          const beatIds = accessRes.data.map((b: any) => b.beat_id).filter(Boolean);
+          if (beatIds.length > 0 && userId) {
+            const { data: shared, error: sharedErr } = await supabase
+              .from('retailers')
+              .select('*')
+              .in('beat_id', beatIds)
+              .neq('user_id', userId);
+            if (sharedErr) {
+              console.warn('Failed to fetch shared-beat retailers:', sharedErr.message);
+            } else {
+              sharedRetailers = shared || [];
+            }
+          }
+        } else if (accessRes?.error) {
+          console.warn('beat_user_access lookup failed, using own retailers only:', accessRes.error.message);
         }
 
-        return { success: true, data: data || [] };
+        // Merge + dedupe by id
+        const merged = Array.from(
+          new Map([...ownRetailers, ...sharedRetailers].map((r: any) => [r.id, r])).values()
+        ).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+
+        if (merged.length > 0) {
+          await offlineStorage.mergeData(STORES.RETAILERS, merged as any);
+        }
+
+        return { success: true, data: merged };
       } else {
         // Offline: Load from cache
         const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
@@ -256,25 +336,27 @@ export function useOfflineRetailers() {
       setLoading(true);
 
       if (isOnline) {
-        // Online: Delete directly
-        const { error } = await supabase
-          .from('retailers')
-          .delete()
-          .eq('id', retailerId);
+        // Online: route through the safe guard so retailers with history are deactivated instead of destroyed.
+        const { deactivateOrDeleteRetailer } = await import("@/utils/safeRetailerBeatDelete");
+        const res = await deactivateOrDeleteRetailer(retailerId);
 
-        if (error) throw error;
+        if (res.action === "failed") {
+          return { success: false, offline: false };
+        }
 
-        // Remove from cache
-        await offlineStorage.delete(STORES.RETAILERS, retailerId);
+        // Keep local cache in sync
+        if (res.action === "deleted") {
+          await offlineStorage.delete(STORES.RETAILERS, retailerId);
+        } else {
+          const cached: any = await offlineStorage.getById(STORES.RETAILERS, retailerId);
+          if (cached) {
+            await offlineStorage.save(STORES.RETAILERS, { ...cached, status: "inactive" });
+          }
+        }
 
-        toast({
-          title: "Retailer Deleted",
-          description: "Retailer has been deleted successfully.",
-        });
-
-        return { success: true, offline: false };
+        return { success: true, offline: false, action: res.action };
       } else {
-        // Offline: Queue for sync
+        // Offline: queue for sync (the queue handler applies the same guard on flush).
         await offlineStorage.delete(STORES.RETAILERS, retailerId);
         await offlineStorage.addToSyncQueue('DELETE_RETAILER', { id: retailerId });
 

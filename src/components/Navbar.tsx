@@ -66,6 +66,7 @@ import {
   Truck,
   FolderKanban,
   HelpCircle,
+  CalendarDays,
 } from "lucide-react";
 
 // Memoized Navbar component for better performance
@@ -96,6 +97,8 @@ export const Navbar = memo(() => {
     const baseItems: NavItem[] = [
       { id: 'attendance', icon: UserCheck, label: t('nav.attendance'), href: "/attendance", color: "from-blue-500 to-blue-600" },
       { id: 'my-visit', icon: Car, label: t('nav.myVisit'), href: "/visits/retailers", color: "from-green-500 to-green-600" },
+      { id: 'counter', icon: Store, label: t('nav.counter'), href: "/counter-sales", color: "from-orange-500 to-orange-600" },
+      { id: 'event', icon: CalendarDays, label: t('nav.event'), href: "/event-create", color: "from-pink-500 to-pink-600" },
       { id: 'all-retailers', icon: Store, label: t('nav.allRetailers'), href: "/my-retailers", color: "from-emerald-500 to-emerald-600" },
       { id: 'my-target', icon: Target, label: t('nav.target'), href: "/my-target", color: "from-cyan-500 to-cyan-600" },
       { id: 'performance', icon: TrendingUp, label: t('nav.targetVsActual'), href: "/performance-dashboard", color: "from-emerald-500 to-emerald-600" },
@@ -157,6 +160,11 @@ export const Navbar = memo(() => {
   // Admin-only navigation items
   const adminNavigationItems = [
     { icon: Shield, label: t('nav.adminControls'), href: "/admin-controls", color: "from-emerald-500 to-emerald-600" },
+    // QA-only: tree-shaken out of production bundles because
+    // import.meta.env.VITE_APP_MODE is statically replaced by Vite.
+    ...(import.meta.env.VITE_APP_MODE === 'qa'
+      ? [{ icon: Shield, label: 'Run Tests (QA)', href: '/qa/run-tests', color: 'from-yellow-500 to-amber-600' }]
+      : []),
   ];
 
   // Get user display name and initials
@@ -196,6 +204,7 @@ export const Navbar = memo(() => {
       {/* Navbar - positioned below safe area top */}
       <nav className="navbar-safe-area bg-gradient-primary text-white shadow-lg z-50">
         <div className="px-4 py-3">
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
             {showBackButton && (
@@ -277,10 +286,10 @@ export const Navbar = memo(() => {
                   <SheetTitle className="text-lg font-bold text-primary-foreground truncate w-full text-left">
                     {displayName}
                   </SheetTitle>
-                  {hasAdminAccess && (
+                  {securityProfileName && (
                     <div className="flex items-center gap-1.5 text-xs opacity-90 text-primary-foreground mt-1">
                       <Shield className="h-3.5 w-3.5" />
-                      <span className="font-medium">Admin</span>
+                      <span className="font-medium">{securityProfileName}</span>
                     </div>
                   )}
                 </div>

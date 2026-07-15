@@ -5,11 +5,46 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { syncOrdersToVanStock, getTodayDateString } from '@/utils/vanStockSync';
 import { visitStatusCache } from '@/lib/visitStatusCache';
-import { classifySyncError, isRetryableError, getBackoffDelay, SLOW_RETRY_THRESHOLD, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
+import { classifySyncError, getBackoffDelay, SLOW_RETRY_THRESHOLD, type SyncErrorType, type SyncLogEntry } from '@/lib/syncErrorClassifier';
+import { enrichWithBeatSnapshots } from '@/utils/offlineOrderUtils';
 // Removed isSlowConnection import - sync should always attempt when online
 
 // Global lock shared across all hook instances to prevent duplicate queue runners
 let globalSyncInProgress = false;
+
+// Dependency-ordered drain priorities: lower drains first, so parents (retailers,
+// beats, visits) always sync before children (orders, invoices, check-out).
+const SYNC_PRIORITY: Record<string, number> = {
+  CREATE_RETAILER: 10, UPDATE_RETAILER: 10,
+  CREATE_BEAT: 20, UPDATE_BEAT: 20, CREATE_BEAT_PLAN: 25, UPDATE_BEAT_PLAN: 25,
+  CREATE_ATTENDANCE: 30, UPDATE_ATTENDANCE: 30,
+  CREATE_VISIT: 40, CHECK_IN: 40,
+  CREATE_ORDER: 50, UPDATE_ORDER: 55, CREATE_COLLECTION: 56,
+  NO_ORDER: 60, UPDATE_VISIT_NO_ORDER: 60, CREATE_VISIT_LOG: 60, UPDATE_VISIT_LOG: 60,
+  CREATE_COMPETITION_DATA: 60, CREATE_STOCK: 60, UPDATE_STOCK: 60,
+  CREATE_RETURN_STOCK: 60, CREATE_EXPENSE: 60,
+  VAN_STOCK_SYNC: 70, CHECK_OUT: 80,
+  UPLOAD_PAYMENT_PROOF: 85, SEND_INVOICE: 90,
+};
+const priorityOf = (a: string) => SYNC_PRIORITY[a] ?? 50;
+
+
+const stripRetailerClientFields = (payload: any) => {
+  const clientOnlyFields = new Set([
+    'quality_status',
+    'verification_status',
+    'syncState',
+    'lastError',
+    'errorType',
+    '_synced',
+    'cached_at',
+    'tempId',
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(payload || {}).filter(([key, value]) => !clientOnlyFields.has(key) && value !== undefined)
+  );
+};
 
 export function useOfflineSync() {
   const connectivityStatus = useConnectivity();
@@ -113,7 +148,38 @@ export function useOfflineSync() {
         return;
       }
 
+      // Drop malformed items up-front so they don't wedge the queue.
+      const malformed: any[] = [];
+      syncQueue = syncQueue.filter((it: any) => {
+        const bad =
+          !it ||
+          typeof it.action !== 'string' ||
+          !it.action.trim() ||
+          it.data === undefined ||
+          it.data === null;
+        if (bad) malformed.push(it);
+        return !bad;
+      });
+      for (const bad of malformed) {
+        console.warn('⚠️ Skipping malformed sync item, removing from queue:', bad);
+        try {
+          if (bad?.id !== undefined && bad?.id !== null) {
+            await offlineStorage.delete(STORES.SYNC_QUEUE, bad.id);
+          }
+        } catch { /* best-effort */ }
+      }
+
+
+      // Dependency-ordered drain: parents (retailers/beats/visits) before
+      // children (orders → collection → check-out → invoice). Stable within a
+      // priority band using the item's insertion timestamp.
+      syncQueue.sort((a: any, b: any) =>
+        priorityOf(a.action) - priorityOf(b.action) ||
+        ((a.timestamp ?? 0) - (b.timestamp ?? 0))
+      );
+
       console.log(`🔄 Processing ${syncQueue.length} queued sync items`);
+
 
       // Helper to log sync attempts
       const logSyncAttempt = async (item: any, success: boolean, errorType?: SyncErrorType, errorMessage?: string) => {
@@ -135,6 +201,51 @@ export function useOfflineSync() {
       };
 
       const verifyQueuedOrderAlreadySynced = async (item: any): Promise<boolean> => {
+        // Generic "confirm-exists-before-retry": for a handful of create actions whose
+        // response may have been lost on a flaky link but which actually committed
+        // server-side, confirm the record exists so we clear the item instead of looping.
+        // Each lookup is wrapped so a failed lookup swallows the error and returns false
+        // (never throws) — only a positive existence check returns true.
+        try {
+          switch (item.action) {
+            case 'CREATE_RETAILER': {
+              const rid = item?.data?.retailer?.id || item?.data?.id;
+              if (rid) {
+                const { data } = await supabase.from('retailers').select('id').eq('id', rid).maybeSingle();
+                if (data?.id) return true;
+              }
+              return false;
+            }
+            case 'CREATE_VISIT':
+            case 'CHECK_IN': {
+              const vid = item?.data?.id;
+              if (vid) {
+                const { data } = await supabase.from('visits').select('id').eq('id', vid).maybeSingle();
+                if (data?.id) return true;
+              }
+              return false;
+            }
+            case 'CREATE_VISIT_LOG': {
+              const d = item?.data || {};
+              const uidv = d.user_id, ridv = d.retailer_id, dt = d.visit_date;
+              if (uidv && ridv && dt) {
+                const { data } = await supabase
+                  .from('retailer_visit_logs')
+                  .select('id')
+                  .eq('user_id', uidv)
+                  .eq('retailer_id', ridv)
+                  .eq('visit_date', dt)
+                  .maybeSingle();
+                if (data?.id) return true;
+              }
+              return false;
+            }
+          }
+        } catch (lookupError) {
+          console.warn('⚠️ confirm-exists lookup failed (non-fatal):', lookupError);
+          return false;
+        }
+
         if (item.action !== 'CREATE_ORDER') return false;
 
         const queuedOrder = item?.data?.order;
@@ -214,81 +325,174 @@ export function useOfflineSync() {
         return true;
       };
 
+      // Helper: update the local ORDERS record so the UI can render a sync status badge.
+      // Only meaningful for CREATE_ORDER actions; no-op for others.
+      const updateLocalOrderSyncStatus = async (
+        item: any,
+        patch: { sync_status: 'pending' | 'syncing' | 'retrying' | 'synced' | 'failed'; sync_error?: any; sync_attempts?: number; last_attempt_at?: string }
+      ) => {
+        if (item?.action !== 'CREATE_ORDER') return;
+        try {
+          const d = item.data || {};
+          const targetId = d.order?.id ?? d.id;
+          const targetKey = d.order?.idempotency_key ?? d.idempotency_key;
+          const all = await offlineStorage.getAll<any>(STORES.ORDERS);
+          const matches = all.filter((o: any) =>
+            (targetId && o.id === targetId) || (targetKey && o.idempotency_key === targetKey)
+          );
+          for (const m of matches) {
+            await offlineStorage.save(STORES.ORDERS, { ...m, ...patch });
+          }
+        } catch (e) {
+          console.warn('updateLocalOrderSyncStatus failed (non-fatal):', e);
+        }
+      };
+
       // Process a single sync item with error handling
       const processAndHandleItem = async (item: any): Promise<void> => {
+        const attemptNumber = (item.retryCount || 0) + 1;
+        await updateLocalOrderSyncStatus(item, {
+          sync_status: 'syncing',
+          sync_attempts: attemptNumber,
+          last_attempt_at: new Date().toISOString(),
+        });
         try {
           console.log(`⏳ Syncing ${item.action}...`, item.data);
-          
-          // Process each sync item based on action type (no SYNCING state write — saves a round-trip)
+
+          // Process each sync item based on action type
           await processSyncItem(item);
-          
+
           // Log success (no separate verification query — RPC already confirms)
           await logSyncAttempt(item, true);
-          
-          // Remove from queue after successful sync
+
+          // Remove from queue after successful sync. For CREATE_ORDER the local
+          // ORDERS record was already deleted inside processSyncItem; any remaining
+          // matches are marked synced defensively.
           await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+          await updateLocalOrderSyncStatus(item, {
+            sync_status: 'synced',
+            sync_error: null as any,
+            sync_attempts: attemptNumber,
+            last_attempt_at: new Date().toISOString(),
+          });
           console.log(`✅ Successfully synced ${item.action}`);
           successCount++;
         } catch (error: any) {
           const errorMsg = error?.message || error?.toString() || 'Unknown error';
-          const errorType = classifySyncError(error);
-          const retryable = isRetryableError(errorType);
+          const classified = classifySyncError(error);
+          const errorType: SyncErrorType = error?.__errorType || classified;
+          const forceFailed = !!error?.__forceFailed;
           const newRetryCount = (item.retryCount || 0) + 1;
 
           const alreadySynced = await verifyQueuedOrderAlreadySynced(item);
           if (alreadySynced) {
             await logSyncAttempt(item, true);
             await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            await updateLocalOrderSyncStatus(item, {
+              sync_status: 'synced',
+              sync_error: null as any,
+              sync_attempts: attemptNumber,
+              last_attempt_at: new Date().toISOString(),
+            });
             console.log(`✅ Recovered ${item.action} after post-sync verification`);
             successCount++;
             return;
           }
-          
+
           console.error(`❌ Failed to sync ${item.action}:`, {
             action: item.action,
             error: errorMsg,
             errorType,
-            retryable,
             retryCount: newRetryCount,
             data: item.data
           });
-          
+
           // Log failure
           await logSyncAttempt(item, false, errorType, errorMsg);
-          
+
           failCount++;
           failedItems.push({ action: item.action, error: errorMsg, errorType });
-          
+
           // CONFLICT errors: item likely already synced, remove from queue
           if (errorType === 'CONFLICT') {
             console.log(`🔄 CONFLICT for ${item.action} — treating as already synced`);
             await offlineStorage.delete(STORES.SYNC_QUEUE, item.id);
+            await updateLocalOrderSyncStatus(item, {
+              sync_status: 'synced',
+              sync_error: null as any,
+              sync_attempts: attemptNumber,
+              last_attempt_at: new Date().toISOString(),
+            });
             successCount++;
             failCount--;
             return;
           }
-          
-          // All retryable errors stay in RETRYING state indefinitely
+
+          // Terminal FAILED state:
+          //  - VALIDATION errors (data mismatch that won't self-heal)
+          //  - Retries reached/exceeded SLOW_RETRY_THRESHOLD
+          //  - Explicitly forced (e.g. quarantined orphan payloads)
+          // NETWORK errors NEVER become FAILED — they always stay RETRYING.
+          const isTerminal =
+            errorType !== 'NETWORK' &&
+            (errorType === 'VALIDATION' || forceFailed || newRetryCount >= SLOW_RETRY_THRESHOLD);
+
+          const nextSyncState: 'FAILED' | 'RETRYING' = isTerminal ? 'FAILED' : 'RETRYING';
+
           const updatedItem = {
             ...item,
             retryCount: newRetryCount,
             lastError: errorMsg,
             errorType,
-            syncState: 'RETRYING',
-            lastRetryAt: new Date().toISOString()
+            syncState: nextSyncState,
+            lastRetryAt: new Date().toISOString(),
           };
           await offlineStorage.save(STORES.SYNC_QUEUE, updatedItem);
+
+          await updateLocalOrderSyncStatus(item, {
+            sync_status: isTerminal ? 'failed' : 'retrying',
+            sync_error: { type: errorType, message: errorMsg },
+            sync_attempts: newRetryCount,
+            last_attempt_at: new Date().toISOString(),
+          });
+
+          if (item.action === 'CREATE_ORDER' && isTerminal) {
+            try {
+              toast({
+                title: 'Order not synced yet',
+                description: "Order couldn't be synced yet — it's saved and will retry automatically.",
+                variant: 'destructive',
+              });
+            } catch {}
+          }
         }
       };
 
-      // PARALLEL BATCHING: Process up to 3 items concurrently for faster sync
-      const BATCH_SIZE = 3;
+
+      // PARALLEL BATCHING within a priority band; bands are drained sequentially
+      // so a child (e.g. CREATE_ORDER) never runs before its parent (CREATE_RETAILER).
+      // Items in the SAME band are independent (parents are always a lower band), so
+      // raising concurrency here is dependency-safe and speeds up order-heavy syncs
+      // (e.g. ~18 orders drain in 3 waves instead of 6). Kept conservative for mobile.
+      const BATCH_SIZE = 6;
       const readyItems = syncQueue.filter(isReadyForRetry);
-      
-      for (let i = 0; i < readyItems.length; i += BATCH_SIZE) {
-        const batch = readyItems.slice(i, i + BATCH_SIZE);
-        await Promise.allSettled(batch.map(item => processAndHandleItem(item)));
+
+      const bands = new Map<number, any[]>();
+      for (const it of readyItems) {
+        const p = priorityOf(it.action);
+        const arr = bands.get(p);
+        if (arr) arr.push(it);
+        else bands.set(p, [it]);
       }
+      const sortedPriorities = Array.from(bands.keys()).sort((a, b) => a - b);
+      for (const p of sortedPriorities) {
+        const band = bands.get(p)!;
+        for (let i = 0; i < band.length; i += BATCH_SIZE) {
+          const batch = band.slice(i, i + BATCH_SIZE);
+          await Promise.allSettled(batch.map(item => processAndHandleItem(item)));
+        }
+      }
+
 
       // SILENT SYNC: Per offline-first architecture, sync should NOT dispatch UI refresh events
       if (successCount > 0) {
@@ -441,311 +645,254 @@ export function useOfflineSync() {
         break;
         
         
-      case 'CREATE_ORDER':
+      case 'CREATE_ORDER': {
         console.log('Syncing order creation:', data);
-        // Handle both old format (single data) and new format (order + items)
-        if (data.order && data.items) {
-          // Strip non-existent columns (scheme_details, pending_amount)
-          const { scheme_details, pending_amount, items: _items, ...orderClean } = data.order;
-          
-          // KEEP the order ID if it's a valid UUID (generated by offlineOrderUtils)
-          const offlineOrderId = orderClean.id;
-          const orderToInsert = { ...orderClean };
-          if (offlineOrderId && !isValidUUID(offlineOrderId)) {
-            console.log('⚠️ Stripping invalid order ID:', offlineOrderId);
-            delete orderToInsert.id;
+
+        // Resolve payload: prefer the queued { order, items } shape.
+        // If items are missing (legacy/orphan payload), attempt recovery from local storage.
+        let orderPayload: any = null;
+        let itemsPayload: any[] = [];
+
+        if (data.order && Array.isArray(data.items) && data.items.length > 0) {
+          orderPayload = data.order;
+          itemsPayload = data.items;
+        } else {
+          const targetId = data.order?.id ?? data.id;
+          const targetKey = data.order?.idempotency_key ?? data.idempotency_key;
+          const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+          const localRecord = cachedOrders.find((o: any) =>
+            (targetId && o.id === targetId) || (targetKey && o.idempotency_key === targetKey)
+          );
+          const recoveredItems = Array.isArray(localRecord?.items) ? localRecord.items : [];
+
+          if (recoveredItems.length > 0) {
+            orderPayload = data.order ?? localRecord ?? data;
+            itemsPayload = recoveredItems;
+            console.log('🩹 Recovered items from local storage for orphan CREATE_ORDER payload');
+          } else {
+            // Not recoverable — quarantine and force FAILED. Never insert a header-only order.
+            console.error('❌ CREATE_ORDER has no items and no recoverable local record — quarantining');
+            try {
+              await supabase.from('failed_sync_log').upsert({
+                idempotency_key: targetKey || targetId || `orphan-${Date.now()}`,
+                user_id: data.order?.user_id ?? data.user_id ?? null,
+                payload: data as any,
+                error: 'old_format_missing_items',
+                retry_count: (item.retryCount || 0),
+                last_failed_at: new Date().toISOString(),
+              } as any, { onConflict: 'idempotency_key' });
+            } catch (logErr) {
+              console.warn('failed_sync_log write failed (non-fatal):', logErr);
+            }
+            const err: any = new Error('old_format_missing_items');
+            err.__forceFailed = true;
+            err.__errorType = 'VALIDATION';
+            throw err;
           }
-          
-          // Strip visit_id if it's not a valid UUID (offline-generated)
-          if (orderToInsert.visit_id && !isValidUUID(orderToInsert.visit_id)) {
-            console.log('⚠️ Stripping invalid visit_id:', orderToInsert.visit_id);
-            delete orderToInsert.visit_id;
+        }
+
+        // Ensure beat/owner snapshots are present before persisting
+        const enrichedOrder = await enrichWithBeatSnapshots(orderPayload);
+        // Strip non-existent columns (scheme_details, pending_amount)
+        const { scheme_details, pending_amount, items: _items, ...orderClean } = enrichedOrder;
+
+        // KEEP the order ID if it's a valid UUID (generated by offlineOrderUtils)
+        const offlineOrderId = orderClean.id;
+        const orderToInsert = { ...orderClean };
+        if (offlineOrderId && !isValidUUID(offlineOrderId)) {
+          console.log('⚠️ Stripping invalid order ID:', offlineOrderId);
+          delete orderToInsert.id;
+        }
+
+        // Strip visit_id if it's not a valid UUID (offline-generated)
+        if (orderToInsert.visit_id && !isValidUUID(orderToInsert.visit_id)) {
+          console.log('⚠️ Stripping invalid visit_id:', orderToInsert.visit_id);
+          delete orderToInsert.visit_id;
+        }
+
+        // Sanitize items: PRESERVE the original "id" field so the DB function can
+        // recover product_id / variant_id from legacy mobile payloads where only
+        // a composite or bare variant id was sent.
+        const isUUID = (v: any) =>
+          typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        const cleanItems = itemsPayload.map((it: any) => ({
+          ...it,
+          product_id: isUUID(it.product_id) ? it.product_id : null,
+          variant_id: isUUID(it.variant_id) ? it.variant_id : null,
+        }));
+
+        // 🩹 Recover missing retailer_id from retailer_name (unique match, scoped to user)
+        if (!orderToInsert.retailer_id) {
+          const nameGuess = (orderToInsert.retailer_name || (orderPayload as any).retailer_name || (orderPayload as any).retailer || '').toString().trim();
+          const uid = orderToInsert.user_id;
+          if (nameGuess && uid) {
+            let match: any = null;
+            try {
+              const cached = await offlineStorage.getAll<any>(STORES.RETAILERS);
+              const hits = (cached || []).filter((r: any) =>
+                r.user_id === uid && (r.name || '').trim().toLowerCase() === nameGuess.toLowerCase());
+              if (hits.length === 1) match = hits[0];
+            } catch {}
+            if (!match && navigator.onLine) {
+              const { data: rMatch } = await supabase.from('retailers')
+                .select('id').eq('user_id', uid).ilike('name', nameGuess).limit(2);
+              if (rMatch && rMatch.length === 1) match = rMatch[0];
+            }
+            if (match?.id) {
+              orderToInsert.retailer_id = match.id;
+              console.log('🩹 Recovered retailer_id from retailer_name for stuck order:', match.id);
+            }
+          }
+        }
+        // If still no retailer_id, let it fail as before (truly unrecoverable).
+
+
+
+        // SINGLE RPC CALL: Upsert order + items in one transaction (replaces 4-5 round-trips)
+        // Do not fall back to direct inserts here — that can create header-only orders if item insert fails.
+        let actualOrderId = offlineOrderId;
+        try {
+          const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('sync_order_with_items', {
+              p_order: orderToInsert,
+              p_items: cleanItems
+            });
+
+          if (rpcError) {
+            console.warn('⚠️ RPC sync_order_with_items returned an error:', rpcError.message);
+            throw rpcError;
           }
 
-          // Sanitize items: PRESERVE the original "id" field so the DB function can
-          // recover product_id / variant_id from legacy mobile payloads where only
-          // a composite or bare variant id was sent.
-          const isUUID = (v: any) =>
-            typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-          const cleanItems = data.items.map((item: any) => ({
-            ...item,
-            product_id: isUUID(item.product_id) ? item.product_id : null,
-            variant_id: isUUID(item.variant_id) ? item.variant_id : null,
-          }));
-          
-          // SINGLE RPC CALL: Upsert order + items in one transaction (replaces 4-5 round-trips)
-          // Do not fall back to direct inserts here — that can create header-only orders if item insert fails.
-          let actualOrderId = offlineOrderId;
-          try {
-            const { data: rpcResult, error: rpcError } = await supabase
-              .rpc('sync_order_with_items', {
-                p_order: orderToInsert,
-                p_items: cleanItems
-              });
-            
-            if (rpcError) {
-              console.warn('⚠️ RPC sync_order_with_items returned an error:', rpcError.message);
-              throw rpcError;
+          // CRITICAL: RPC returns HTTP success even on validation_error.
+          // Never mark queue item as synced unless status is 'ok' or 'duplicate'.
+          const rpcStatus = (rpcResult as any)?.status;
+          if (rpcStatus !== 'ok' && rpcStatus !== 'duplicate') {
+            const errs = (rpcResult as any)?.errors || [(rpcResult as any)?.error || 'unknown_validation_error'];
+            console.error('❌ RPC validation_error - keeping in queue + logging to failed_sync_log:', errs);
+            try {
+              await supabase.from('failed_sync_log').upsert({
+                idempotency_key: enrichedOrder?.idempotency_key || offlineOrderId,
+                user_id: enrichedOrder?.user_id,
+                payload: { order: orderToInsert, items: cleanItems } as any,
+                error: JSON.stringify(errs),
+                retry_count: (item.retryCount || 0),
+                last_failed_at: new Date().toISOString(),
+              } as any, { onConflict: 'idempotency_key' });
+            } catch (logErr) {
+              console.warn('failed_sync_log write failed (non-fatal):', logErr);
             }
-            
-            actualOrderId = rpcResult?.order_id || offlineOrderId;
-            console.log('✅ Order + items synced via RPC:', rpcResult);
-          } catch (rpcSyncError: any) {
-            console.warn('⚠️ RPC sync_order_with_items failed; verifying whether the order was already persisted:', rpcSyncError?.message || rpcSyncError);
+            const vErr: any = new Error(`RPC ${rpcStatus || 'error'}: ${JSON.stringify(errs)}`);
+            vErr.__errorType = 'VALIDATION';
+            vErr.__forceFailed = true;
+            throw vErr;
+          }
 
-            let matchedOrderId: string | null = null;
+          actualOrderId = (rpcResult as any)?.order_id || offlineOrderId;
+          console.log('✅ Order + items synced via RPC:', rpcResult);
 
-            if (offlineOrderId && isValidUUID(offlineOrderId)) {
-              const { data: existingById, error: existingByIdError } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('id', offlineOrderId)
-                .maybeSingle();
+        } catch (rpcSyncError: any) {
+          console.warn('⚠️ RPC sync_order_with_items failed; verifying whether the order was already persisted:', rpcSyncError?.message || rpcSyncError);
 
-              if (existingByIdError) {
-                console.warn('⚠️ Could not verify order by offline id after RPC failure:', existingByIdError);
-              } else if (existingById?.id) {
-                matchedOrderId = existingById.id;
-              }
+          let matchedOrderId: string | null = null;
+
+          if (offlineOrderId && isValidUUID(offlineOrderId)) {
+            const { data: existingById, error: existingByIdError } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('id', offlineOrderId)
+              .maybeSingle();
+
+            if (existingByIdError) {
+              console.warn('⚠️ Could not verify order by offline id after RPC failure:', existingByIdError);
+            } else if (existingById?.id) {
+              matchedOrderId = existingById.id;
             }
+          }
 
-            if (!matchedOrderId && data.order?.idempotency_key) {
-              const { data: existingByKey, error: existingByKeyError } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('idempotency_key', data.order.idempotency_key)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+          if (!matchedOrderId && enrichedOrder?.idempotency_key) {
+            const { data: existingByKey, error: existingByKeyError } = await supabase
+              .from('orders')
+              .select('id')
+              .eq('idempotency_key', enrichedOrder.idempotency_key)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-              if (existingByKeyError) {
-                console.warn('⚠️ Could not verify order by idempotency key after RPC failure:', existingByKeyError);
-              } else if (existingByKey?.id) {
-                matchedOrderId = existingByKey.id;
-              }
+            if (existingByKeyError) {
+              console.warn('⚠️ Could not verify order by idempotency key after RPC failure:', existingByKeyError);
+            } else if (existingByKey?.id) {
+              matchedOrderId = existingByKey.id;
             }
+          }
 
-            if (matchedOrderId) {
-              const { count: itemCount, error: itemCountError } = await supabase
-                .from('order_items')
-                .select('id', { count: 'exact', head: true })
-                .eq('order_id', matchedOrderId);
+          if (matchedOrderId) {
+            const { count: itemCount, error: itemCountError } = await supabase
+              .from('order_items')
+              .select('id', { count: 'exact', head: true })
+              .eq('order_id', matchedOrderId);
 
-              if (!itemCountError && (itemCount || 0) > 0) {
-                actualOrderId = matchedOrderId;
-                console.log('✅ Order already exists with items after RPC verification:', matchedOrderId);
-              } else {
-                throw rpcSyncError;
-              }
+            if (!itemCountError && (itemCount || 0) > 0) {
+              actualOrderId = matchedOrderId;
+              console.log('✅ Order already exists with items after RPC verification:', matchedOrderId);
             } else {
               throw rpcSyncError;
             }
-          }
-          
-          // POST-SYNC CLEANUP: Remove synced order from local storage
-          try {
-            if (offlineOrderId) {
-              await offlineStorage.delete(STORES.ORDERS, offlineOrderId);
-              console.log('🧹 [orderCleanup] Removed synced order from local storage:', offlineOrderId);
-            }
-            if (actualOrderId && actualOrderId !== offlineOrderId) {
-              await offlineStorage.delete(STORES.ORDERS, actualOrderId);
-            }
-            if (data.order?.idempotency_key) {
-              const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
-              const matchingOrders = cachedOrders.filter((o: any) => 
-                o.idempotency_key === data.order.idempotency_key
-              );
-              for (const matchingOrder of matchingOrders) {
-                await offlineStorage.delete(STORES.ORDERS, matchingOrder.id);
-              }
-            }
-          } catch (cacheErr) {
-            console.warn('⚠️ Post-sync cleanup failed (non-fatal):', cacheErr);
-          }
-
-          // Update retailer's pending_amount and last_order_date
-          const orderRetailerId = data.order?.retailer_id;
-          if (orderRetailerId) {
-            // Get current pending amount from retailer
-            const { data: retailerData } = await supabase
-              .from('retailers')
-              .select('pending_amount')
-              .eq('id', orderRetailerId)
-              .single();
-            
-            const currentPending = retailerData?.pending_amount || 0;
-            const creditPending = data.order?.credit_pending_amount || 0;
-            const creditPaid = data.order?.credit_paid_amount || 0;
-            const previousCleared = data.order?.previous_pending_cleared || 0;
-            
-            // Calculate new pending: current + new credit - paid amount (that clears previous)
-            const newPending = data.order?.is_credit_order 
-              ? currentPending + creditPending - previousCleared
-              : 0; // Full payment clears everything
-            
-            console.log('💰 Updating retailer pending amount from sync:', { 
-              orderRetailerId, 
-              currentPending, 
-              creditPending,
-              creditPaid,
-              previousCleared,
-              newPending 
-            });
-            
-            const { error: retailerUpdateError } = await supabase
-              .from('retailers')
-              .update({ 
-                pending_amount: Math.max(0, newPending),
-                last_order_date: new Date().toISOString().split('T')[0]
-              })
-              .eq('id', orderRetailerId);
-            
-            if (retailerUpdateError) {
-              console.error('❌ Failed to update retailer pending amount during sync:', retailerUpdateError);
-            } else {
-              console.log('✅ Retailer pending amount updated during sync');
-            }
-          }
-
-          // Trigger visit status refresh (database trigger auto-updates visit status)
-          if (data.visitId || data.order?.visit_id) {
-            const visitId = data.visitId || data.order.visit_id;
-            const retailerId = data.order?.retailer_id;
-            
-            // Explicitly update visit status to productive (don't rely only on DB trigger)
-            console.log('🔄 Updating visit status to productive after order sync:', { visitId });
-            const { error: visitUpdateError } = await supabase
-              .from('visits')
-              .update({
-                status: 'productive',
-                no_order_reason: null,
-                check_out_time: new Date().toISOString()
-              })
-              .eq('id', visitId);
-            
-            if (visitUpdateError) {
-              console.error('❌ Error updating visit status:', visitUpdateError);
-            } else {
-              console.log('✅ Visit status updated to productive');
-            }
-            
-            console.log('✅ Order synced, dispatching visitStatusChanged event:', { visitId, retailerId });
-            
-            // Include order in dispatch for immediate orders state update
-            window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-              detail: { 
-                visitId, 
-                status: 'productive', 
-                retailerId,
-                order: data.order 
-              }
-            }));
-            
-          // Dispatch visitDataChanged WITH date to trigger targeted sync (not full reload)
-            setTimeout(() => {
-              const orderDate = data.order?.order_date || data.order?.created_at?.split('T')[0] || getTodayDateString();
-              console.log('✅ Dispatching visitDataChanged for date:', orderDate);
-              window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
-            }, 1000);
-            
-            // Sync order quantities to van stock
-            console.log('🚚 Syncing order to van stock...');
-            const orderDate = data.order?.created_at?.split('T')[0] || getTodayDateString();
-            syncOrdersToVanStock(orderDate, data.order?.user_id).catch(err => {
-              console.error('Error syncing van stock after order:', err);
-            });
-          }
-        } else {
-          // Old format - just the order data
-          const { error: orderError } = await supabase
-            .from('orders')
-            .insert(data);
-          if (orderError) throw orderError;
-
-          // Update retailer's pending_amount for old format too
-          if (data.retailer_id) {
-            const { data: retailerData } = await supabase
-              .from('retailers')
-              .select('pending_amount')
-              .eq('id', data.retailer_id)
-              .single();
-            
-            const currentPending = retailerData?.pending_amount || 0;
-            const creditPending = data.credit_pending_amount || 0;
-            const previousCleared = data.previous_pending_cleared || 0;
-            
-            const newPending = data.is_credit_order 
-              ? currentPending + creditPending - previousCleared
-              : 0;
-            
-            console.log('💰 Updating retailer pending amount from sync (old format):', { 
-              retailerId: data.retailer_id, 
-              currentPending, 
-              creditPending,
-              previousCleared,
-              newPending 
-            });
-            
-            await supabase
-              .from('retailers')
-              .update({ 
-                pending_amount: Math.max(0, newPending),
-                last_order_date: new Date().toISOString().split('T')[0]
-              })
-              .eq('id', data.retailer_id);
-          }
-
-          // Trigger visit status refresh (database trigger auto-updates visit status)
-          if (data.visit_id) {
-            // Explicitly update visit status to productive (don't rely only on DB trigger)
-            console.log('🔄 Updating visit status to productive after order sync (old format):', { visitId: data.visit_id });
-            const { error: visitUpdateError } = await supabase
-              .from('visits')
-              .update({
-                status: 'productive',
-                no_order_reason: null,
-                check_out_time: new Date().toISOString()
-              })
-              .eq('id', data.visit_id);
-            
-            if (visitUpdateError) {
-              console.error('❌ Error updating visit status:', visitUpdateError);
-            } else {
-              console.log('✅ Visit status updated to productive');
-            }
-            
-            console.log('✅ Order synced, dispatching visitStatusChanged event:', { 
-              visitId: data.visit_id, 
-              retailerId: data.retailer_id 
-            });
-            
-            // Include order in dispatch for immediate orders state update
-            window.dispatchEvent(new CustomEvent('visitStatusChanged', {
-              detail: { 
-                visitId: data.visit_id, 
-                status: 'productive', 
-                retailerId: data.retailer_id,
-                order: data 
-              }
-            }));
-            
-            // Dispatch visitDataChanged WITH date to trigger targeted sync (not full reload)
-            setTimeout(() => {
-              const oldFormatOrderDate = data.order_date || data.created_at?.split('T')[0] || getTodayDateString();
-              console.log('✅ Dispatching visitDataChanged for date:', oldFormatOrderDate);
-              window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: oldFormatOrderDate } }));
-            }, 1000);
-            
-            // Sync order quantities to van stock (old format)
-            console.log('🚚 Syncing order to van stock (old format)...');
-            const oldOrderDate = data.created_at?.split('T')[0] || getTodayDateString();
-            syncOrdersToVanStock(oldOrderDate, data.user_id).catch(err => {
-              console.error('Error syncing van stock after order:', err);
-            });
+          } else {
+            throw rpcSyncError;
           }
         }
+
+        // POST-SYNC CLEANUP: Remove synced order from local storage only after
+        // the server has confirmed an atomic save (ok/duplicate).
+        try {
+          if (offlineOrderId) {
+            await offlineStorage.delete(STORES.ORDERS, offlineOrderId);
+            console.log('🧹 [orderCleanup] Removed synced order from local storage:', offlineOrderId);
+          }
+          if (actualOrderId && actualOrderId !== offlineOrderId) {
+            await offlineStorage.delete(STORES.ORDERS, actualOrderId);
+          }
+          if (enrichedOrder?.idempotency_key) {
+            const cachedOrders = await offlineStorage.getAll<any>(STORES.ORDERS);
+            const matchingOrders = cachedOrders.filter((o: any) =>
+              o.idempotency_key === enrichedOrder.idempotency_key
+            );
+            for (const matchingOrder of matchingOrders) {
+              await offlineStorage.delete(STORES.ORDERS, matchingOrder.id);
+            }
+          }
+        } catch (cacheErr) {
+          console.warn('⚠️ Post-sync cleanup failed (non-fatal):', cacheErr);
+        }
+
+        // NOTE: retailer pending_amount, visit productive status, and van stock
+        // decrement are now handled atomically inside sync_order_with_items_v2.
+
+        // Trigger visit status refresh events for UI
+        if (data.visitId || enrichedOrder?.visit_id) {
+          const visitId = data.visitId || enrichedOrder.visit_id;
+          const retailerId = enrichedOrder?.retailer_id;
+
+          console.log('✅ Order synced, dispatching visitStatusChanged event:', { visitId, retailerId });
+          window.dispatchEvent(new CustomEvent('visitStatusChanged', {
+            detail: {
+              visitId,
+              status: 'productive',
+              retailerId,
+              order: enrichedOrder
+            }
+          }));
+
+          setTimeout(() => {
+            const orderDate = enrichedOrder?.order_date || enrichedOrder?.created_at?.split('T')[0] || getTodayDateString();
+            console.log('✅ Dispatching visitDataChanged for date:', orderDate);
+            window.dispatchEvent(new CustomEvent('visitDataChanged', { detail: { date: orderDate } }));
+          }, 1000);
+        }
+
         break;
+      }
+
         
       case 'UPDATE_ORDER':
         console.log('Syncing order update:', data);
@@ -761,6 +908,10 @@ export function useOfflineSync() {
         console.log('Syncing visit/check-in:', data);
         // Only include valid columns - explicitly exclude invalid fields like visit_type
         const visitInsertData: any = {};
+        // Preserve client-generated id so retries are idempotent via upsert(onConflict:'id').
+        // Legacy queue items (queue_version < 2) may lack an id — generate one now so we
+        // still upsert cleanly instead of inserting a duplicate on retry.
+        visitInsertData.id = data.id || crypto.randomUUID();
         if (data.user_id) visitInsertData.user_id = data.user_id;
         if (data.retailer_id) visitInsertData.retailer_id = data.retailer_id;
         if (data.planned_date) visitInsertData.planned_date = data.planned_date;
@@ -773,12 +924,39 @@ export function useOfflineSync() {
         if (data.skip_check_in_reason) visitInsertData.skip_check_in_reason = data.skip_check_in_reason;
         if (data.skip_check_in_time) visitInsertData.skip_check_in_time = data.skip_check_in_time;
         if (data.no_order_reason) visitInsertData.no_order_reason = data.no_order_reason;
-        
+
+        // Stamp the authenticated user if the offline payload's user_id is missing/stale,
+        // so the RLS `user_id = auth.uid()` check holds.
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser?.id) visitInsertData.user_id = visitInsertData.user_id || authUser.id;
+
+        // A visit with no retailer can never pass RLS — quarantine instead of retrying forever.
+        if (!visitInsertData.retailer_id) {
+          const err: any = new Error('visit_missing_retailer');
+          err.__forceFailed = true; err.__errorType = 'VALIDATION';
+          throw err;
+        }
+
+        // If online, verify the retailer exists in the DB. If not, the paired retailer
+        // hasn't synced yet — DEFER (throw a NETWORK-class error so it retries, never terminal),
+        // rather than hard-failing RLS.
+        if (navigator.onLine) {
+          const { data: rExists } = await supabase.from('retailers')
+            .select('id').eq('id', visitInsertData.retailer_id).maybeSingle();
+          if (!rExists) {
+            const err: any = new Error('retailer_not_synced_yet');
+            err.__errorType = 'NETWORK';   // stays RETRYING; heals once the retailer syncs
+            throw err;
+          }
+        }
+
         const { error: visitError } = await supabase
           .from('visits')
-          .insert(visitInsertData);
+          .upsert(visitInsertData, { onConflict: 'id', ignoreDuplicates: false });
         if (visitError) throw visitError;
         break;
+
+
         
       case 'CHECK_OUT':
         console.log('Syncing check-out:', data);
@@ -886,9 +1064,13 @@ export function useOfflineSync() {
         console.log('Syncing stock creation:', data);
         const { error: stockError } = await supabase
           .from('stock')
-          .insert(data);
+          .upsert(data, {
+            onConflict: 'user_id,retailer_id,visit_id,product_id',
+            ignoreDuplicates: false,
+          });
         if (stockError) throw stockError;
         break;
+
         
       case 'UPDATE_STOCK':
         console.log('Syncing stock update:', data);
@@ -903,12 +1085,36 @@ export function useOfflineSync() {
         console.log('Syncing retailer creation:', data);
         // Handle both data formats: wrapped { retailer, tempId } or direct retailer object
         const retailerPayload = data.retailer || data;
-        // Remove tempId if present (it's not a database field)
-        const { tempId, ...retailerData } = retailerPayload;
-        const { error: retailerError } = await supabase
+        // Strip client-only fields before upload
+        const retailerData = stripRetailerClientFields(retailerPayload);
+        // Ensure a stable client id so retries upsert onto the same row.
+        // Legacy payloads without an id fall back to a fresh UUID.
+        if (!retailerData.id) retailerData.id = crypto.randomUUID();
+        const { data: syncedRetailer, error: retailerError } = await supabase
           .from('retailers')
-          .insert(retailerData);
+          // insert-or-IGNORE: a pre-existing row (common on retries / shared-coverage beats)
+          // must NOT take the ON CONFLICT -> UPDATE path, because retailers_update's RLS USING
+          // requires module_my_retailers/can_edit (no field profile has it) + auth.uid()=user_id
+          // (false on coverage beats where user_id = beat owner). DO NOTHING on conflict avoids
+          // that trap; the row already exists, so we treat it as synced.
+          .upsert(retailerData, { onConflict: 'id', ignoreDuplicates: true })
+          .select('id, phone')
+          .maybeSingle();
         if (retailerError) throw retailerError;
+
+
+        if (syncedRetailer?.id && syncedRetailer?.phone) {
+          const { data: waResult, error: waError } = await supabase.functions.invoke('send-retailer-welcome-whatsapp', {
+            body: { retailer_id: syncedRetailer.id }
+          });
+
+          if (waError) {
+            console.warn('⚠️ Retailer synced, but WhatsApp welcome invoke failed:', waError);
+          }
+          if (waResult && waResult.success === false) {
+            console.warn('⚠️ Retailer synced, but WhatsApp welcome was not sent:', waResult.error || waResult);
+          }
+        }
         
         // Dispatch event to refresh retailer list
         window.dispatchEvent(new Event('retailerDataChanged'));
@@ -930,7 +1136,7 @@ export function useOfflineSync() {
         console.log('Syncing attendance check-in:', data);
         const { data: syncedAttendance, error: attendanceError } = await supabase
           .from('attendance')
-          .insert(data)
+          .upsert(data, { onConflict: 'user_id,date', ignoreDuplicates: false })
           .select()
           .single();
         if (attendanceError) throw attendanceError;
@@ -944,6 +1150,40 @@ export function useOfflineSync() {
           console.log('✅ Attendance synced and cache updated with real ID');
         }
         break;
+
+      case 'CREATE_COLLECTION': {
+        console.log('Syncing retailer payment collection:', data);
+        const collection = data?.collection || data;
+        if (!collection?.id || !collection?.retailer_id || !collection?.amount) {
+          throw new Error('CREATE_COLLECTION missing required fields (id/retailer_id/amount)');
+        }
+        const { error: collErr } = await (supabase as any)
+          .from('retailer_payment_collections')
+          .upsert(collection, { onConflict: 'id', ignoreDuplicates: false });
+        if (collErr) throw collErr;
+        if (data?.apply_fifo !== false) {
+          const { error: fifoErr } = await (supabase as any).rpc('apply_retailer_payment_fifo', {
+            p_retailer_id: collection.retailer_id,
+            p_amount: collection.amount,
+            p_collection_id: collection.id,
+          });
+          if (fifoErr) throw fifoErr;
+        }
+        break;
+      }
+
+
+      case 'CREATE_EXPENSE': {
+        console.log('Syncing additional expense:', data);
+        const { error: expenseError } = await supabase
+          .from('additional_expenses')
+          .upsert(data, { onConflict: 'id', ignoreDuplicates: false });
+        if (expenseError) throw expenseError;
+        break;
+      }
+
+
+
         
       case 'UPDATE_ATTENDANCE':
         console.log('Syncing attendance check-out:', data);
@@ -956,9 +1196,10 @@ export function useOfflineSync() {
         
       case 'CREATE_BEAT':
         console.log('Syncing beat creation:', data);
+        if (!data.id) data.id = crypto.randomUUID();
         const { error: beatError } = await supabase
           .from('beats')
-          .insert(data);
+          .upsert(data, { onConflict: 'id', ignoreDuplicates: false });
         if (beatError) throw beatError;
         break;
         
@@ -975,27 +1216,31 @@ export function useOfflineSync() {
         console.log('Syncing beat plan creation:', data);
         const { error: beatPlanError } = await supabase
           .from('beat_plans')
-          .insert(data);
+          .upsert(data, {
+            onConflict: 'user_id,plan_date,beat_id',
+            ignoreDuplicates: false,
+          });
         if (beatPlanError) throw beatPlanError;
         break;
+
         
-      case 'DELETE_RETAILER':
-        console.log('Syncing retailer deletion:', data);
-        const { error: deleteRetailerError } = await supabase
-          .from('retailers')
-          .delete()
-          .eq('id', data.id);
-        if (deleteRetailerError) throw deleteRetailerError;
+      case 'DELETE_RETAILER': {
+        console.log('Syncing retailer deletion (via safe guard):', data);
+        const { deactivateOrDeleteRetailer } = await import('@/utils/safeRetailerBeatDelete');
+        const res = await deactivateOrDeleteRetailer(data.id);
+        if (res.action === 'failed') throw new Error(res.error || 'Retailer delete/deactivate failed');
         break;
-        
-      case 'DELETE_BEAT':
-        console.log('Syncing beat deactivation (soft delete):', data);
-        const { error: deleteBeatError } = await supabase
-          .from('beats')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq('id', data.id);
-        if (deleteBeatError) throw deleteBeatError;
+      }
+
+      case 'DELETE_BEAT': {
+        console.log('Syncing beat deletion (via safe guard):', data);
+        const { deactivateOrDeleteBeat, resolveBeatTextId } = await import('@/utils/safeRetailerBeatDelete');
+        // Queue historically stored uuid `id`; guard needs text `beat_id`.
+        const textId = (data as any).beat_id || (await resolveBeatTextId(data.id)) || data.id;
+        const res = await deactivateOrDeleteBeat(textId);
+        if (res.action === 'failed') throw new Error(res.error || 'Beat delete/deactivate failed');
         break;
+      }
         
       case 'UPDATE_BEAT_PLAN':
         console.log('Syncing beat plan update:', data);
@@ -1022,9 +1267,11 @@ export function useOfflineSync() {
         
       case 'CREATE_COMPETITION_DATA':
         console.log('Syncing competition data:', data);
+        if (!data.id) data.id = crypto.randomUUID();
         const { error: competitionError } = await supabase
           .from('competition_data')
-          .insert(data);
+          .upsert(data, { onConflict: 'id', ignoreDuplicates: false });
+
         if (competitionError) throw competitionError;
         break;
         
@@ -1032,13 +1279,12 @@ export function useOfflineSync() {
         console.log('Syncing return stock:', data);
         // Return stock is typically part of orders table or a separate returns table
         // Update this based on your schema
+        const returnEnriched = await enrichWithBeatSnapshots({ ...data, order_type: 'return' });
         const { error: returnStockError } = await supabase
           .from('orders')
-          .insert({
-            ...data,
-            order_type: 'return'
-          });
+          .insert(returnEnriched);
         if (returnStockError) throw returnStockError;
+
         break;
         
       case 'SEND_INVOICE':
@@ -1090,76 +1336,6 @@ export function useOfflineSync() {
         }
         break;
         
-      case 'SEND_INVOICE_SMS':
-        console.log('📨 Syncing invoice SMS/WhatsApp from offline queue:', data);
-        try {
-          console.log('📄 Generating invoice PDF for order:', data.orderId);
-          
-          // Generate invoice PDF
-          const { fetchAndGenerateInvoice } = await import('@/utils/invoiceGenerator');
-          const { blob, invoiceNumber } = await fetchAndGenerateInvoice(data.orderId);
-          
-          console.log('✅ Invoice generated:', invoiceNumber);
-          
-          const fileName = `invoice-${invoiceNumber}.pdf`;
-          
-          console.log('☁️ Uploading PDF to storage:', fileName);
-          
-          // Upload to storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('invoices')
-            .upload(fileName, blob, {
-              contentType: 'application/pdf',
-              upsert: true
-            });
-
-          if (uploadError) {
-            console.error('❌ Storage upload failed during sync:', uploadError);
-            throw uploadError;
-          }
-
-          if (uploadData) {
-            console.log('✅ PDF uploaded successfully');
-            
-            // Get public URL
-            const { data: { publicUrl } } = await supabase.storage
-              .from('invoices')
-              .getPublicUrl(uploadData.path);
-
-            console.log('🔗 Public URL:', publicUrl);
-            console.log('📨 Invoking send-invoice-whatsapp edge function...');
-
-            // Send via edge function
-            const { data: fnResult, error: fnError } = await supabase.functions.invoke('send-invoice-whatsapp', {
-              body: {
-                invoiceId: data.orderId,
-                customerPhone: data.customerPhone,
-                pdfUrl: publicUrl,
-                invoiceNumber: invoiceNumber
-              }
-            });
-
-            if (fnError) {
-              console.error('❌ Edge function error during sync:', fnError);
-              throw fnError;
-            }
-            
-            console.log('✅ Invoice SMS/WhatsApp sent successfully during sync:', fnResult);
-            
-            // Show success notification
-            toast({
-              title: '✅ SMS Sent',
-              description: 'Offline invoice SMS delivered successfully',
-              duration: 3000,
-            });
-          }
-        } catch (smsError) {
-          console.error('❌ Failed to send invoice SMS during sync:', smsError);
-          console.error('❌ SMS error details:', JSON.stringify(smsError, null, 2));
-          throw smsError;
-        }
-        break;
-        
       case 'UPLOAD_PAYMENT_PROOF':
         console.log('Syncing payment proof upload:', data);
         try {
@@ -1198,8 +1374,19 @@ export function useOfflineSync() {
         }
         break;
         
+      case 'VAN_STOCK_SYNC': {
+        const stockDate = data?.stockDate || data?.stock_date || getTodayDateString();
+        const ok = await syncOrdersToVanStock(stockDate, data?.userId);
+        if (!ok) {
+          console.warn('[Sync] VAN_STOCK_SYNC soft skip — syncOrdersToVanStock returned false (non-applicable or transient); not throwing');
+          break;
+        }
+        break;
+      }
+
       default:
-        console.warn('Unknown sync action:', action);
+        console.warn('Unknown sync action, keeping in queue:', action);
+        throw new Error(`Unknown sync action: ${action}`);
     }
   };
 

@@ -197,6 +197,11 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const parsedCache = JSON.parse(cached);
+        if (parsedCache.userId && parsedCache.userId !== userId) {
+          console.warn('[useHomeDashboard] Ignoring cache for different user');
+          localStorage.removeItem(CACHE_KEY);
+          return defaultState;
+        }
         console.log('[useHomeDashboard] Loaded from localStorage cache, lastUpdated:', parsedCache.lastUpdated);
 
         // Never reuse stale attendance from cache (cache is not date-scoped)
@@ -242,9 +247,22 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
   };
 
   const [data, setData] = useState<HomeDashboardData>(getInitialState);
+  const previousUserIdRef = useRef<string | undefined>(userId);
 
   const dateStr = toLocalISODate(selectedDate);
   const isToday = dateStr === getLocalTodayDate();
+
+  useEffect(() => {
+    if (previousUserIdRef.current !== userId) {
+      console.log('[useHomeDashboard] User changed — resetting dashboard state');
+      attendanceLockedRef.current = false;
+      lockedAttendanceRef.current = null;
+      isRefreshingRef.current = false;
+      setHasInitiallyLoaded(false);
+      setData({ ...getDefaultState(), isLoading: !!userId });
+    }
+    previousUserIdRef.current = userId;
+  }, [userId]);
 
   // Save data to localStorage cache
   const saveToCache = useCallback((newData: HomeDashboardData) => {
@@ -252,6 +270,8 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
     try {
       const cacheData = {
         ...newData,
+        userId,
+        date: dateStr,
         lastUpdated: new Date().toISOString()
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
@@ -259,11 +279,11 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
     } catch (e) {
       console.error('[useHomeDashboard] Error saving cache:', e);
     }
-  }, [userId, CACHE_KEY]);
+  }, [userId, CACHE_KEY, dateStr]);
 
   const loadDashboardData = useCallback(async () => {
     if (!userId) {
-      setData(prev => ({ ...prev, isLoading: false }));
+      setData({ ...getDefaultState(), isLoading: false });
       return;
     }
     
@@ -490,6 +510,19 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
         });
 
         const totalVisits = visitsAny.length;
+
+        // Include activity visits (retailer_id is null) in progress counts, matching My Visit logic.
+        const acts = (visits || []).filter(v => v.visit_type === 'activity' && v.status !== 'cancelled');
+        const actProductive = acts.filter(v => v.status === 'productive').length;
+        const actUnproductive = acts.filter(v => v.status === 'unproductive').length;
+        const actPending = acts.filter(v => !['productive', 'unproductive', 'cancelled'].includes(v.status)).length;
+        const actTotal = acts.length;
+
+        productive += actProductive;
+        unproductive += actUnproductive;
+        notYetVisited += actPending;
+        const totalPlannedWithActivities = totalPlannedRetailers + actTotal;
+
         const remaining = notYetVisited;
         const completed = productive + unproductive;
         const revenueTarget = 10000;
@@ -506,7 +539,7 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
 
         const salesAmount = revenueAchieved;
         const pointsEarned = points.reduce((sum: number, p: any) => sum + p.points, 0);
-        const dailyProgress = totalVisits > 0 ? Math.round((completed / totalVisits) * 100) : 0;
+        const dailyProgress = totalPlannedWithActivities > 0 ? Math.round((completed / totalPlannedWithActivities) * 100) : 0;
 
         // Fetch urgent items (only for today)
         let pendingPayments: any[] = [];
@@ -573,10 +606,10 @@ export const useHomeDashboard = (userId: string | undefined, selectedDate: Date 
             nextVisit: visits.find((v: any) => !v.check_in_time) || null,
             attendance: enhancedAttendance,
             beatProgress: {
-              total: totalPlannedRetailers,
+              total: totalPlannedWithActivities,
               completed,
               remaining: notYetVisited,
-              planned: totalPlannedRetailers,
+              planned: totalPlannedWithActivities,
               productive,
               unproductive,
             },

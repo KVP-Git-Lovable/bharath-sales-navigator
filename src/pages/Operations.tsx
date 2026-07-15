@@ -21,7 +21,15 @@ import { getCurrentWeekRange, getCurrentMonthRange, getLastMonthRange, toLocalIS
 import { downloadCSV } from '@/utils/fileDownloader';
 import { PaymentProofsView } from '@/components/admin/PaymentProofsView';
 import { OperationsSummaryBoxes } from '@/components/operations/OperationsSummaryBoxes';
-import EditOrderDialog from '@/components/EditOrderDialog';
+import EditedOrdersSection from '@/components/operations/EditedOrdersSection';
+import OperationsExceptionsTab from '@/components/operations/OperationsExceptionsTab';
+
+import OperationsConfig from '@/components/operations/OperationsConfig';
+import BackdateApprovalsList from '@/components/operations/BackdateApprovalsList';
+import OrderEditApprovalsList from '@/components/operations/OrderEditApprovalsList';
+
+import { usePermissions } from '@/hooks/usePermissions';
+
 import { CancelOrderDialog, CancelableOrder } from '@/components/CancelOrderDialog';
 import { SignedImage } from '@/components/ui/signed-image';
 import { InvoicePDFGenerator } from '@/components/invoice/InvoicePDFGenerator';
@@ -96,7 +104,12 @@ interface StockData {
 
 const Operations = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
+  const { can } = usePermissions();
   const navigate = useNavigate();
+  const [topTab, setTopTab] = useState<string>(() => {
+    try { return localStorage.getItem('operations_top_tab') || 'overview'; } catch { return 'overview'; }
+  });
+  useEffect(() => { try { localStorage.setItem('operations_top_tab', topTab); } catch {} }, [topTab]);
   
   const [activeTab, setActiveTab] = useState<string>(() => {
     try { return localStorage.getItem('operations_active_tab') || 'orders'; } catch { return 'orders'; }
@@ -245,8 +258,6 @@ const Operations = () => {
   };
   
   // Edit order dialog state
-  const [editOrderDialogOpen, setEditOrderDialogOpen] = useState(false);
-  const [selectedOrderForEdit, setSelectedOrderForEdit] = useState<{ id: string; retailer_name: string } | null>(null);
 
   // Cancel order dialog state
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -600,13 +611,17 @@ const Operations = () => {
           status,
           retailer_name,
           retailer_id,
+          visit_id,
           counter_customer_id,
           is_credit_order,
           credit_pending_amount,
           credit_paid_amount,
           payment_method,
           payment_status,
-          invoice_generated_at
+          invoice_generated_at,
+          is_edited,
+          edited_at,
+          edit_count
         `)
         .eq('status', 'confirmed')
         .order('created_at', { ascending: false });
@@ -674,13 +689,13 @@ const Operations = () => {
         const invoice = invoicesData?.find((i: any) => i.order_id === order.id);
         const itemsForOrder = (itemsData || []).filter((it: any) => it.order_id === order.id);
         
-        // Check if order was edited (updated_at differs from created_at by more than 5 seconds)
-        const createdTime = new Date(order.created_at).getTime();
-        const updatedTime = order.updated_at ? new Date(order.updated_at).getTime() : createdTime;
-        const isEdited = Math.abs(updatedTime - createdTime) > 5000; // 5 second threshold
+        // Edited flag is set ONLY when the order is updated via the edit dialog
+        const isEdited = (order as any).is_edited === true;
         
         return {
           id: order.id,
+          retailer_id: order.retailer_id,
+          visit_id: (order as any).visit_id ?? null,
           user_name: user?.full_name || user?.username || 'Unknown',
           retailer_name: order.retailer_name || 'Unknown',
           retailer_phone: (retailer?.phone || counter?.phone || null) as string | null,
@@ -1169,19 +1184,19 @@ const Operations = () => {
     const silentRefetchReturns = debounce(() => fetchReturnStockDataRef.current(true), 800);
 
     const ordersChannel = supabase
-      .channel('operations-orders')
+      .channel(`operations-orders-page-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, silentRefetchOrders)
       .subscribe();
     const visitsChannel = supabase
-      .channel('operations-visits')
+      .channel(`operations-visits-page-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'visits' }, silentRefetchCheckins)
       .subscribe();
     const stockChannel = supabase
-      .channel('operations-stock')
+      .channel(`operations-stock-page-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, silentRefetchStock)
       .subscribe();
     const returnChannel = supabase
-      .channel('operations-returns')
+      .channel(`operations-returns-page-${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'van_return_grn' }, silentRefetchReturns)
       .subscribe();
 
@@ -1236,7 +1251,7 @@ const Operations = () => {
   return (
     <Layout>
     <div className="min-h-screen bg-gradient-subtle p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -1256,6 +1271,32 @@ const Operations = () => {
           </div>
         </div>
 
+        <Tabs value={topTab} onValueChange={setTopTab} className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="approvals">Approvals</TabsTrigger>
+            <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="approvals" className="space-y-4">
+            <BackdateApprovalsList />
+            <OrderEditApprovalsList />
+          </TabsContent>
+
+
+          <TabsContent value="configuration">
+            {can('operations_config', 'edit') ? (
+              <OperationsConfig />
+            ) : (
+              <Card>
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  You don't have access to Operations configuration.
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="overview" className="space-y-6">
         {/* Operations Summary Boxes */}
         <OperationsSummaryBoxes 
           dateFilter={summaryDateFilter}
@@ -1286,7 +1327,7 @@ const Operations = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-7">
+              <TabsList className={cn('grid w-full', can('operations_config', 'edit') ? 'grid-cols-9' : 'grid-cols-8')}>
                 <TabsTrigger value="checkins">Check-in/Out</TabsTrigger>
                 <TabsTrigger value="orders">Orders</TabsTrigger>
                 <TabsTrigger value="stock">Stock</TabsTrigger>
@@ -1294,7 +1335,12 @@ const Operations = () => {
                 <TabsTrigger value="competitor">Competitor</TabsTrigger>
                 <TabsTrigger value="returnstock">Return Stock</TabsTrigger>
                 <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+                <TabsTrigger value="edited">Edited</TabsTrigger>
+                {can('operations_config', 'edit') && (
+                  <TabsTrigger value="exceptions">Exceptions</TabsTrigger>
+                )}
               </TabsList>
+
 
               {/* Filters */}
               <div className="flex flex-wrap gap-4 mt-4 mb-6">
@@ -2175,8 +2221,17 @@ const Operations = () => {
                                   className="h-8 w-8"
                                   title="Edit Order"
                                   onClick={() => {
-                                    setSelectedOrderForEdit({ id: item.id, retailer_name: item.retailer_name });
-                                    setEditOrderDialogOpen(true);
+                                    if (!item.retailer_id) {
+                                      toast.error('Cannot edit: this order has no linked retailer.');
+                                      return;
+                                    }
+                                    const params = new URLSearchParams();
+                                    if ((item as any).visit_id) params.set('visitId', (item as any).visit_id);
+                                    params.set('retailerId', item.retailer_id);
+                                    if (item.retailer_name) params.set('retailer', item.retailer_name);
+                                    params.set('editOrderId', item.id);
+                                    params.set('source', 'admin');
+                                    navigate(`/order-entry?${params.toString()}`);
                                   }}
                                 >
                                   <Pencil size={16} />
@@ -2635,24 +2690,25 @@ const Operations = () => {
                   </Table>
                 </div>
               </TabsContent>
+
+              <TabsContent value="edited" className="space-y-4">
+                <EditedOrdersSection />
+              </TabsContent>
+
+              {can('operations_config', 'edit') && (
+                <TabsContent value="exceptions" className="space-y-4">
+                  <OperationsExceptionsTab />
+                </TabsContent>
+              )}
+
             </Tabs>
           </CardContent>
         </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Edit Order Dialog */}
-      {selectedOrderForEdit && (
-        <EditOrderDialog
-          orderId={selectedOrderForEdit.id}
-          retailerName={selectedOrderForEdit.retailer_name}
-          open={editOrderDialogOpen}
-          onOpenChange={setEditOrderDialogOpen}
-          onSaved={() => {
-            fetchOrderData();
-            toast.success("Order updated - changes will reflect across the system");
-          }}
-        />
-      )}
+
 
       {/* Cancel Order Dialog */}
       {selectedOrderForCancel && (

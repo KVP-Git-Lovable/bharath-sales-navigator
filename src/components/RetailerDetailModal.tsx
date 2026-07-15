@@ -30,6 +30,9 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isTod
 import { RetailerLoyaltySection } from "./loyalty/RetailerLoyaltySection";
 import { TargetVsActualCard } from "./performance/TargetVsActualCard";
 import { CreditScoreDisplay } from "./CreditScoreDisplay";
+import { CreditHistorySection } from "./CreditHistorySection";
+import { RetailerCustomerPortalSection } from "./retailer/RetailerCustomerPortalSection";
+
 
 interface RetailerInvoice {
   id: string;
@@ -78,6 +81,9 @@ interface Retailer {
   latitude?: number | null;
   longitude?: number | null;
   photo_url?: string | null;
+  alternate_phone?: string | null;
+  distributor_id?: string | null;
+  state?: string | null;
   order_value?: number | null;
   manual_credit_score?: number | null;
   last_order_date?: string | null;
@@ -147,8 +153,46 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
   const [invoicesLoading, setInvoicesLoading] = useState(false);
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
   const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
+  const [sendingOtp, setSendingOtp] = useState(false);
+
+  const isValidIndianMobile = (phone?: string | null): boolean => {
+    if (!phone) return false;
+    const digits = String(phone).replace(/\D/g, '');
+    return digits.length === 10 || (digits.length === 12 && digits.startsWith('91'));
+  };
+
+  const handleSendOtp = async () => {
+    if (!retailer?.id || !isValidIndianMobile(formData.phone)) return;
+    setSendingOtp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-retailer-otp', {
+        body: {
+          retailer_id: retailer.id,
+          retailer_name: formData.name || 'Retailer',
+          mobile: formData.phone,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast({ title: 'OTP sent successfully.' });
+      } else {
+        toast({ title: 'Failed to send OTP', description: data?.error || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Failed to send OTP', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
   const [invoicesDisplayCount, setInvoicesDisplayCount] = useState(5);
   const [associatedDistributor, setAssociatedDistributor] = useState<string | null>(null);
+  const [ownership, setOwnership] = useState<{
+    beatName: string | null;
+    createdByName: string | null;
+    ownerName: string | null;
+    currentUserName: string | null;
+  }>({ beatName: null, createdByName: null, ownerName: null, currentUserName: null });
 
   // Calendar state
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -203,8 +247,52 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
       loadInvoices(retailer.id);
       loadVisitsAndOrders(retailer.id);
       loadAssociatedDistributor(retailer.id);
+      loadOwnership(retailer.id);
     }
   }, [retailer?.id, isOpen]);
+
+  const loadOwnership = async (retailerId: string) => {
+    try {
+      const { data: r } = await supabase
+        .from('retailers')
+        .select('beat_id, created_by, owner_id, owner_name, user_id')
+        .eq('id', retailerId)
+        .maybeSingle();
+      if (!r) return;
+
+      const userIds = Array.from(
+        new Set([r.created_by, r.owner_id, r.user_id].filter(Boolean) as string[])
+      );
+
+      const [beatRes, profilesRes] = await Promise.all([
+        r.beat_id
+          ? supabase.from('beats').select('beat_name').eq('beat_id', r.beat_id).maybeSingle()
+          : Promise.resolve({ data: null } as any),
+        userIds.length
+          ? supabase.from('profiles').select('id, full_name, username').in('id', userIds)
+          : Promise.resolve({ data: [] } as any),
+      ]);
+
+      const nameMap = new Map<string, { full_name: string | null; username: string | null }>();
+      (profilesRes.data || []).forEach((p: any) =>
+        nameMap.set(p.id, { full_name: p.full_name, username: p.username })
+      );
+      const resolve = (uid: string | null | undefined) => {
+        if (!uid) return null;
+        const p = nameMap.get(uid);
+        return p?.full_name || p?.username || null;
+      };
+
+      setOwnership({
+        beatName: (beatRes.data as any)?.beat_name || null,
+        createdByName: resolve(r.created_by),
+        ownerName: (r.owner_name as string) || resolve(r.owner_id),
+        currentUserName: resolve(r.user_id),
+      });
+    } catch (e) {
+      console.error('Error loading retailer ownership:', e);
+    }
+  };
 
   const loadAssociatedDistributor = async (retailerId: string) => {
     try {
@@ -555,14 +643,16 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
     try {
       const selectedBeat = beats.find(b => b.beat_id === formData.beat_id);
       
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from('retailers')
         .update({
           name: formData.name,
           contact_name: formData.contact_name,
           contact_title: formData.contact_title,
           phone: formData.phone,
+          alternate_phone: (formData as any).alternate_phone ?? null,
           address: formData.address,
+          state: (formData as any).state ?? null,
           category: formData.category,
           priority: formData.priority,
           status: formData.status,
@@ -579,12 +669,23 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
           beat_id: formData.beat_id,
           beat_name: selectedBeat?.beat_name || formData.beat_id,
           territory_id: formData.territory_id || null,
+          distributor_id: (formData as any).distributor_id ?? null,
+          photo_url: (formData as any).photo_url ?? null,
           manual_credit_score: formData.manual_credit_score,
-        })
+        }, { count: 'exact' })
         .eq('id', formData.id)
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      if ((count ?? 0) === 0) {
+        toast({
+          title: "Permission denied",
+          description: "You don't have permission to edit this retailer.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       toast({
         title: "Retailer updated",
@@ -615,30 +716,12 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
 
     setLoading(true);
     try {
-      const movedToRecycleBin = await moveToRecycleBin({
-        tableName: 'retailers',
-        recordId: formData.id,
-        recordData: formData,
-        moduleName: 'Retailers',
-        recordName: formData.name
-      });
+      const { deactivateOrDeleteRetailer } = await import("@/utils/safeRetailerBeatDelete");
+      const res = await deactivateOrDeleteRetailer(formData.id, formData);
 
-      if (!movedToRecycleBin) {
-        throw new Error("Could not move to recycle bin");
+      if (res.action === "failed") {
+        throw new Error(res.error || "Delete failed");
       }
-
-      const { error } = await supabase
-        .from('retailers')
-        .delete()
-        .eq('id', formData.id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Moved to Recycle Bin",
-        description: `${formData.name} can be restored from Recycle Bin`,
-      });
 
       setShowDeleteConfirm(false);
       onSuccess();
@@ -745,7 +828,11 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
             <div className="grid grid-cols-3 gap-2 mt-1.5 text-xs">
               <div>
                 <span className="text-muted-foreground">Beat:</span>{' '}
-                <span className="font-medium">{beats.find(b => b.beat_id === formData.beat_id)?.beat_name || formData.beat_id || 'Unassigned'}</span>
+                <span className="font-medium">
+                  {ownership.beatName
+                    || beats.find(b => b.beat_id === formData.beat_id)?.beat_name
+                    || 'Unassigned'}
+                </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Territory:</span>{' '}
@@ -756,6 +843,18 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
               <div>
                 <span className="text-muted-foreground">Distributor:</span>{' '}
                 <span className="font-medium">{associatedDistributor || formData.parent_name || 'Not mapped'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Created by:</span>{' '}
+                <span className="font-medium">{ownership.createdByName || '—'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Owner:</span>{' '}
+                <span className="font-medium">{ownership.ownerName || '—'}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Currently operated by:</span>{' '}
+                <span className="font-medium">{ownership.currentUserName || '—'}</span>
               </div>
             </div>
           </div>
@@ -975,6 +1074,7 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                 variant="full" 
                 showCreditLimit 
               />
+              <CreditHistorySection retailerId={formData.id} />
             </TabsContent>
 
             {/* Calendar Tab */}
@@ -1165,12 +1265,27 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                       <Label className="text-xs text-muted-foreground">Owner's Number</Label>
                       {isEditing ? (
                         <Input value={formData.phone || ''} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="h-8 text-sm mt-1" />
-                      ) : formData.phone ? (
-                        <a href={`tel:${formData.phone}`} className="flex items-center gap-1 text-sm hover:text-primary">
-                          <Phone size={12} className="text-primary" /> {formData.phone}
-                        </a>
                       ) : (
-                        <p className="text-sm text-muted-foreground">-</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {formData.phone ? (
+                            <a href={`tel:${formData.phone}`} className="flex items-center gap-1 text-sm hover:text-primary">
+                              <Phone size={12} className="text-primary" /> {formData.phone}
+                            </a>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">-</p>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            disabled={!isValidIndianMobile(formData.phone) || sendingOtp}
+                            onClick={handleSendOtp}
+                          >
+                            {sendingOtp ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                            Send OTP
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1204,12 +1319,30 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                     </div>
                   </div>
                   
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">GST Number</Label>
+                      {isEditing ? (
+                        <Input value={formData.gst_number || ''} onChange={(e) => setFormData({...formData, gst_number: e.target.value})} className="h-8 text-sm mt-1" />
+                      ) : (
+                        <p className="text-sm">{formData.gst_number || '-'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Alternate Phone</Label>
+                      {isEditing ? (
+                        <Input value={(formData as any).alternate_phone || ''} onChange={(e) => setFormData({...formData, alternate_phone: e.target.value} as any)} className="h-8 text-sm mt-1" placeholder="Alternate number" />
+                      ) : (
+                        <p className="text-sm">{(formData as any).alternate_phone || '-'}</p>
+                      )}
+                    </div>
+                  </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">GST Number</Label>
+                    <Label className="text-xs text-muted-foreground">Photo URL</Label>
                     {isEditing ? (
-                      <Input value={formData.gst_number || ''} onChange={(e) => setFormData({...formData, gst_number: e.target.value})} className="h-8 text-sm mt-1" />
+                      <Input value={(formData as any).photo_url || ''} onChange={(e) => setFormData({...formData, photo_url: e.target.value} as any)} className="h-8 text-sm mt-1" placeholder="https://..." />
                     ) : (
-                      <p className="text-sm">{formData.gst_number || '-'}</p>
+                      <p className="text-sm break-all">{(formData as any).photo_url || '-'}</p>
                     )}
                   </div>
                 </CardContent>
@@ -1229,6 +1362,14 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                       <a href={getGoogleMapsLink() || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formData.address || '')}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
                         {formData.address}
                       </a>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">State</Label>
+                    {isEditing ? (
+                      <Input value={(formData as any).state || ''} onChange={(e) => setFormData({...formData, state: e.target.value} as any)} className="h-8 text-sm mt-1" placeholder="State" />
+                    ) : (
+                      <p className="text-sm">{(formData as any).state || '-'}</p>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -1287,7 +1428,16 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                 </CardContent>
               </Card>
 
+              {/* Customer Portal */}
+              <RetailerCustomerPortalSection
+                retailerId={formData.id}
+                retailerPhone={formData.phone}
+                portalEnabled={(formData as any).portal_enabled}
+                portalPin={(formData as any).portal_pin}
+              />
+
               {/* Distributor Mapping */}
+
               <Card>
                 <CardHeader className="py-2 px-3">
                   <CardTitle className="text-sm flex items-center gap-2"><Building className="h-4 w-4" /> Distributor Mapping</CardTitle>
@@ -1314,7 +1464,7 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                       <Popover open={distributorOpen} onOpenChange={setDistributorOpen}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" aria-expanded={distributorOpen} className="w-full h-8 text-sm mt-1 justify-between font-normal">
-                            {formData.parent_name || "Select distributor..."}
+                            {formData.parent_name || (distributors.find(d => d.id === (formData as any).distributor_id)?.name) || "Select distributor..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -1329,11 +1479,11 @@ export const RetailerDetailModal = ({ isOpen, onClose, retailer, onSuccess, star
                                     key={dist.id}
                                     value={dist.name}
                                     onSelect={() => {
-                                      setFormData({...formData, parent_name: dist.name});
+                                      setFormData({...formData, parent_name: dist.name, distributor_id: dist.id} as any);
                                       setDistributorOpen(false);
                                     }}
                                   >
-                                    <Check className={cn("mr-2 h-4 w-4", formData.parent_name === dist.name ? "opacity-100" : "opacity-0")} />
+                                    <Check className={cn("mr-2 h-4 w-4", (formData as any).distributor_id === dist.id || formData.parent_name === dist.name ? "opacity-100" : "opacity-0")} />
                                     {dist.name}
                                   </CommandItem>
                                 ))}

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { compressImageFile, compressToTargetSize } from "@/utils/imageCompression";
 import { useTranslation } from "react-i18next";
 import { Layout } from "@/components/Layout";
-import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft, User } from "lucide-react";
+import { Plus, MapPin, Phone, Store, Camera, Tag, X, ScanLine, Check, ChevronsUpDown, WifiOff, ChevronDown, Pencil, ArrowLeft, User, MessageCircle, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { useOfflineRetailers } from "@/hooks/useOfflineRetailers";
 import { useOfflineSync } from "@/hooks/useOfflineSync";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { useCompanyData } from "@/hooks/useCompanyData";
 
 export const AddRetailer = () => {
   const { t } = useTranslation();
@@ -31,6 +32,8 @@ export const AddRetailer = () => {
   const location = useLocation();
   const { user } = useAuth();
   const connectivityStatus = useConnectivity();
+  const { company, headerName } = useCompanyData();
+  const companyDisplayName = headerName || company?.name || "";
   const returnTo = location.state?.returnTo || '/my-retailers';
   const plannedBeats = location.state?.plannedBeats || [];
   
@@ -77,7 +80,7 @@ export const AddRetailer = () => {
       category: "",
       notes: "",
       parentType: "Distributor",
-      parentName: "BHARATH BEVERAGES",
+      parentName: "",
       selectedDistributors: [] as string[],
       locationTag: "",
       retailType: "",
@@ -109,7 +112,7 @@ export const AddRetailer = () => {
   const [distributors, setDistributors] = useState<{id: string, name: string}[]>([]);
   const [beatMappedDistributors, setBeatMappedDistributors] = useState<{id: string, name: string}[]>([]);
   const [selectedBeat, setSelectedBeat] = useState<string>('');
-  const [beats, setBeats] = useState<{beat_id: string, beat_name: string, id?: string}[]>([]);
+  const [beats, setBeats] = useState<{beat_id: string, beat_name: string, id?: string, user_id?: string, owner_name?: string | null, access_type?: string}[]>([]);
   const [isScanningBoard, setIsScanningBoard] = useState(false);
   const [territories, setTerritories] = useState<{id: string, name: string, region: string}[]>([]);
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null);
@@ -123,6 +126,9 @@ export const AddRetailer = () => {
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null);
   const [selectedOwnerName, setSelectedOwnerName] = useState<string>('');
   const [ownerComboOpen, setOwnerComboOpen] = useState(false);
+  const [contactDialog, setContactDialog] = useState<{ retailerId: string; phone: string; name: string } | null>(null);
+  const [contactSending, setContactSending] = useState<null | 'whatsapp' | 'call'>(null);
+
 
   const categories = ["Category A", "Category B", "Category C"];
   const parentTypes = ["Company", "Super Stockist", "Distributor"];
@@ -142,59 +148,96 @@ export const AddRetailer = () => {
   ];
   const [customRetailType, setCustomRetailType] = useState("");
 
-  // Load all distributors from distributors table
+  // Load all distributors from distributors table (cache-fallback when offline)
   const loadDistributors = async () => {
     if (!user) return;
+
+    const loadFromCache = async () => {
+      try {
+        await offlineStorage.init();
+        const cached = await offlineStorage.getAll<any>(STORES.DISTRIBUTORS);
+        setDistributors(
+          (cached || [])
+            .filter((d: any) => !d.status || d.status === 'active')
+            .map((d: any) => ({ id: d.id, name: d.name }))
+        );
+      } catch (e) {
+        console.error('[AddRetailer] cache read distributors failed:', e);
+        setDistributors([]);
+      }
+    };
+
+    if (!navigator.onLine) {
+      await loadFromCache();
+      return;
+    }
+
     const { data, error } = await supabase
       .from('distributors')
       .select('id, name')
       .eq('status', 'active')
       .order('name');
-    
+
     if (error) {
-      console.error('Failed to load distributors:', error);
-      setDistributors([]);
+      console.error('Failed to load distributors, falling back to cache:', error);
+      await loadFromCache();
     } else {
       setDistributors(data || []);
     }
   };
 
-  // Load distributors mapped to the selected beat
+  // Load distributors mapped to the selected beat (cache-fallback when offline)
   const loadBeatMappedDistributors = async (beatId: string) => {
     if (!beatId || beatId === 'unassigned') {
       setBeatMappedDistributors([]);
       return;
     }
-    
-    try {
-      // Find the beat's UUID from beat_id
-      const beat = beats.find(b => b.beat_id === beatId);
-      if (!beat?.id) {
-        setBeatMappedDistributors([]);
-        return;
-      }
 
+    // Find the beat's UUID from beat_id
+    const beat = beats.find(b => b.beat_id === beatId);
+    if (!beat?.id) {
+      setBeatMappedDistributors([]);
+      return;
+    }
+
+    const applyMapped = (rows: any[]) => {
+      const mapped = (rows || [])
+        .filter(d => d.distributors)
+        .map(d => ({ id: (d.distributors as any)?.id, name: (d.distributors as any)?.name }));
+      setBeatMappedDistributors(mapped);
+      if (mapped.length > 0 && !retailerData.selectedDistributors.length) {
+        handleInputChange("selectedDistributors", [mapped[0].id]);
+        handleInputChange("parentName", mapped[0].name);
+      }
+    };
+
+    const loadFromCache = async () => {
+      try {
+        await offlineStorage.init();
+        const cached = await offlineStorage.getAll<any>(STORES.DISTRIBUTOR_BEAT_MAPPINGS);
+        applyMapped((cached || []).filter((m: any) => m.beat_id === beat.id));
+      } catch (e) {
+        console.error('[AddRetailer] cache read beat mappings failed:', e);
+        setBeatMappedDistributors([]);
+      }
+    };
+
+    if (!navigator.onLine) {
+      await loadFromCache();
+      return;
+    }
+
+    try {
       const { data, error } = await supabase
         .from('distributor_beat_mappings')
         .select('distributor_id, distributors(id, name)')
         .eq('beat_id', beat.id);
-      
+
       if (error) throw error;
-      
-      const mappedDistributors = (data || [])
-        .filter(d => d.distributors)
-        .map(d => ({ id: (d.distributors as any)?.id, name: (d.distributors as any)?.name }));
-      
-      setBeatMappedDistributors(mappedDistributors);
-      
-      // Auto-select first distributor if available
-      if (mappedDistributors.length > 0 && !retailerData.selectedDistributors.length) {
-        handleInputChange("selectedDistributors", [mappedDistributors[0].id]);
-        handleInputChange("parentName", mappedDistributors[0].name);
-      }
+      applyMapped(data || []);
     } catch (error) {
-      console.error('Failed to load beat-mapped distributors:', error);
-      setBeatMappedDistributors([]);
+      console.error('Failed to load beat-mapped distributors, falling back to cache:', error);
+      await loadFromCache();
     }
   };
 
@@ -224,15 +267,20 @@ export const AddRetailer = () => {
       const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
       console.log('[AddRetailer Cache-First] Total cached beats:', cachedBeats.length);
       
-      const userBeats = cachedBeats.filter((beat: any) => {
-        return beat.created_by === user.id && beat.is_active;
-      });
-      
+      // Include both owned beats and beats shared/covering this user
+      const userBeats = cachedBeats.filter((beat: any) =>
+        beat.is_active !== false &&
+        (beat.user_id === user.id || beat.access_type)
+      );
+
       if (userBeats.length > 0) {
         const mappedBeats = userBeats.map((beat: any) => ({
           beat_id: beat.beat_id,
           beat_name: beat.beat_name,
-          id: beat.id
+          id: beat.id,
+          user_id: beat.user_id,
+          owner_name: beat.owner_name ?? null,
+          access_type: beat.access_type,
         }));
         setBeats(mappedBeats);
         cachedBeatsLoaded = true;
@@ -252,44 +300,99 @@ export const AddRetailer = () => {
           setTimeout(() => reject(new Error('Request timeout')), 8000)
         );
         
-        const fetchPromise = supabase
-          .from('beats')
-          .select('beat_id, beat_name, created_by, is_active, id')
-          .eq('created_by', user.id)
-          .eq('is_active', true)
-          .order('beat_name');
+        const nowIso = new Date().toISOString();
+        const fetchPromise = Promise.all([
+          supabase
+            .from('beats')
+            .select('beat_id, beat_name, user_id, created_by, owner_name, is_active, id')
+            .eq('user_id', user.id)
+            .eq('is_active', true),
+          supabase
+            .from('beat_user_access')
+            .select('access_type, beat_id, effective_from, effective_to, is_active, beats:beats!beat_user_access_beat_id_fkey(beat_id, beat_name, user_id, created_by, owner_name, is_active, id)')
+            .eq('user_id', user.id)
+            .eq('is_active', true)
+            .or(`effective_to.is.null,effective_to.gt.${nowIso}`),
+        ]);
         
-        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
-        
-        if (error) throw error;
-        
-        // Cache beats immediately after loading for offline access
-        if (data && data.length > 0) {
-          await offlineStorage.init();
-          console.log('[AddRetailer Online] Caching beats to IndexedDB:', data.length);
-          for (const beat of data) {
-            await offlineStorage.save(STORES.BEATS, {
-              id: beat.id,
-              beat_id: beat.beat_id,
-              beat_name: beat.beat_name,
-              created_by: user.id,
-              is_active: true
-            });
+        const [ownedRes, accessRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+        if (ownedRes.error) throw ownedRes.error;
+
+        // Fallback if FK relation name differs: the shared-access embed
+        // (beats:beats!beat_user_access_beat_id_fkey) errors because that FK
+        // does not exist, so re-query without the alias and stitch client-side.
+        let accessRows: any[] = accessRes?.data ?? [];
+        if (accessRes?.error || accessRes?.data == null) {
+          try {
+            const alt = await supabase
+              .from('beat_user_access')
+              .select('access_type, beat_id, effective_from, effective_to, is_active')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .or(`effective_to.is.null,effective_to.gt.${nowIso}`);
+            if (alt.error) throw alt.error;
+            const textIds = (alt.data ?? []).map((r: any) => r.beat_id);
+            if (textIds.length) {
+              const { data: beatRows, error: beatErr } = await supabase
+                .from('beats')
+                .select('beat_id, beat_name, user_id, created_by, owner_name, is_active, id')
+                .in('beat_id', textIds);
+              if (beatErr) throw beatErr;
+              const beatMap = new Map<string, any>();
+              for (const b of (beatRows ?? [])) beatMap.set(b.beat_id, b);
+              accessRows = (alt.data ?? []).map((r: any) => ({
+                ...r,
+                beats: beatMap.get(r.beat_id),
+              }));
+            } else {
+              accessRows = [];
+            }
+          } catch (fallbackErr) {
+            console.error('[AddRetailer Online] Shared-beat access fallback failed:', fallbackErr);
+            accessRows = [];
           }
-          console.log('[AddRetailer Online] ✅ Beats cached successfully');
+        }
+
+        const WRITE_ACCESS = new Set(['OWNED', 'CO_OWNER', 'OPERATIONAL', 'COVERAGE']);
+        const byId = new Map<string, any>();
+        for (const b of (ownedRes.data ?? [])) {
+          byId.set(b.beat_id, { ...b, access_type: 'OWNED' });
+        }
+        for (const row of accessRows) {
+          const at = String(row.access_type || '').toUpperCase();
+          if (!WRITE_ACCESS.has(at)) continue;
+          const beat = row.beats;
+          if (!beat?.beat_id || beat.is_active === false) continue;
+          if (byId.has(beat.beat_id)) continue;
+          byId.set(beat.beat_id, { ...beat, access_type: at });
         }
         
-        setBeats(data || []);
-        console.log('[AddRetailer Online] Loaded beats from Supabase:', data?.length || 0);
+        const merged = Array.from(byId.values()).sort((a: any, b: any) =>
+          String(a.beat_name || '').localeCompare(String(b.beat_name || ''))
+        );
+        
+        // Cache merged beats for offline access (single batched write)
+        try {
+          await offlineStorage.init();
+          await offlineStorage.replaceAll(
+            STORES.BEATS,
+            merged.map((b: any) => ({ ...b, is_active: true }))
+          );
+          console.log('[AddRetailer Online] ✅ Beats cached to IndexedDB:', merged.length);
+        } catch (e) {
+          console.warn('[AddRetailer] cache beats failed:', e);
+        }
+        
+        setBeats(merged);
+        console.log('[AddRetailer Online] Loaded beats from Supabase:', merged.length);
         return; // Success - exit function
       } catch (error) {
         console.error('[AddRetailer Online] Failed to load beats (timeout or error):', error);
-        // If we already loaded from cache, don't show error - cache data is displayed
         if (cachedBeatsLoaded) {
           console.log('[AddRetailer] Using cached beats due to network issue');
           return;
         }
-        // Fall through to cache fallback only if cache wasn't loaded
       }
     }
     
@@ -302,20 +405,20 @@ export const AddRetailer = () => {
         const cachedBeats = await offlineStorage.getAll(STORES.BEATS);
         console.log('[AddRetailer] Total cached beats:', cachedBeats.length);
         
-        const userBeats = cachedBeats.filter((beat: any) => {
-          const matches = beat.created_by === user.id && beat.is_active;
-          return matches;
-        });
+        const userBeats = cachedBeats.filter((beat: any) => beat.is_active);
         
         const mappedBeats = userBeats.map((beat: any) => ({
           beat_id: beat.beat_id,
-          beat_name: beat.beat_name
+          beat_name: beat.beat_name,
+          id: beat.id,
+          user_id: beat.user_id,
+          owner_name: beat.owner_name ?? null,
+          access_type: beat.access_type,
         }));
         
         setBeats(mappedBeats);
         console.log('[AddRetailer] Loaded beats from cache:', mappedBeats.length);
         
-        // If cache is empty and we're not definitely offline, show a toast
         if (mappedBeats.length === 0 && connectivityStatus !== 'offline') {
           toast({
             title: "Loading beats...",
@@ -345,19 +448,35 @@ export const AddRetailer = () => {
     }
   };
 
-  // Load all users for owner dropdown
+  // Load all users for owner dropdown (cache-fallback when offline)
   const loadAllUsers = async () => {
+    const loadFromCache = async () => {
+      try {
+        await offlineStorage.init();
+        const cached = await offlineStorage.getAll<any>(STORES.PROFILES);
+        setAllUsers((cached || []).filter((u: any) => u.full_name));
+      } catch (e) {
+        console.error('[AddRetailer] cache read profiles failed:', e);
+        setAllUsers([]);
+      }
+    };
+
+    if (!navigator.onLine) {
+      await loadFromCache();
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name')
         .order('full_name');
-      
+
       if (error) throw error;
       setAllUsers((data || []).filter(u => u.full_name));
     } catch (error) {
-      console.error('Error loading users:', error);
-      setAllUsers([]);
+      console.error('Error loading users, falling back to cache:', error);
+      await loadFromCache();
     }
   };
 
@@ -407,15 +526,31 @@ export const AddRetailer = () => {
     if (isEditMode && editingRetailer?.owner_id) {
       setSelectedOwnerId(editingRetailer.owner_id);
       setSelectedOwnerName(editingRetailer.owner_name || '');
-    } else if (!isEditMode && user && allUsers.length > 0 && !selectedOwnerId) {
-      // Auto-fill owner with current user when creating new retailer
-      const currentUserProfile = allUsers.find(u => u.id === user.id);
-      if (currentUserProfile) {
-        setSelectedOwnerId(user.id);
-        setSelectedOwnerName(currentUserProfile.full_name || '');
-      }
+    } else if (!isEditMode && user && !selectedOwnerId) {
+      // Auto-fill owner with current user (works offline even if profiles cache is empty)
+      const prof = allUsers.find(u => u.id === user.id);
+      setSelectedOwnerId(user.id);
+      setSelectedOwnerName(
+        prof?.full_name || (user.user_metadata as any)?.full_name || 'Me'
+      );
     }
   }, [isEditMode, editingRetailer, user, allUsers, selectedOwnerId]);
+
+  // When the selected beat is owned by someone else (shared / coverage),
+  // auto-assign the owner field to the beat owner so the new retailer stays
+  // with the beat owner after coverage ends. User can still override manually.
+  useEffect(() => {
+    if (isEditMode || !user || !selectedBeat) return;
+    const beat = beats.find(b => b.beat_id === selectedBeat);
+    if (!beat?.user_id) return;
+    const isOwnBeat = beat.user_id === user.id;
+    if (isOwnBeat) return;
+    // Only auto-switch when owner currently points to the current user (i.e. auto-filled, not a manual override)
+    if (selectedOwnerId && selectedOwnerId !== user.id) return;
+    setSelectedOwnerId(beat.user_id);
+    setSelectedOwnerName(beat.owner_name || '');
+  }, [selectedBeat, beats, user, isEditMode]);
+
   
   // Set photo preview when editing
   useEffect(() => {
@@ -439,6 +574,61 @@ export const AddRetailer = () => {
     }
   }, [isEditMode, editingRetailer, distributors]);
 
+  // In edit mode, fetch the freshest retailer row from DB and merge it in,
+  // so prefill is complete even if the caller passed only a partial object.
+  useEffect(() => {
+    if (!isEditMode || !editingRetailer?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('retailers')
+          .select('*')
+          .eq('id', editingRetailer.id)
+          .maybeSingle();
+        if (error || !data || cancelled) return;
+        const r: any = data;
+        const competitors = r.competitors || [];
+        setRetailerData(prev => ({
+          ...prev,
+          name: r.name ?? prev.name,
+          contactName: r.contact_name ?? prev.contactName,
+          contactTitle: r.contact_title ?? prev.contactTitle,
+          gstNumber: r.gst_number ?? prev.gstNumber,
+          phone: r.phone ?? prev.phone,
+          address: r.address ?? prev.address,
+          category: r.category ?? prev.category,
+          notes: r.notes ?? prev.notes,
+          parentType: r.parent_type ?? prev.parentType,
+          parentName: r.parent_name ?? prev.parentName,
+          locationTag: r.location_tag ?? prev.locationTag,
+          retailType: r.retail_type ?? prev.retailType,
+          potential: r.potential
+            ? String(r.potential).charAt(0).toUpperCase() + String(r.potential).slice(1)
+            : prev.potential,
+          competitor1: competitors[0] ?? prev.competitor1,
+          competitor2: competitors[1] ?? prev.competitor2,
+          competitor3: competitors[2] ?? prev.competitor3,
+          latitude: r.latitude != null ? String(r.latitude) : prev.latitude,
+          longitude: r.longitude != null ? String(r.longitude) : prev.longitude,
+          photo_url: r.photo_url ?? prev.photo_url,
+          manual_credit_score: r.manual_credit_score != null ? String(r.manual_credit_score) : prev.manual_credit_score,
+          state: r.state ?? prev.state,
+        }));
+        if (r.photo_url) setCapturedPhotoPreview(r.photo_url);
+        if (r.beat_id) setSelectedBeat(prev => prev || r.beat_id);
+        if (r.territory_id) setSelectedTerritoryId(prev => prev || r.territory_id);
+        if (r.owner_id) {
+          setSelectedOwnerId(prev => prev || r.owner_id);
+          setSelectedOwnerName(prev => prev || r.owner_name || '');
+        }
+      } catch (e) {
+        console.error('Edit-mode fresh fetch failed:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isEditMode, editingRetailer?.id]);
+
   const loadCreditConfig = async () => {
     try {
       const { data, error } = await supabase
@@ -453,6 +643,17 @@ export const AddRetailer = () => {
       console.error('Error loading credit config:', error);
     }
   };
+
+  // Auto-fill parent name with company brand when Parent Type is Company
+  useEffect(() => {
+    if (
+      retailerData.parentType === "Company" &&
+      companyDisplayName &&
+      !retailerData.parentName
+    ) {
+      setRetailerData(prev => ({ ...prev, parentName: companyDisplayName }));
+    }
+  }, [retailerData.parentType, companyDisplayName, retailerData.parentName]);
 
   const handleInputChange = (field: string, value: string | string[]) => {
     setRetailerData(prev => ({ ...prev, [field]: value }));
@@ -773,11 +974,46 @@ export const AddRetailer = () => {
   const { createRetailer } = useOfflineRetailers();
   const { isOnline } = useOfflineSync();
 
-  const performInsert = async (beatId: string) => {
+  type DuplicateMatch = {
+    id: string;
+    name: string;
+    phone: string | null;
+    owner_user_id: string;
+    owner_name: string | null;
+    matched_on: string[];
+    distance_m: number | null;
+  };
+  const [duplicateDialog, setDuplicateDialog] = useState<{ beatId: string; matches: DuplicateMatch[] } | null>(null);
+  const [duplicateSharing, setDuplicateSharing] = useState(false);
+
+  const performInsert = async (beatId: string, opts?: { skipDupCheck?: boolean; duplicateOfId?: string }) => {
     if (!user) {
       toast({ title: 'Not signed in', description: 'Please sign in to continue', variant: 'destructive' });
       return;
     }
+
+    // R-3: warn (never block) when a possible duplicate exists.
+    if (!isEditMode && !opts?.skipDupCheck) {
+      try {
+        const lat = retailerData.latitude ? parseFloat(retailerData.latitude) : null;
+        const lng = retailerData.longitude ? parseFloat(retailerData.longitude) : null;
+        const { data: dups, error: dupErr } = await supabase.rpc('find_duplicate_retailers' as any, {
+          p_name: retailerData.name,
+          p_phone: retailerData.phone || null,
+          p_lat: lat,
+          p_lng: lng,
+        });
+        if (dupErr) {
+          console.warn('find_duplicate_retailers failed, proceeding without warning:', dupErr);
+        } else if (Array.isArray(dups) && dups.length > 0) {
+          setDuplicateDialog({ beatId, matches: dups as DuplicateMatch[] });
+          return;
+        }
+      } catch (e) {
+        console.warn('find_duplicate_retailers threw, proceeding without warning:', e);
+      }
+    }
+
     setIsSaving(true);
     
     const payload: any = {
@@ -834,34 +1070,71 @@ export const AddRetailer = () => {
         setIsSaving(false);
       }
     } else {
-      // Create new retailer
-      payload.user_id = user.id;
+      // Create new retailer — ownership follows the beat owner for shared/coverage beats,
+      // so retailers stay with the beat owner after coverage ends.
+      const selectedBeatRow = beats.find(b => b.beat_id === beatId);
+      const beatOwnerUserId = selectedBeatRow?.user_id ?? user.id;
+      const beatOwnerName = selectedBeatRow?.owner_name ?? null;
+      const isOwnBeat = beatOwnerUserId === user.id;
+
+      payload.created_by = user.id; // audit: who physically added the row
+      payload.user_id = isOwnBeat ? user.id : beatOwnerUserId;
+      // Form-picked owner wins (manual override); otherwise default to beat owner
+      payload.owner_id = selectedOwnerId || (isOwnBeat ? user.id : beatOwnerUserId);
+      payload.owner_name = selectedOwnerName || (isOwnBeat ? null : beatOwnerName);
       payload.status = 'active';
       
+      // SIMPLE FLOW: Retailer starts unverified, waiting for WhatsApp confirmation
+      payload.retailer_confirmed = false;  // Waiting for WhatsApp confirmation
+      payload.verified = false;             // Not verified yet
+      payload.verification_method = null;   // Will be set to 'whatsapp' when customer confirms
+      
+      if (opts?.duplicateOfId) {
+        payload.duplicate_of = opts.duplicateOfId;
+        payload.duplicate_risk_score = 90;
+      }
+
       const result = await createRetailer(payload);
       setIsSaving(false);
 
+      // Note: Welcome message no longer auto-sent. User chooses WhatsApp/SMS/Call from post-save dialog.
+
       if (result.success) {
-        const message = result.offline 
-          ? `${retailerData.name} saved offline. Will sync when online.`
-          : `${retailerData.name} saved successfully.`;
-        
-        toast({ 
-          title: result.offline ? 'Retailer Saved Offline' : 'Retailer Added', 
-          description: message,
+        let title = 'Retailer Created';
+        let description = `${retailerData.name} created successfully.`;
+
+        if (result.offline) {
+          title = 'Retailer Saved Offline';
+          description = `${retailerData.name} saved offline. You can notify the customer once back online.`;
+        }
+
+        toast({
+          title,
+          description,
           action: result.offline ? <WifiOff className="h-4 w-4" /> : undefined
         });
-        
-        navigate(returnTo, { replace: true });
+
+        // Open contact-action dialog so user picks WhatsApp / SMS / Call.
+        // Offline rows have no id yet — just navigate back.
+        if (!isEditMode && result.data?.id && payload.phone && !result.offline) {
+          setContactDialog({
+            retailerId: result.data.id,
+            phone: payload.phone,
+            name: retailerData.name,
+          });
+        } else {
+          navigate(result.offline ? '/visits/retailers' : returnTo, { replace: true });
+        }
       } else {
-        toast({ 
-          title: 'Failed to save', 
-          description: 'Could not save retailer', 
-          variant: 'destructive' 
+        toast({
+          title: 'Failed to save',
+          description: 'Could not save retailer',
+          variant: 'destructive'
         });
       }
     }
   };
+
 
   const handleSaveWithBeat = async () => {
     if (!retailerData.name || !retailerData.phone || !retailerData.address) {
@@ -925,11 +1198,33 @@ export const AddRetailer = () => {
     setValidationErrors(errors);
     
     if (Object.keys(errors).length > 0) {
-      // Show toast as backup, but inline errors will always show
+      // Toast lists the actual missing fields so an offline user immediately
+      // sees WHICH field (Distributor, GPS, etc.) is blocking Save.
+      const messages = Object.values(errors).filter(Boolean);
       toast({
         title: "Missing Required Fields",
-        description: "Please fill in all fields marked with *",
+        description: messages.join(' • '),
         variant: "destructive"
+      });
+
+      // Scroll to the first errored field
+      const firstKey = Object.keys(errors)[0];
+      const idMap: Record<string, string> = {
+        location: 'latitude',
+        distributor: 'beat',
+        parentType: 'beat',
+        retailType: 'name',
+        category: 'name',
+      };
+      const targetId = idMap[firstKey] || firstKey;
+      requestAnimationFrame(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          try { (el as HTMLElement).focus?.(); } catch { /* no-op */ }
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       });
       return;
     }
@@ -1096,6 +1391,7 @@ export const AddRetailer = () => {
                 <Label htmlFor="name">{t('retailer.retailerName')} *</Label>
                 <Input
                   id="name"
+                  data-testid="retailer-name-input"
                   placeholder={t('retailer.enterRetailerName')}
                   value={retailerData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
@@ -1148,6 +1444,7 @@ export const AddRetailer = () => {
                 <Label htmlFor="phone">{t('retailer.phone')} *</Label>
                 <Input
                   id="phone"
+                  data-testid="retailer-phone-input"
                   type="tel"
                   placeholder={t('retailer.enterPhone')}
                   value={retailerData.phone}
@@ -1161,6 +1458,7 @@ export const AddRetailer = () => {
                 <div className="flex gap-2">
                   <Textarea
                     id="address"
+                    data-testid="retailer-address-input"
                     placeholder="Enter complete address"
                     value={retailerData.address}
                     onChange={(e) => handleInputChange("address", e.target.value)}
@@ -1170,6 +1468,7 @@ export const AddRetailer = () => {
                     type="button" 
                     variant="outline" 
                     size="icon"
+                    data-testid="retailer-get-location-button"
                     onClick={async () => {
                       if (!navigator.geolocation) {
                         toast({ 
@@ -1605,13 +1904,20 @@ export const AddRetailer = () => {
                       }
                     }}
                   >
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="bg-background" data-testid="retailer-retail-type-select">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent className="bg-background border z-50">
-                      {retailTypes.map((type) => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
+                      {(() => {
+                        const list = [...retailTypes];
+                        const v = retailerData.retailType;
+                        if (v && v !== "Other" && !list.some(t => t.toLowerCase() === v.toLowerCase())) {
+                          list.unshift(v);
+                        }
+                        return list.map((type) => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
                   {retailerData.retailType === "Other" && (
@@ -1630,13 +1936,20 @@ export const AddRetailer = () => {
                 <div className="space-y-2">
                   <Label>{t('retailer.category')} *</Label>
                   <Select value={retailerData.category} onValueChange={(value) => handleInputChange("category", value)}>
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="bg-background" data-testid="retailer-category-select">
                       <SelectValue placeholder={t('retailer.selectCategory')} />
                     </SelectTrigger>
                     <SelectContent className="bg-background border z-50">
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>{category}</SelectItem>
-                      ))}
+                      {(() => {
+                        const list = [...categories];
+                        const v = retailerData.category;
+                        if (v && !list.some(c => c.toLowerCase() === v.toLowerCase())) {
+                          list.unshift(v);
+                        }
+                        return list.map((category) => (
+                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1675,7 +1988,7 @@ export const AddRetailer = () => {
                       }
                     }}
                   >
-                    <SelectTrigger className={cn("bg-background border-primary/30", validationErrors.beat && "border-destructive")}>
+                    <SelectTrigger data-testid="retailer-beat-select" className={cn("bg-background border-primary/30", validationErrors.beat && "border-destructive")}>
                       <SelectValue placeholder="Select a beat" />
                     </SelectTrigger>
                     <SelectContent className="bg-background border z-50">
@@ -1694,6 +2007,15 @@ export const AddRetailer = () => {
                     <p className="text-sm text-destructive">{validationErrors.beat}</p>
                   )}
                   <p className="text-xs text-muted-foreground">Select which beat this retailer belongs to</p>
+                  {(() => {
+                    const sb = beats.find(b => b.beat_id === selectedBeat);
+                    if (!sb?.user_id || !user?.id || sb.user_id === user.id) return null;
+                    return (
+                      <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+                        This beat is owned by <span className="font-semibold">{sb.owner_name || 'another user'}</span>. The new retailer will be assigned to them; you'll remain recorded as the creator.
+                      </p>
+                    );
+                  })()}
                 </div>
 
                 {/* Territory Selection */}
@@ -1770,12 +2092,18 @@ export const AddRetailer = () => {
                     value={retailerData.parentType} 
                     onValueChange={(value) => {
                       handleInputChange("parentType", value);
+                      if (value === "Company") {
+                        handleInputChange("parentName", companyDisplayName);
+                      } else if (retailerData.parentType === "Company") {
+                        // switching away from Company → clear the auto-filled company name
+                        handleInputChange("parentName", "");
+                      }
                       if (validationErrors.parentType) {
                         setValidationErrors(prev => ({ ...prev, parentType: '' }));
                       }
                     }}
                   >
-                    <SelectTrigger className={cn("bg-background", validationErrors.parentType && "border-destructive")}>
+                    <SelectTrigger data-testid="retailer-parent-type-select" className={cn("bg-background", validationErrors.parentType && "border-destructive")}>
                       <SelectValue placeholder="Select parent" />
                     </SelectTrigger>
                     <SelectContent className="bg-background border z-50">
@@ -1804,7 +2132,7 @@ export const AddRetailer = () => {
                         }
                       }}
                     >
-                      <SelectTrigger className={cn("bg-background", validationErrors.distributor && "border-destructive")}>
+                      <SelectTrigger data-testid="retailer-distributor-select" className={cn("bg-background", validationErrors.distributor && "border-destructive")}>
                         <SelectValue placeholder="Select distributor" className="truncate" />
                       </SelectTrigger>
                       <SelectContent className="bg-background border z-50">
@@ -1869,7 +2197,7 @@ export const AddRetailer = () => {
 
           {/* Actions */}
           <div className="flex gap-2">
-            <Button type="submit" className="flex-1" size="lg" disabled={isSaving}>
+            <Button type="submit" data-testid="save-retailer-button" className="flex-1" size="lg" disabled={isSaving}>
               <Plus size={16} className="mr-2" />
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -1905,6 +2233,191 @@ export const AddRetailer = () => {
             <DialogFooter>
               <Button variant="secondary" onClick={() => setBeatDialogOpen(false)}>Cancel</Button>
               <Button onClick={confirmAssignBeat} disabled={isSaving}>Assign & Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Post-save contact action dialog */}
+        <Dialog
+          open={!!contactDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              setContactDialog(null);
+              navigate(returnTo, { replace: true });
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Notify {contactDialog?.name}</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Choose how to reach the retailer at {contactDialog?.phone}.
+            </p>
+            <div className="grid gap-2 py-2">
+              <Button
+                variant="default"
+                className="justify-start"
+                disabled={contactSending !== null}
+                onClick={async () => {
+                  if (!contactDialog) return;
+                  setContactSending('whatsapp');
+                  try {
+                    const { triggerRetailerWelcomeMessage } = await import('@/utils/retailerWelcomeMessage');
+                    const result = await triggerRetailerWelcomeMessage(contactDialog.retailerId, contactDialog.phone);
+                    if (result.ok) {
+                      toast({ title: 'WhatsApp sent', description: `Message sent to ${contactDialog.phone}${result.sid ? ` (SID ${result.sid.slice(0, 10)}…)` : ''}` });
+                    } else {
+                      toast({ title: 'WhatsApp not sent', description: result.error || 'Twilio rejected the message', variant: 'destructive' });
+                    }
+                  } catch (e: any) {
+                    toast({ title: 'Failed to send WhatsApp', description: e?.message || 'Try again', variant: 'destructive' });
+                  } finally {
+                    setContactSending(null);
+                    setContactDialog(null);
+                    navigate(returnTo, { replace: true });
+                  }
+                }}
+              >
+                <MessageCircle className="h-4 w-4 mr-2" />
+                {contactSending === 'whatsapp' ? 'Sending…' : 'Send WhatsApp'}
+              </Button>
+              <Button
+                variant="secondary"
+                className="justify-start"
+                onClick={() => {
+                  toast({ title: 'Coming soon', description: 'SMS sending will be available shortly.' });
+                }}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Send SMS
+              </Button>
+              <Button
+                variant="secondary"
+                className="justify-start"
+                disabled={contactSending !== null}
+                onClick={async () => {
+                  if (!contactDialog) return;
+                  setContactSending('call');
+                  toast({ title: 'Calling retailer via Bolna…' });
+                  try {
+                    const { data, error } = await supabase.functions.invoke('bolna-outbound-call', {
+                      body: { retailer_id: contactDialog.retailerId },
+                    });
+                    if (error) throw error;
+                    if (!(data as any)?.success) throw new Error((data as any)?.error || 'Failed to initiate outbound call.');
+                    toast({ title: 'Call initiated.' });
+                  } catch (e: any) {
+                    toast({ title: e?.message || 'Failed to initiate outbound call.', variant: 'destructive' });
+                  } finally {
+                    setContactSending(null);
+                    setContactDialog(null);
+                    navigate(returnTo, { replace: true });
+                  }
+                }}
+              >
+                <Phone className="h-4 w-4 mr-2" />
+                {contactSending === 'call' ? 'Calling…' : 'Initiate Call'}
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setContactDialog(null);
+                  navigate(returnTo, { replace: true });
+                }}
+              >
+                Skip
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* R-3: possible-duplicate warning (never blocks) */}
+        <Dialog
+          open={!!duplicateDialog}
+          onOpenChange={(open) => { if (!open) setDuplicateDialog(null); }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Possible duplicate retailer</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              We found {duplicateDialog?.matches.length} retailer{(duplicateDialog?.matches.length || 0) > 1 ? 's' : ''} that may already exist. You can still continue.
+            </p>
+            <div className="max-h-64 overflow-y-auto divide-y rounded-md border">
+              {duplicateDialog?.matches.map((m) => (
+                <div key={m.id} className="p-3 text-sm">
+                  <div className="font-medium">{m.name}</div>
+                  <div className="text-muted-foreground">
+                    already present under <span className="font-medium text-foreground">{m.owner_name || 'another user'}</span>
+                    {' '}(matched on: {m.matched_on.join(', ') || '—'}
+                    {m.distance_m != null && m.matched_on.includes('location') ? ` · ${m.distance_m}m` : ''})
+                  </div>
+                  {m.phone ? <div className="text-xs text-muted-foreground mt-0.5">📞 {m.phone}</div> : null}
+                </div>
+              ))}
+            </div>
+            <DialogFooter className="flex-col gap-2 sm:flex-row">
+              <Button
+                variant="ghost"
+                onClick={() => setDuplicateDialog(null)}
+                disabled={duplicateSharing}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={duplicateSharing || !duplicateDialog?.matches[0]}
+                onClick={async () => {
+                  if (!duplicateDialog || !user) return;
+                  const top = duplicateDialog.matches[0];
+                  setDuplicateSharing(true);
+                  try {
+                    const requesterName = (user.user_metadata as any)?.full_name || user.email || 'A colleague';
+                    const { error } = await supabase.from('notifications').insert({
+                      user_id: top.owner_user_id,
+                      title: 'Retailer share request',
+                      message: `${requesterName} wants to work with "${top.name}" and has requested share access.`,
+                      type: 'retailer_share_request',
+                      related_table: 'retailers',
+                      related_id: top.id,
+                      retailer_id: top.id,
+                      metadata: {
+                        requested_by: user.id,
+                        requested_by_name: requesterName,
+                        retailer_name: top.name,
+                        matched_on: top.matched_on,
+                      },
+                    } as any);
+                    if (error) throw error;
+                    toast({ title: 'Share request sent', description: `${top.owner_name || 'The owner'} will be notified.` });
+                    setDuplicateDialog(null);
+                    navigate(returnTo, { replace: true });
+                  } catch (e: any) {
+                    console.error('share request failed', e);
+                    toast({ title: 'Could not send request', description: e?.message || 'Try again', variant: 'destructive' });
+                  } finally {
+                    setDuplicateSharing(false);
+                  }
+                }}
+              >
+                {duplicateSharing ? 'Requesting…' : 'Request share'}
+              </Button>
+              <Button
+                variant="default"
+                disabled={duplicateSharing}
+                onClick={() => {
+                  if (!duplicateDialog) return;
+                  const top = duplicateDialog.matches[0];
+                  const beatId = duplicateDialog.beatId;
+                  setDuplicateDialog(null);
+                  performInsert(beatId, { skipDupCheck: true, duplicateOfId: top?.id });
+                }}
+              >
+                Continue anyway
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

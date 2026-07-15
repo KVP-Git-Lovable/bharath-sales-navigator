@@ -111,7 +111,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
     console.log('[PendingPayments] Setting up real-time subscription...');
     
     const channel = supabase
-      .channel('pending-payments-changes')
+      .channel(`pending-payments-changes-${userId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -132,7 +132,7 @@ export const PendingPayments = ({ userId }: PendingPaymentsProps) => {
 
     // Also listen to orders table for payment updates
     const ordersChannel = supabase
-      .channel('pending-payments-orders')
+      .channel(`pending-payments-orders-${userId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {

@@ -12,6 +12,13 @@ import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { InventoryValuationConfig } from '@/components/admin/InventoryValuationConfig';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ByCompanyTab } from '@/components/features/admin/ByCompanyTab';
+import { ByRoleTab } from '@/components/features/admin/ByRoleTab';
+import { ByUserTab } from '@/components/features/admin/ByUserTab';
+import { DependenciesTab } from '@/components/features/admin/DependenciesTab';
+import { AuditLogTab } from '@/components/features/admin/AuditLogTab';
+import { Layout } from '@/components/Layout';
 
 const FeatureManagement = () => {
   const { hasAdminAccess, loading } = useAdminAccess();
@@ -56,9 +63,11 @@ const FeatureManagement = () => {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
     );
   }
 
@@ -78,9 +87,11 @@ const FeatureManagement = () => {
 
   // Filter features based on search
   const filteredGroupedFeatures = Object.entries(groupedFeatures || {}).reduce((acc, [category, categoryFeatures]) => {
+    const q = searchQuery.toLowerCase();
     const filtered = (categoryFeatures as any[])?.filter((feature: any) => 
-      feature.feature_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      feature.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      (feature.feature_name?.toLowerCase().includes(q)) ||
+      (feature.feature_key?.toLowerCase().includes(q)) ||
+      (feature.description?.toLowerCase().includes(q))
     );
     if (filtered && filtered.length > 0) {
       acc[category] = filtered;
@@ -112,18 +123,11 @@ const FeatureManagement = () => {
   const totalCount = features?.length || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-subtle p-4">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <Layout>
+      <div className="min-h-screen bg-gradient-subtle p-4">
+        <div className="w-full space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button 
-            onClick={() => navigate('/admin-controls')} 
-            variant="ghost" 
-            size="sm"
-            className="p-2"
-          >
-            <ArrowLeft size={20} />
-          </Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-foreground">Feature Management</h1>
             <p className="text-muted-foreground text-sm">Enable or disable features by module</p>
@@ -140,6 +144,17 @@ const FeatureManagement = () => {
           </div>
         </div>
 
+        <Tabs defaultValue="global" className="w-full">
+          <TabsList>
+            <TabsTrigger value="global">Global Features</TabsTrigger>
+            <TabsTrigger value="company">By Company</TabsTrigger>
+            <TabsTrigger value="role">By Role</TabsTrigger>
+            <TabsTrigger value="user">By User</TabsTrigger>
+            <TabsTrigger value="deps">Dependencies</TabsTrigger>
+            <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="global" className="space-y-4">
         {/* Search and Actions */}
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -254,8 +269,17 @@ const FeatureManagement = () => {
             </p>
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="company"><ByCompanyTab /></TabsContent>
+          <TabsContent value="role"><ByRoleTab /></TabsContent>
+          <TabsContent value="user"><ByUserTab /></TabsContent>
+          <TabsContent value="deps"><DependenciesTab /></TabsContent>
+          <TabsContent value="audit"><AuditLogTab /></TabsContent>
+        </Tabs>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 

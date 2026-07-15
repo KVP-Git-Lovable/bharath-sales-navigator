@@ -211,7 +211,8 @@ export const useTeamAttendance = (
 
       // Parallel: show all pending steps for pending requests
       const myTurnSteps = (steps || []).filter((s: any) =>
-        s.approval_requests?.status === 'pending'
+        s.approval_requests?.status === 'pending' &&
+        ['leave', 'regularization'].includes(s.approval_requests?.entity_type)
       );
 
       if (myTurnSteps.length === 0) return [];
@@ -235,13 +236,13 @@ export const useTeamAttendance = (
         leaveIds.length > 0
           ? supabase
               .from('leave_applications')
-              .select('id, user_id, start_date, end_date, reason, leave_type_id, days_requested, is_half_day, half_day_period')
+              .select('id, user_id, start_date, end_date, reason, leave_type_id, days_requested, is_half_day, half_day_period, created_at')
               .in('id', leaveIds)
           : Promise.resolve({ data: [], error: null }),
         regIds.length > 0
           ? supabase
               .from('regularization_requests')
-              .select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time')
+              .select('id, user_id, attendance_date, reason, requested_check_in_time, requested_check_out_time, created_at')
               .in('id', regIds)
           : Promise.resolve({ data: [], error: null }),
         requesterIds.length > 0
@@ -387,7 +388,8 @@ export const useTeamAttendance = (
       }
 
       const processedSteps = (steps || []).filter((s: any) =>
-        ['approved', 'rejected'].includes(s.approval_requests?.status)
+        ['approved', 'rejected'].includes(s.approval_requests?.status) &&
+        ['leave', 'regularization'].includes(s.approval_requests?.entity_type)
       );
 
       if (processedSteps.length === 0) return [];
@@ -693,8 +695,14 @@ export const useTeamAttendance = (
         }
       });
 
-    // Pending first, then processed (most recent first)
-    return [...engineApprovals, ...legacyRegApprovals, ...processedApprovals];
+    // Pending first (newest created first), then processed
+    const getCreated = (a: any): number => {
+      const src = (pendingStepsData as any[]).find((x: any) => (x.entityData?.id || x.entityId) === a.id);
+      const c = src?.entityData?.created_at;
+      return c ? new Date(c).getTime() : 0;
+    };
+    const sortedEngine = [...engineApprovals].sort((a, b) => getCreated(b) - getCreated(a));
+    return [...sortedEngine, ...legacyRegApprovals, ...processedApprovals];
   }, [pendingStepsData, processedStepsData, pendingRegularizations, profiles, approvalUserIds]);
 
   // handleLeaveAction: uses approval engine if approvalRequestId present, else legacy direct update

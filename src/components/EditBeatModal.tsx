@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { SearchInput } from '@/components/SearchInput';
 import { Save, X, Users, MapPin, Clock, Truck, Repeat, CalendarDays, Navigation, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +26,7 @@ interface Beat {
   average_km?: number;
   average_time_minutes?: number;
   territory_id?: string;
+  category?: string;
 }
 
 interface Territory {
@@ -56,6 +56,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
   const [travelAllowance, setTravelAllowance] = useState('');
   const [averageKm, setAverageKm] = useState('');
   const [averageTimeMinutes, setAverageTimeMinutes] = useState('');
+  const [category, setCategory] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [allRetailers, setAllRetailers] = useState<Retailer[]>([]);
@@ -100,6 +101,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
       setBeatName(beat.name || '');
       setAverageKm(beat.average_km?.toString() || '');
       setAverageTimeMinutes(beat.average_time_minutes?.toString() || '');
+      setCategory(beat.category || '');
       loadRetailers();
       loadTerritories();
       loadBeatTerritory();
@@ -269,16 +271,17 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
 
     setLoading(true);
     try {
-      // Update the shared beats table
+      // Update the shared beats table.
+      // Note: beat.id here is the text beat_id (see MyBeats.loadBeats which maps id: beat.beat_id).
       const { error: beatUpdateError } = await supabase
         .from('beats')
         .update({
           beat_name: beatName.trim(),
+          category: category.trim() || null,
           travel_allowance: taType === 'fixed' ? fixedTaAmount : (parseFloat(travelAllowance) || 0),
           average_km: parseFloat(averageKm) || 0,
           average_time_minutes: parseInt(averageTimeMinutes) || 0,
           territory_id: selectedTerritoryId || null,
-          updated_at: new Date().toISOString()
         })
         .eq('beat_id', beat.id);
 
@@ -347,14 +350,8 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
         if (addError) throw addError;
       }
 
-      // Update beat name for all current retailers in this beat
-      const { error: updateNameError } = await supabase
-        .from('retailers')
-        .update({ beat_name: beatName.trim() })
-        .eq('beat_id', beat.id)
-        .eq('user_id', user.id);
-
-      if (updateNameError) throw updateNameError;
+      // Note: retailers.beat_name is auto-synced for ALL users by the
+      // trg_sync_retailers_beat_name database trigger when beats.beat_name changes.
 
       // Handle beat plans if recurrence is enabled
       if (repeatEnabled && repeatEndDate) {
@@ -396,6 +393,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
     setTravelAllowance('');
     setAverageKm('');
     setAverageTimeMinutes('');
+    setCategory('');
     setSearchTerm('');
     setSelectedRetailers(new Set());
     setRepeatEnabled(false);
@@ -410,11 +408,15 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
     onClose();
   };
 
-  const filteredRetailers = retailers.filter(retailer =>
-    retailer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    retailer.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    retailer.phone.includes(searchTerm)
-  );
+  const filteredRetailers = retailers.filter(retailer => {
+    const q = searchTerm.toLowerCase();
+    return (
+      retailer.name.toLowerCase().includes(q) ||
+      retailer.address.toLowerCase().includes(q) ||
+      retailer.phone.includes(searchTerm) ||
+      (retailer.beat_name || '').toLowerCase().includes(q)
+    );
+  });
 
   const getCurrentBeatName = (retailer: Retailer) => {
     if (!retailer.beat_id || retailer.beat_id === 'unassigned') {
@@ -425,16 +427,26 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-4 sm:p-6">
+      <DialogContent className="w-[95vw] max-w-4xl h-[90dvh] max-h-[90dvh] overflow-hidden !flex flex-col p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Edit Beat: {beat?.name}
           </DialogTitle>
         </DialogHeader>
+
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 flex gap-2">
+          <Info className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Edit this beat's details</p>
+            <p className="mt-0.5 text-blue-800">
+              Update name, area, schedule, retailers, and travel settings. Changes apply immediately to all retailers in this beat. To make a copy instead, use <strong>Clone Beat</strong>. To reassign permanently to another rep, use <strong>Transfer Ownership</strong>. For short-term cover, use <strong>Assign Coverage</strong>.
+            </p>
+          </div>
+        </div>
         
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-[60vh] pr-4">
+        
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-2 sm:pr-4 pb-28">
             <div className="space-y-6">
               {/* Beat Details Form */}
               <Card>
@@ -507,6 +519,17 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Input
+                      id="category"
+                      placeholder="e.g. General, Premium, Wholesale"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    />
+                  </div>
+                  
                   
                   <div className="space-y-2">
                     <Label htmlFor="territory" className="flex items-center gap-2">
@@ -704,7 +727,7 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                   </div>
                   
                   <SearchInput
-                    placeholder="Search retailers by name, address, or phone"
+                    placeholder="Search retailers by name, address, phone, or beat"
                     value={searchTerm}
                     onChange={setSearchTerm}
                   />
@@ -769,7 +792,6 @@ export const EditBeatModal = ({ isOpen, onClose, beat, onBeatUpdated }: EditBeat
                 </CardContent>
               </Card>
             </div>
-          </ScrollArea>
         </div>
         
         <div className="flex justify-end gap-2 pt-4 border-t">

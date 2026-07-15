@@ -29,6 +29,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { FeedbackSummarySection } from "@/components/FeedbackSummarySection";
 import { UserSelector } from "@/components/UserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
+import { useActivityTypes } from "@/hooks/useActivityTypes";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -40,6 +41,9 @@ export const TodaySummary = () => {
   const [loading, setLoading] = useState(true);
   const initialLoadDone = useRef(false);
   const { user } = useAuth();
+  const { types: activityTypesMaster } = useActivityTypes();
+  const activityTypesRef = useRef(activityTypesMaster);
+  activityTypesRef.current = activityTypesMaster;
   const isAdmin = false; // No longer used for gating; kept for backward compat in data loading
   
   // Hierarchical user filter (for managers)
@@ -88,7 +92,7 @@ export const TodaySummary = () => {
     totalOrderValue: 0,
     avgOrderValue: 0,
     totalKgSold: 0,
-    totalKgSoldFormatted: "0 KG",
+    totalKgSoldFormatted: "0 PC",
     visitEfficiency: 0,
     orderConversionRate: 0,
     distanceCovered: 0,
@@ -103,7 +107,7 @@ export const TodaySummary = () => {
   ]);
 
   const [topRetailers, setTopRetailers] = useState<Array<{ name: string; orderValue: number; location: string }>>([]);
-  const [productSales, setProductSales] = useState<Array<{ name: string; kgSold: number; kgFormatted: string; revenue: number }>>([]);
+  const [productSales, setProductSales] = useState<Array<{ name: string; qty: number; unit: string; qtyFormatted: string; revenue: number; kgSold: number; kgFormatted: string }>>([]);
   const [orders, setOrders] = useState<Array<{ retailer: string; amount: number; kgSold: number; kgFormatted: string; creditAmount: number; cashInHand: number; paymentMethod: string }>>([]);
   const [visitsByStatus, setVisitsByStatus] = useState<Record<string, Array<{ retailer: string; note?: string; totalValue?: number; beatName?: string; address?: string; planDate?: string }>>>({});
   const [productGroupedOrders, setProductGroupedOrders] = useState<Array<{ product: string; kgSold: number; kgFormatted: string; value: number; orders: number }>>([]);
@@ -151,6 +155,33 @@ export const TodaySummary = () => {
 
   const [pointsEarnedToday, setPointsEarnedToday] = useState(0);
   const [completedActivitiesCount, setCompletedActivitiesCount] = useState(0);
+  const [activitySummary, setActivitySummary] = useState<{
+    totalCount: number;
+    completedCount: number;
+    totalFieldMinutes: number;
+    completedFieldMinutes: number;
+    activityProductivityPoints: number;
+    byType: Array<{
+      type: string;
+      label: string;
+      count: number;
+      completedCount: number;
+      totalMinutes: number;
+      color: string;
+      weight: number;
+      details: Array<{
+        name: string;
+        duration: string;
+        outcome?: string;
+        beat?: string;
+        checkInTime?: string;
+        checkOutTime?: string;
+        completed: boolean;
+        weight: number;
+      }>;
+    }>;
+    overdueFollowUps: number;
+  }>({ totalCount: 0, completedCount: 0, totalFieldMinutes: 0, completedFieldMinutes: 0, activityProductivityPoints: 0, byType: [], overdueFollowUps: 0 });
   
   // Payment method breakdown data for pie chart
   const [paymentMethodBreakdown, setPaymentMethodBreakdown] = useState<Array<{
@@ -412,7 +443,7 @@ export const TodaySummary = () => {
             .from('orders')
             .select(`
               *,
-              order_items(*)
+              order_items!order_items_order_id_fkey(*)
             `)
             .in('user_id', targetUserIds)
             .eq('status', 'confirmed')
@@ -767,15 +798,29 @@ export const TodaySummary = () => {
       
       // CRITICAL: Productive count = unique retailers with productive visit OR confirmed order
       const productiveCount = productiveRetailerIds.size;
-      
+
       // Unproductive = unique unproductive + store_closed retailers
       const unproductiveCount = unproductiveRetailerIds.size + closedRetailerIds.size;
-      
+
       // Pending = Planned - Productive - Unproductive
       // This ensures: Planned = Productive + Unproductive + Pending
       const totalPendingCount = Math.max(0, totalPlannedFromBeatPlans - productiveCount - unproductiveCount);
       const totalPlanned = totalPlannedFromBeatPlans;
-      
+
+      // Include activity visits (retailer_id is null) in counts, matching My Visit logic.
+      const acts = (visits || []).filter(v => v.visit_type === 'activity' && v.status !== 'cancelled');
+      const actProductive = acts.filter(v => v.status === 'productive').length;
+      const actUnproductive = acts.filter(v => v.status === 'unproductive').length;
+      const actPending = acts.filter(v => !['productive', 'unproductive', 'cancelled'].includes(v.status)).length;
+      const actTotal = acts.length;
+
+      const plannedVisitsCount = totalPlanned + actPending;
+      const productiveVisitsCount = productiveCount + actProductive;
+      const unproductiveVisitsCount = unproductiveCount + actUnproductive;
+      const completedVisitsCount = productiveVisits.length + unproductiveVisits.length + closedVisits.length + actProductive + actUnproductive;
+      const totalPlannedWithActivities = totalPlanned + actTotal;
+      const totalPendingWithActivities = Math.max(0, totalPlannedWithActivities - productiveVisitsCount - unproductiveVisitsCount);
+
       console.log('🎯 [USER FILTER DEBUG]', {
         targetUserIds,
         filterType,
@@ -787,7 +832,11 @@ export const TodaySummary = () => {
         ordersCount: todayOrders?.length || 0,
         productiveCount,
         unproductiveCount,
-        totalPlanned
+        totalPlanned,
+        actProductive,
+        actUnproductive,
+        actPending,
+        actTotal
       });
 
       // Get attendance start/end times from attendance table
@@ -830,23 +879,120 @@ export const TodaySummary = () => {
         return 0; // For pieces and other units, don't count towards KG
       };
       
-      const formatKg = (totalGrams: number): string => {
-        const kg = Math.floor(totalGrams);
-        const grams = Math.round((totalGrams - kg) * 1000);
-        if (grams === 0) {
-          return `${kg} KG`;
-        }
-        return `${kg} KG ${grams} g`;
-      };
-      
-      let totalKgFromOrders = 0;
+      // Check whether item rows are present on the merged orders
+      let totalItemsCount = 0;
       todayOrders?.forEach(order => {
-        order.order_items?.forEach((item: any) => {
-          totalKgFromOrders += convertToKg(item.quantity, item.unit || 'piece');
+        const items = order.order_items || order.items || [];
+        items.forEach((item: any) => {
+          totalItemsCount += Number(item.quantity) || 0;
         });
       });
-      
-      const totalKgSoldFormatted = formatKg(totalKgFromOrders);
+
+      // Fallback: if local/snapshot orders had no items, fetch quantities from DB
+      if (totalItemsCount === 0 && (todayOrders?.length || 0) > 0 && navigator.onLine) {
+        try {
+          const orderIds = todayOrders.map((o: any) => o.id).filter(Boolean);
+          if (orderIds.length > 0) {
+            const { data: itemsRows } = await supabase
+              .from('order_items')
+              .select('order_id, quantity')
+              .in('order_id', orderIds);
+            if (itemsRows && itemsRows.length > 0) {
+              totalItemsCount = itemsRows.reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0);
+              // Backfill onto orders so downstream maps (productSales, ordersData) also have items
+              const byOrder: Record<string, any[]> = {};
+              const { data: fullItems } = await supabase
+                .from('order_items')
+                .select('*')
+                .in('order_id', orderIds);
+              (fullItems || []).forEach((it: any) => {
+                (byOrder[it.order_id] = byOrder[it.order_id] || []).push(it);
+              });
+              todayOrders.forEach((o: any) => {
+                if ((!o.order_items || o.order_items.length === 0) && byOrder[o.id]) {
+                  o.order_items = byOrder[o.id];
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[SUMMARY] Failed to backfill order_items for PC count', e);
+        }
+      }
+
+      const normalizeUnitLabel = (unit?: string) => (unit || '').toLowerCase().replace(/\./g, '').trim();
+      const isWeightLikeUnit = (unit?: string) => ['kg', 'kilogram', 'kilograms', 'g', 'gm', 'gram', 'grams'].includes(normalizeUnitLabel(unit));
+      const formatQty = (q: number): string => {
+        if (!Number.isFinite(q)) return '0';
+        return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/\.?0+$/, '');
+      };
+      const formatUnitLabel = (unit?: string): string => {
+        const normalized = normalizeUnitLabel(unit);
+        if (['pc', 'pcs', 'piece', 'pieces'].includes(normalized)) return 'Piece';
+        if (['g', 'gm', 'gram', 'grams'].includes(normalized)) return 'Grams';
+        if (['kg', 'kilogram', 'kilograms'].includes(normalized)) return 'KG';
+        if (['ml', 'milliliter', 'milliliters', 'millilitre', 'millilitres'].includes(normalized)) return 'ML';
+        if (['l', 'ltr', 'liter', 'liters', 'litre', 'litres'].includes(normalized)) return 'L';
+        return (unit || 'Piece').toString().trim();
+      };
+
+      const allOrderItems = (todayOrders || []).flatMap((order: any) => order.order_items || order.items || []);
+      const productMastersById = new Map<string, { unit: string; rate: number }>();
+      const productMastersByName = new Map<string, { unit: string; rate: number }>();
+      const cleanProductName = (name?: string) => (name || '').replace(/\s*\(FREE\)$/i, '').trim();
+      if (navigator.onLine && allOrderItems.length > 0) {
+        try {
+          const productIds = Array.from(new Set(allOrderItems.map((item: any) => item.product_id).filter(Boolean)));
+          const productNames = Array.from(new Set(allOrderItems.map((item: any) => cleanProductName(item.product_name)).filter(Boolean)));
+          const [byIdResult, byNameResult] = await Promise.all([
+            productIds.length > 0
+              ? supabase.from('products').select('id, name, unit, base_unit, rate').in('id', productIds)
+              : Promise.resolve({ data: [] as any[] }),
+            productNames.length > 0
+              ? supabase.from('products').select('id, name, unit, base_unit, rate').in('name', productNames)
+              : Promise.resolve({ data: [] as any[] }),
+          ]);
+          [...(byIdResult.data || []), ...(byNameResult.data || [])].forEach((product: any) => {
+            const masterUnit = product.unit || product.base_unit;
+            if (masterUnit) {
+              const master = { unit: masterUnit, rate: Number(product.rate) || 0 };
+              productMastersById.set(product.id, master);
+              productMastersByName.set(product.name, master);
+            }
+          });
+        } catch (e) {
+          console.warn('[SUMMARY] Failed to load product master units', e);
+        }
+      }
+
+      const getItemDisplayQtyUnit = (item: any) => {
+        const rawUnit = (item.unit || 'Piece').toString().trim() || 'Piece';
+        const master = productMastersById.get(item.product_id) || productMastersByName.get(cleanProductName(item.product_name));
+        const masterUnit = master?.unit;
+        let qty = Number(item.quantity) || 0;
+        let unit = rawUnit;
+        if (masterUnit && !isWeightLikeUnit(masterUnit) && isWeightLikeUnit(rawUnit)) {
+          unit = masterUnit;
+          const masterRate = Number(master?.rate) || 0;
+          const storedRate = Number(item.original_rate || item.rate) || 0;
+          if (masterRate > 0 && storedRate > 0) {
+            qty = (qty * storedRate) / masterRate;
+          } else if (masterRate > 0 && Number(item.total) > 0) {
+            qty = Number(item.total) / masterRate;
+          }
+        }
+        return { qty, unit: formatUnitLabel(unit), rawUnit };
+      };
+
+      const totalByUnit = new Map<string, number>();
+      allOrderItems.forEach((item: any) => {
+        const { qty, unit } = getItemDisplayQtyUnit(item);
+        totalByUnit.set(unit, (totalByUnit.get(unit) || 0) + qty);
+      });
+      const totalKgSoldFormatted = Array.from(totalByUnit.entries())
+        .map(([unit, qty]) => `${formatQty(qty)} ${unit}`)
+        .join(', ') || '0 Piece';
+      totalItemsCount = Array.from(totalByUnit.values()).reduce((sum, qty) => sum + qty, 0);
 
       // Calculate distance from van_stock (start_km to end_km)
       let totalDistance = 0;
@@ -930,7 +1076,7 @@ export const TodaySummary = () => {
       
       console.log('📊 Today\'s Summary Data:', {
         totalVisits: visits?.length || 0,
-        completedVisits: completedVisits.length,
+        completedVisits: completedVisitsCount,
         totalOrders: totalOrdersCount,
         totalOrderValue,
         distanceFromVan: totalDistance,
@@ -959,18 +1105,18 @@ export const TodaySummary = () => {
         beatNames: beatNamesDisplay,
         startTime: formatTime(firstCheckIn),
         endTime: lastCheckOut ? formatTime(lastCheckOut) : (firstCheckIn ? "In Progress" : "Not started"),
-        plannedVisits: totalPlanned,
-        completedVisits: completedVisits.length,
-        productiveVisits: productiveCount,
-        unproductiveVisits: unproductiveCount,
+        plannedVisits: plannedVisitsCount,
+        completedVisits: completedVisitsCount,
+        productiveVisits: productiveVisitsCount,
+        unproductiveVisits: unproductiveVisitsCount,
         totalRetailers: totalPlannedFromBeatPlans,
         totalOrders: totalOrdersCount,
         totalOrderValue,
         avgOrderValue,
-        totalKgSold: totalKgFromOrders,
+        totalKgSold: totalItemsCount,
         totalKgSoldFormatted,
-        visitEfficiency: totalPlanned > 0 ? Math.round((completedVisits.length / totalPlanned) * 100) : 0,
-        orderConversionRate: completedVisits.length > 0 ? Math.round((productiveCount / completedVisits.length) * 100) : 0,
+        visitEfficiency: totalPlannedWithActivities > 0 ? Math.round((completedVisitsCount / totalPlannedWithActivities) * 100) : 0,
+        orderConversionRate: completedVisitsCount > 0 ? Math.round((productiveVisitsCount / completedVisitsCount) * 100) : 0,
         distanceCovered: totalDistance > 0 ? Math.round(totalDistance * 10) / 10 : 0,
         travelTime: timeAtRetailersStr
       });
@@ -978,17 +1124,17 @@ export const TodaySummary = () => {
       console.log('📈 Calculated Metrics:', {
         distanceCovered: Math.round(totalDistance * 10) / 10,
         timeAtRetailers: timeAtRetailersStr,
-        visitEfficiency: totalPlanned > 0 ? Math.round((completedVisits.length / totalPlanned) * 100) : 0,
-        orderConversionRate: completedVisits.length > 0 ? Math.round((productiveVisits.length / completedVisits.length) * 100) : 0
+        visitEfficiency: totalPlannedWithActivities > 0 ? Math.round((completedVisitsCount / totalPlannedWithActivities) * 100) : 0,
+        orderConversionRate: completedVisitsCount > 0 ? Math.round((productiveVisitsCount / completedVisitsCount) * 100) : 0
       });
 
       // Update visit breakdown - Planned (total), Productive, Unproductive, Pending
-      // CRITICAL: Use productiveCount (retailers with orders OR productive visits) not productiveVisits.length
+      // Include activity visits so the breakdown matches My Visit and Home dashboard.
       setVisitBreakdown([
-        { status: "Planned", count: totalPlannedFromBeatPlans, color: "primary" },
-        { status: "Productive", count: productiveCount, color: "success" },
-        { status: "Unproductive", count: unproductiveVisits.length + closedVisits.length, color: "destructive" },
-        { status: "Pending", count: totalPendingCount, color: "warning" }
+        { status: "Planned", count: totalPlannedWithActivities, color: "primary" },
+        { status: "Productive", count: productiveVisitsCount, color: "success" },
+        { status: "Unproductive", count: unproductiveVisitsCount, color: "destructive" },
+        { status: "Pending", count: totalPendingWithActivities, color: "warning" }
       ]);
 
       // Process top retailers (based on order value)
@@ -1009,25 +1155,32 @@ export const TodaySummary = () => {
 
       setTopRetailers(topRetailersData);
 
-      // Process product sales with KG conversion
-      const productSalesMap = new Map();
+      // Process product sales — aggregate by (product, unit) and show the actual unit
+      const productSalesMap = new Map<string, { name: string; qty: number; unit: string; revenue: number; kgSold: number }>();
       todayOrders?.forEach(order => {
         order.order_items?.forEach((item: any) => {
-          const existing = productSalesMap.get(item.product_name) || { kgSold: 0, revenue: 0 };
-          const itemKg = convertToKg(item.quantity, item.unit || 'piece');
-          productSalesMap.set(item.product_name, {
-            kgSold: existing.kgSold + itemKg,
-            revenue: existing.revenue + Number(item.total || 0)
+          const { qty, unit, rawUnit } = getItemDisplayQtyUnit(item);
+          const key = `${item.product_name}|${unit.toLowerCase()}`;
+          const existing = productSalesMap.get(key) || { name: item.product_name, qty: 0, unit, revenue: 0, kgSold: 0 };
+          productSalesMap.set(key, {
+            name: item.product_name,
+            unit,
+            qty: existing.qty + qty,
+            revenue: existing.revenue + Number(item.total || 0),
+            kgSold: existing.kgSold + convertToKg(qty, rawUnit),
           });
         });
       });
 
-      const productSalesData = Array.from(productSalesMap.entries())
-        .map(([name, data]) => ({ 
-          name, 
-          kgSold: data.kgSold,
-          kgFormatted: data.kgSold > 0 ? formatKg(data.kgSold) : 'N/A',
-          revenue: data.revenue 
+      const productSalesData = Array.from(productSalesMap.values())
+        .map(d => ({
+          name: d.name,
+          qty: d.qty,
+          unit: d.unit,
+          qtyFormatted: `${formatQty(d.qty)} ${d.unit}`,
+          revenue: d.revenue,
+          kgSold: d.kgSold,
+          kgFormatted: d.kgSold > 0 ? `${d.kgSold.toFixed(2)} KG` : 'N/A',
         }))
         .sort((a, b) => b.revenue - a.revenue);
 
@@ -1067,11 +1220,20 @@ export const TodaySummary = () => {
           });
         } catch (e) {}
         
+        const orderQtyByUnit = new Map<string, number>();
+        order.order_items?.forEach((item: any) => {
+          const { qty, unit } = getItemDisplayQtyUnit(item);
+          orderQtyByUnit.set(unit, (orderQtyByUnit.get(unit) || 0) + qty);
+        });
+        const qtyFormatted = Array.from(orderQtyByUnit.entries())
+          .map(([unit, qty]) => `${formatQty(qty)} ${unit}`)
+          .join(', ') || '0 Piece';
+
         return {
           retailer: order.retailer_name,
           amount: totalAmount,
           kgSold: kgSum,
-          kgFormatted: kgSum > 0 ? formatKg(kgSum) : '0 KG',
+          kgFormatted: qtyFormatted,
           creditAmount: creditAmount,
           cashInHand: totalAmount - creditAmount,
           paymentMethod: paymentMethod
@@ -1155,10 +1317,13 @@ export const TodaySummary = () => {
       const productOrderMap = new Map();
       todayOrders?.forEach(order => {
         order.order_items?.forEach((item: any) => {
-          const existing = productOrderMap.get(item.product_name) || { kgSold: 0, value: 0, orderCount: 0 };
-          const itemKg = convertToKg(item.quantity, item.unit || 'piece');
-          productOrderMap.set(item.product_name, {
-            kgSold: existing.kgSold + itemKg,
+          const { qty, unit } = getItemDisplayQtyUnit(item);
+          const key = `${item.product_name}|${unit.toLowerCase()}`;
+          const existing = productOrderMap.get(key) || { productName: item.product_name, itemCount: 0, unit, value: 0, orderCount: 0 };
+          productOrderMap.set(key, {
+            productName: item.product_name,
+            unit,
+            itemCount: existing.itemCount + qty,
             value: existing.value + Number(item.total || 0),
             orderCount: existing.orderCount + 1
           });
@@ -1166,10 +1331,10 @@ export const TodaySummary = () => {
       });
 
       const productGroupedData = Array.from(productOrderMap.entries())
-        .map(([product, data]) => ({ 
-          product, 
-          kgSold: data.kgSold,
-          kgFormatted: data.kgSold > 0 ? formatKg(data.kgSold) : 'N/A',
+        .map(([_, data]) => ({ 
+          product: data.productName, 
+          kgSold: data.itemCount,
+          kgFormatted: `${formatQty(data.itemCount)} ${data.unit}`,
           value: data.value,
           orders: data.orderCount
         }))
@@ -1490,22 +1655,109 @@ export const TodaySummary = () => {
         variant: "destructive"
       });
     } finally {
-      // Fetch completed activities count
+      // Fetch rich activity summary for the date range
       try {
-        const activityUserId = managerSelectedUserId !== 'self' ? managerSelectedUserId : user?.id;
-        if (activityUserId) {
-          const { data: activityVisits } = await supabase
-            .from('visits')
-            .select('id')
-            .eq('user_id', activityUserId)
-            .eq('visit_type', 'activity')
-            .eq('status', 'productive')
-            .gte('planned_date', format(dateRange.from, 'yyyy-MM-dd'))
-            .lte('planned_date', format(dateRange.to, 'yyyy-MM-dd'));
-          setCompletedActivitiesCount(activityVisits?.length || 0);
+        const activityUserIds: string[] =
+          isManager && managerSelectedUserId === 'all'
+            ? [user?.id || '', ...subordinateIds].filter(Boolean)
+            : managerSelectedUserId !== 'self' && managerSelectedUserId !== user?.id
+              ? [managerSelectedUserId]
+              : [user?.id || ''].filter(Boolean);
+
+        if (activityUserIds.length > 0) {
+          const fromStr = format(dateRange.from, 'yyyy-MM-dd');
+          const toStr = format(dateRange.to, 'yyyy-MM-dd');
+
+          const { data: activityRows } = await supabase
+            .from('activity_events')
+            .select('id, activity_type, visit_category, activity_sub_type, check_in_time, check_out_time, duration_minutes, beat_name, outcome, contact_person, follow_up_date, retailer_name, distributor_name, activity_name, activity_place, shops_visited, survey_priority, survey_estimated_monthly_value, rep_overall_outcome, survey_suggested_beat_count, status, completed_at')
+            .in('user_id', activityUserIds)
+            .gte('activity_date', fromStr)
+            .lte('activity_date', toStr);
+
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const { count: followUpCount } = await supabase
+            .from('activity_events')
+            .select('id', { count: 'exact', head: true })
+            .in('user_id', activityUserIds)
+            .eq('outcome', 'follow_up_needed')
+            .lte('follow_up_date', today);
+
+          const rows = (activityRows as any[]) || [];
+          if (rows.length > 0) {
+            // Build label/color/weight lookup from activity_types master (match by name or code).
+            // Missing type → weight 1.0, neutral color.
+            const masterTypes = activityTypesRef.current || [];
+            const typeLookup = new Map<string, { label: string; color: string; weight: number }>();
+            masterTypes.forEach((t) => {
+              const entry = { label: t.name, color: t.color || 'gray', weight: Number(t.productivity_weight ?? 1) };
+              typeLookup.set(t.name, entry);
+              if (t.code) typeLookup.set(t.code, entry);
+            });
+            const humanize = (k: string) =>
+              k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+            const resolveType = (key: string) =>
+              typeLookup.get(key) || { label: humanize(key), color: 'gray', weight: 1 };
+            const isCompleted = (r: any) =>
+              !!r.check_out_time || !!r.completed_at || r.status === 'closed';
+            const fmtTime = (iso?: string | null) =>
+              iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined;
+            const grouped = new Map<string, any[]>();
+            rows.forEach((r) => {
+              const key = r.visit_category || r.activity_type || 'Other';
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key)!.push(r);
+            });
+            const totalFieldMinutes = rows.reduce((s, r) => s + (r.duration_minutes || 0), 0);
+            const completedRows = rows.filter(isCompleted);
+            const completedFieldMinutes = completedRows.reduce((s, r) => s + (r.duration_minutes || 0), 0);
+            const activityProductivityPoints = completedRows.reduce((s, r) => {
+              const key = r.visit_category || r.activity_type || 'Other';
+              return s + resolveType(key).weight;
+            }, 0);
+            const fmt = (m: number) => (!m ? '' : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
+            const byType = Array.from(grouped.entries()).map(([type, rs]) => {
+              const cfg = resolveType(type);
+              const typeMins = rs.reduce((s, r) => s + (r.duration_minutes || 0), 0);
+              const completed = rs.filter(isCompleted).length;
+              return {
+                type,
+                label: cfg.label,
+                color: cfg.color,
+                count: rs.length,
+                completedCount: completed,
+                totalMinutes: typeMins,
+                weight: cfg.weight,
+                details: rs.map((r) => ({
+                  name: r.retailer_name || r.distributor_name || r.activity_name || r.activity_place || r.beat_name || cfg.label,
+                  duration: fmt(r.duration_minutes || 0),
+                  outcome: r.outcome || r.rep_overall_outcome || undefined,
+                  beat: r.beat_name || undefined,
+                  checkInTime: fmtTime(r.check_in_time),
+                  checkOutTime: fmtTime(r.check_out_time),
+                  completed: isCompleted(r),
+                  weight: cfg.weight,
+                })),
+              };
+            }).sort((a, b) => b.count - a.count);
+
+            setActivitySummary({
+              totalCount: rows.length,
+              completedCount: completedRows.length,
+              totalFieldMinutes,
+              completedFieldMinutes,
+              activityProductivityPoints,
+              byType,
+              overdueFollowUps: followUpCount || 0,
+            });
+            setCompletedActivitiesCount(completedRows.length);
+          } else {
+            setActivitySummary({ totalCount: 0, completedCount: 0, totalFieldMinutes: 0, completedFieldMinutes: 0, activityProductivityPoints: 0, byType: [], overdueFollowUps: followUpCount || 0 });
+            setCompletedActivitiesCount(0);
+          }
         }
-      } catch {
-        setCompletedActivitiesCount(0);
+      } catch (e) {
+        console.warn('[TodaySummary] Activity summary fetch failed:', e);
       }
       setLoading(false);
       initialLoadDone.current = true;
@@ -1527,7 +1779,7 @@ export const TodaySummary = () => {
   };
 
   const openKgBreakdownDialog = () => {
-    setDialogTitle("Total KG Sold - Product-wise Breakdown");
+    setDialogTitle("Total Items Sold - Product-wise Breakdown");
     setDialogContentType("kgBreakdown");
     setDialogFilter(null);
     setDialogOpen(true);
@@ -1617,7 +1869,7 @@ export const TodaySummary = () => {
         ['Unproductive', summaryData.unproductiveVisits.toString()],
         ['Total Order Value', `Rs. ${Math.round(summaryData.totalOrderValue).toLocaleString('en-IN')}`],
         ['Orders Placed', summaryData.totalOrders.toString()],
-        ['Total KG Sold (Unit)', summaryData.totalKgSoldFormatted],
+        ['Total Qty Sold', summaryData.totalKgSoldFormatted],
         ['Avg Order Value', `Rs. ${Math.round(summaryData.avgOrderValue).toLocaleString('en-IN')}`],
         ['Points Earned', pointsEarnedToday.toString()]
       ];
@@ -1778,13 +2030,13 @@ export const TodaySummary = () => {
         
         const productsData = productSales.map(p => [
           sanitizeText(p.name) || 'Unknown Product',
-          p.kgFormatted,
+          p.qtyFormatted,
           `Rs. ${Math.round(p.revenue).toLocaleString('en-IN')}`
         ]);
         
         autoTable(doc, {
           startY: yPosition,
-          head: [['Product', 'KG Sold', 'Revenue']],
+          head: [['Product', 'Qty Sold', 'Revenue']],
           body: productsData,
           theme: 'striped',
           headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
@@ -2071,7 +2323,7 @@ export const TodaySummary = () => {
                 <div className="text-lg font-bold text-warning">
                   {loading ? "Loading..." : summaryData.totalKgSoldFormatted}
                 </div>
-                <div className="text-sm text-muted-foreground">Total KG Sold (Unit)</div>
+                <div className="text-sm text-muted-foreground">Total Qty Sold</div>
               </div>
               <div className="text-center p-3 bg-muted rounded-lg">
                 <div className="text-lg font-bold">
@@ -2095,21 +2347,140 @@ export const TodaySummary = () => {
               </div>
             </div>
 
-            {/* Activities Completed */}
-            {completedActivitiesCount > 0 && (
-              <div className="grid grid-cols-1 gap-4">
-                <div className="text-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                  <div className="text-xl font-bold text-purple-600">
-                    {completedActivitiesCount}
-                  </div>
-                  <div className="text-sm text-purple-600/80 font-medium">
-                    {completedActivitiesCount === 1 ? '1 activity was completed' : `${completedActivitiesCount} activities were completed`}
-                  </div>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
+
+        {/* Activity Log Card */}
+        {activitySummary.totalCount > 0 && (
+          <Card className="shadow-card border-purple-200/50 dark:border-purple-800/30">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <span className="text-purple-600"><CalendarIcon size={18} /></span>
+                  Activity Log
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  {activitySummary.overdueFollowUps > 0 && (
+                    <Badge className="bg-red-100 text-red-700 border border-red-300 text-xs gap-1">
+                      <Clock size={10} />
+                      {activitySummary.overdueFollowUps} follow-up{activitySummary.overdueFollowUps > 1 ? 's' : ''} overdue
+                    </Badge>
+                  )}
+                  <Badge className="bg-purple-100 text-purple-700 text-xs">{activitySummary.totalCount} logged</Badge>
+                </div>
+              </div>
+              {activitySummary.totalFieldMinutes > 0 && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                  <Clock size={12} />
+                  {Math.floor(activitySummary.totalFieldMinutes / 60)}h {activitySummary.totalFieldMinutes % 60}m total field time logged
+                </p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-2 pt-0">
+              {/* Today's Activities totals strip */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                <div className="rounded-md border bg-muted/30 p-2 text-center">
+                  <div className="text-lg font-bold text-purple-700">{activitySummary.completedCount}</div>
+                  <div className="text-[10px] text-muted-foreground">Activities Completed</div>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-2 text-center">
+                  <div className="text-lg font-bold text-purple-700">
+                    {Math.floor(activitySummary.completedFieldMinutes / 60)}h {activitySummary.completedFieldMinutes % 60}m
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Time on Activities</div>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-2 text-center" title="Sum of productivity_weight over completed activities">
+                  <div className="text-lg font-bold text-indigo-700">
+                    {activitySummary.activityProductivityPoints.toFixed(2)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Activity Productivity (Σ weight)</div>
+                </div>
+                <div className="rounded-md border bg-gradient-to-r from-emerald-50 to-indigo-50 p-2 text-center">
+                  <div className="text-lg font-bold text-emerald-700">
+                    {(summaryData.productiveVisits + activitySummary.activityProductivityPoints).toFixed(2)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Overall Field Productivity</div>
+                </div>
+              </div>
+
+              {activitySummary.byType.map((typeGroup) => {
+                const colorMap: Record<string, string> = {
+                  green: 'bg-green-50 border-green-200 text-green-800 dark:bg-green-950/20',
+                  blue: 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/20',
+                  purple: 'bg-purple-50 border-purple-200 text-purple-800 dark:bg-purple-950/20',
+                  teal: 'bg-teal-50 border-teal-200 text-teal-800 dark:bg-teal-950/20',
+                  amber: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/20',
+                  orange: 'bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-950/20',
+                  gray: 'bg-gray-50 border-gray-200 text-gray-700 dark:bg-gray-950/20',
+                  indigo: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-950/20',
+                  rose: 'bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/20',
+                };
+                const cardClass = colorMap[typeGroup.color] || colorMap.gray;
+                return (
+                  <div key={typeGroup.type} className={`rounded-lg border p-3 ${cardClass}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold">{typeGroup.label}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/60 border">
+                          weight {typeGroup.weight}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs opacity-70">
+                        {typeGroup.totalMinutes > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Clock size={10} />
+                            {Math.floor(typeGroup.totalMinutes / 60) > 0
+                              ? `${Math.floor(typeGroup.totalMinutes / 60)}h ${typeGroup.totalMinutes % 60}m`
+                              : `${typeGroup.totalMinutes}m`}
+                          </span>
+                        )}
+                        <span className="font-semibold">
+                          {typeGroup.completedCount}/{typeGroup.count} done
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      {typeGroup.details.slice(0, 5).map((detail, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs opacity-90 gap-2">
+                          <span className="truncate max-w-[50%] flex items-center gap-1">
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${detail.completed ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                            {detail.name}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0 text-[10px]">
+                            {detail.checkInTime && <span className="opacity-70">In {detail.checkInTime}</span>}
+                            {detail.checkOutTime && <span className="opacity-70">Out {detail.checkOutTime}</span>}
+                            {detail.duration && <span className="opacity-70">· {detail.duration}</span>}
+                            {detail.outcome && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                                {detail.outcome.replace(/_/g, ' ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {typeGroup.details.length > 5 && (
+                        <p className="text-[10px] opacity-50 mt-1">+{typeGroup.details.length - 5} more</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {activitySummary.overdueFollowUps > 0 && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-950/20">
+                  <Clock size={14} className="text-red-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-700">
+                      {activitySummary.overdueFollowUps} overdue follow-up{activitySummary.overdueFollowUps > 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-red-600 mt-0.5">Go to My Visits → Activity tab to mark them complete</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+
 
         {/* Performance Summary */}
         <Card className="shadow-card">
@@ -2318,7 +2689,7 @@ export const TodaySummary = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Product</TableHead>
-                  <TableHead className="text-right">KG Sold</TableHead>
+                  <TableHead className="text-right">Qty Sold</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
                 </TableRow>
               </TableHeader>
@@ -2339,7 +2710,7 @@ export const TodaySummary = () => {
                   (showAllProducts ? productSales : productSales.slice(0, 5)).map((p) => (
                    <TableRow key={p.name}>
                      <TableCell className="font-medium">{p.name}</TableCell>
-                     <TableCell className="text-right">{p.kgFormatted}</TableCell>
+                     <TableCell className="text-right">{p.qtyFormatted}</TableCell>
                      <TableCell className="text-right">₹{Math.round(p.revenue).toLocaleString('en-IN')}</TableCell>
                    </TableRow>
                  ))
@@ -2504,13 +2875,13 @@ export const TodaySummary = () => {
               {dialogContentType === "kgBreakdown" && (
                 <div className="space-y-3">
                   <div className="text-sm text-muted-foreground">
-                    Total KG: {summaryData.totalKgSoldFormatted} • {productGroupedOrders.length} products
+                    Total Items: {summaryData.totalKgSoldFormatted} • {productGroupedOrders.length} products
                   </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Product</TableHead>
-                        <TableHead className="text-right">KG Sold</TableHead>
+                        <TableHead className="text-right">Qty Sold</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2526,7 +2897,7 @@ export const TodaySummary = () => {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={2} className="text-center text-muted-foreground">
-                            No KG-based products sold today
+                            No items sold today
                           </TableCell>
                         </TableRow>
                       )}
@@ -2544,7 +2915,7 @@ export const TodaySummary = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Product</TableHead>
-                        <TableHead className="text-right">KG</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
                         <TableHead className="text-right">Value</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2578,7 +2949,7 @@ export const TodaySummary = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Retailer</TableHead>
-                        <TableHead className="text-right">KG</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
                       </TableRow>
                     </TableHeader>

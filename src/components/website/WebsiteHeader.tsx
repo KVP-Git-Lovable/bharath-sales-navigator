@@ -5,14 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import quickappLogo from "@/assets/quickapp-logo-full-yellow-black.png";
 
 const solutionLinks = [
-  { label: "Quick Field Sales Platform", href: "/solutions/field-sales", external: false },
+  { label: "Field Sales Platform", href: "/solutions/field-sales", external: false },
   { label: "Quick Channel Hub", href: "/solutions/distributor-portal", external: false },
   { label: "Quick Retailer Hub", href: "/solutions/retailer-portal", external: false },
   { label: "Quick Store Ops", href: "https://storeops.quickapp.ai/", external: true },
   { label: "Quick Locate", href: "/solutions/quick-locate", external: false },
-  { label: "Quick Influence", href: "/solutions/quick-influence", external: false },
-  { label: "Quick Marketing", href: "/solutions/quick-marketing", external: false },
-  { label: "Quick Service", href: "/solutions/quick-service", external: false },
 ];
 
 export const WebsiteHeader = () => {
@@ -26,10 +23,10 @@ export const WebsiteHeader = () => {
   const navItems = [
     { label: "Solutions", href: "#solutions", hasDropdown: true },
     { label: "Impact", href: "/impact" },
+    { label: "Enterprise AI", href: "/features" },
     { label: "Insights", href: "/insights" },
     { label: "Connectors", href: "/connectors" },
     { label: "Pricing", href: "/pricing" },
-    { label: "Support", href: "/support" },
   ];
 
   // Handle hash navigation after page load

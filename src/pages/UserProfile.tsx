@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InstagramSocialFeed } from '@/components/profile/InstagramSocialFeed';
 import { ProfileAttachments } from '@/components/profile/ProfileAttachments';
 import { Layout } from '@/components/Layout';
+import { UserFeaturesSection } from '@/components/features/UserFeaturesSection';
 import { FollowersFollowingCard } from '@/components/profile/FollowersFollowingCard';
 import { WorkExperienceSection } from '@/components/profile/about/WorkExperienceSection';
 import { EducationHistorySection } from '@/components/profile/about/EducationHistorySection';
@@ -20,6 +21,7 @@ import { AboutEditMode } from '@/components/profile/about/AboutEditMode';
 import { ProfilePointsBadge } from '@/components/profile/ProfilePointsBadge';
 import { PasswordChangeSection } from '@/components/profile/PasswordChangeSection';
 import { LanguageSettings } from '@/components/profile/LanguageSettings';
+import { PushNotificationSettings } from '@/components/PushNotificationSettings';
 
 
 interface Territory {
@@ -261,6 +263,10 @@ const UserProfile = () => {
             {/* Language Settings */}
             <LanguageSettings />
 
+            {/* Push Notifications */}
+            <PushNotificationSettings />
+
+
             {/* Additional Sections - Always in view/edit with their own controls */}
             <WorkExperienceSection />
             <EducationHistorySection />
@@ -269,6 +275,7 @@ const UserProfile = () => {
             <OnboardingChecklistSection />
             <ProfileAttachments />
             <FollowersFollowingCard />
+            <UserFeaturesSection />
           </TabsContent>
 
           {/* Social/Collaboration Tab */}

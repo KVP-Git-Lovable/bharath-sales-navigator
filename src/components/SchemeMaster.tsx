@@ -13,11 +13,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import { fetchAllPaginated } from '@/utils/fetchAllPaginated';
 import { Plus, Edit2, Trash2, Gift, Search, Loader2, AlertTriangle, TrendingUp, Calendar, Globe, MapPin, Settings, Bot, Sparkles, RefreshCw } from 'lucide-react';
 import { SchemeFormFields } from './SchemeFormFields';
 import { SchemeDetailsDisplay } from './SchemeDetailsDisplay';
 import { SchemeApplicabilitySelector, ApplicabilityRule } from './SchemeApplicabilitySelector';
 import { SchemePolicyConfig } from './SchemePolicyConfig';
+import { OrderEditPolicyConfig } from './OrderEditPolicyConfig';
 import { AISuggestionCard } from './AISuggestionCard';
 import { AISuggestionReview } from './AISuggestionReview';
 import { useAISchemeSuggestions, AISchemeSuggestion } from '@/hooks/useAISchemeSuggestions';
@@ -48,9 +50,6 @@ interface ProductScheme {
   variant_id?: string;
   category_id?: string;
   category?: ProductCategory;
-  product_name?: string;
-  category_name?: string;
-  free_product_name?: string;
   name: string;
   description: string;
   scheme_type: string;
@@ -103,6 +102,7 @@ const initialSchemeForm = {
   validity_days: null as number | null,
   min_order_value: 0,
   is_active: true,
+  show_in_portal: false,
   start_date: '',
   end_date: '',
   // New applicability fields
@@ -185,101 +185,59 @@ export const SchemeMaster = () => {
   };
 
   const fetchSchemes = async () => {
-    const { data: schemesData, error } = await supabase
+    const { data, error } = await supabase
       .from('product_schemes')
-      .select('*')
+      .select(`
+        *,
+        product:products!product_schemes_product_id_fkey(*),
+        category:product_categories(*),
+        free_product:products!product_schemes_free_product_id_fkey(*)
+      `)
       .order('name');
     
     if (error) throw error;
-
-    const schemes = (schemesData as any[]) || [];
-    const targetProductIds = [...new Set(
-      schemes.flatMap((scheme) => scheme.target_product_ids || []).filter(Boolean)
-    )];
-    const freeProductIds = [...new Set(schemes.map((scheme) => scheme.free_product_id).filter(Boolean))];
-    const categoryIds = [...new Set(schemes.map((scheme) => scheme.category_id).filter(Boolean))];
-    const variantIds = [...new Set(schemes.map((scheme) => scheme.variant_id).filter(Boolean))];
-
-    const [productsResult, categoriesResult, variantsResult] = await Promise.all([
-      targetProductIds.length || freeProductIds.length
-        ? supabase
-            .from('products')
-            .select('id, name')
-            .in('id', [...new Set([...targetProductIds, ...freeProductIds])])
-        : Promise.resolve({ data: [], error: null }),
-      categoryIds.length
-        ? supabase
-            .from('product_categories')
-            .select('id, name')
-            .in('id', categoryIds)
-        : Promise.resolve({ data: [], error: null }),
-      variantIds.length
-        ? supabase
-            .from('product_variants')
-            .select('id, variant_name')
-            .in('id', variantIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
-
-    if (productsResult.error) throw productsResult.error;
-    if (categoriesResult.error) throw categoriesResult.error;
-    if (variantsResult.error) throw variantsResult.error;
-
-    const productMap = new Map((productsResult.data || []).map((product) => [product.id, product.name]));
-    const categoryMap = new Map((categoriesResult.data || []).map((category) => [category.id, category.name]));
-    const variantMap = new Map((variantsResult.data || []).map((variant) => [variant.id, variant.variant_name]));
-
-    const hydratedSchemes: ProductScheme[] = schemes.map((scheme: any) => {
-      const targetNames = (scheme.target_product_ids || [])
-        .map((id: string) => productMap.get(id))
-        .filter(Boolean) as string[];
-
-      const primaryProductName = scheme.variant_id
-        ? variantMap.get(scheme.variant_id) || targetNames[0] || undefined
-        : targetNames[0] || undefined;
-
-      return {
-        ...scheme,
-        product_name: primaryProductName,
-        category_name: scheme.category_id ? categoryMap.get(scheme.category_id) || undefined : undefined,
-        free_product_name: scheme.free_product_id ? productMap.get(scheme.free_product_id) || undefined : undefined,
-        product: primaryProductName ? { name: primaryProductName } as Product : undefined,
-        category: scheme.category_id
-          ? ({ id: scheme.category_id, name: categoryMap.get(scheme.category_id) || 'Unknown Category', description: '' } as ProductCategory)
-          : undefined,
-      };
-    });
-
-    setSchemes(hydratedSchemes);
+    setSchemes((data as any) || []);
   };
 
   const fetchProducts = async () => {
-    // Fetch base products
-    const { data: productsData, error: productsError } = await supabase
-      .from('products')
-      .select('id, sku, name, description, category_id, rate, base_unit, is_active')
-      .eq('is_active', true)
-      .order('name');
-    
-    if (productsError) throw productsError;
-    
-    // Fetch product variants
-    const { data: variantsData, error: variantsError } = await supabase
-      .from('product_variants')
-      .select(`
-        id, 
-        sku, 
-        variant_name, 
-        product_id, 
-        price, 
-        is_active,
-        product:products!product_id(name, category_id, base_unit)
-      `)
-      .eq('is_active', true)
-      .order('variant_name');
-    
-    if (variantsError) throw variantsError;
-    
+    // Fetch base products (paginated to bypass PostgREST 1k cap)
+    let productsData: any[] = [];
+    try {
+      productsData = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('products')
+          .select('id, sku, name, description, category_id, rate, base_unit, is_active')
+          .eq('is_active', true)
+          .order('name')
+          .range(from, to)
+      );
+    } catch (productsError) {
+      console.error('[SchemeMaster] fetchProducts products error:', productsError);
+    }
+
+    // Fetch product variants (don't let this block the whole list if it errors)
+    let variantsData: any[] = [];
+    try {
+      variantsData = await fetchAllPaginated<any>((from, to) =>
+        supabase
+          .from('product_variants')
+          .select(`
+            id,
+            sku,
+            variant_name,
+            product_id,
+            price,
+            is_active,
+            product:products!product_id(name, category_id, base_unit)
+          `)
+          .eq('is_active', true)
+          .order('variant_name')
+          .range(from, to)
+      );
+    } catch (e) {
+      console.warn('[SchemeMaster] fetchProducts variants threw (continuing without variants):', e);
+    }
+
     // Combine products and variants into unified list
     const baseProducts: Product[] = (productsData || []).map(p => ({
       id: p.id,
@@ -292,7 +250,7 @@ export const SchemeMaster = () => {
       is_active: p.is_active,
       type: 'product' as const
     }));
-    
+
     const variantProducts: Product[] = (variantsData || []).map((v: any) => ({
       id: v.id,
       sku: v.sku || '',
@@ -305,14 +263,16 @@ export const SchemeMaster = () => {
       type: 'variant' as const,
       parent_product_id: v.product_id
     }));
-    
+
     // Combine and sort alphabetically
-    const allProducts = [...baseProducts, ...variantProducts].sort((a, b) => 
+    const allProducts = [...baseProducts, ...variantProducts].sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-    
+
+    console.log('[SchemeMaster] fetchProducts loaded', { products: baseProducts.length, variants: variantProducts.length });
     setProducts(allProducts);
   };
+
 
   const fetchCategories = async () => {
     const { data, error } = await supabase
@@ -326,13 +286,28 @@ export const SchemeMaster = () => {
 
   const handleSchemeSubmit = async () => {
     try {
+      // Validate BOGO: must have buy qty, free qty, and free product set or it silently no-ops.
+      if (schemeForm.scheme_type === 'buy_x_get_y_free' || schemeForm.scheme_type === 'buy_get_free') {
+        const missing: string[] = [];
+        if (!schemeForm.buy_quantity || schemeForm.buy_quantity <= 0) missing.push('Buy quantity');
+        if (!schemeForm.free_quantity || schemeForm.free_quantity <= 0) missing.push('Free quantity');
+        if (!schemeForm.free_product_id) missing.push('Free product');
+        if (missing.length) {
+          toast.error('Scheme incomplete', {
+            description: `Please set: ${missing.join(', ')}. Without these the offer will not apply at checkout.`,
+          });
+          return;
+        }
+
+      }
+
       let schemeId = schemeForm.id;
+
       
       // Determine product_id and target_product_ids based on mode
       const isMultiProduct = schemeForm.multi_product_mode && (schemeForm.target_product_ids || []).length > 0;
-      const targetProductIds = isMultiProduct
-        ? schemeForm.target_product_ids
-        : (schemeForm.product_id ? [schemeForm.product_id] : null);
+      const productId = isMultiProduct ? null : (schemeForm.product_id || null);
+      const targetProductIds = isMultiProduct ? schemeForm.target_product_ids : null;
       const perProductDiscounts = isMultiProduct && schemeForm.discount_mode === 'different' 
         ? schemeForm.per_product_discounts 
         : null;
@@ -341,12 +316,14 @@ export const SchemeMaster = () => {
         const { error } = await supabase
           .from('product_schemes')
           .update({
+            product_id: productId,
             variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
             category_id: schemeForm.category_id || null,
             name: schemeForm.name,
             description: schemeForm.description,
             scheme_type: schemeForm.scheme_type,
             condition_quantity: schemeForm.condition_quantity,
+            quantity_condition_type: schemeForm.quantity_condition_type,
             discount_percentage: schemeForm.discount_percentage,
             discount_amount: schemeForm.discount_amount,
             free_quantity: schemeForm.free_quantity,
@@ -362,6 +339,7 @@ export const SchemeMaster = () => {
             validity_days: schemeForm.validity_days,
             min_order_value: schemeForm.min_order_value,
             is_active: schemeForm.is_active,
+            show_in_portal: schemeForm.show_in_portal,
             start_date: schemeForm.start_date || null,
             end_date: schemeForm.end_date || null,
             applicability_type: schemeForm.applicability_type,
@@ -371,6 +349,9 @@ export const SchemeMaster = () => {
             per_product_discounts: perProductDiscounts,
             max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (Number(schemeForm.max_discount_per_unit) || 0)
+              : null,
+            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_unit || 'kg')
               : null,
             discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
@@ -383,12 +364,14 @@ export const SchemeMaster = () => {
         const { data, error } = await supabase
           .from('product_schemes')
           .insert({
+            product_id: productId,
             variant_id: schemeForm.variant_id === 'all' ? null : schemeForm.variant_id,
             category_id: schemeForm.category_id || null,
             name: schemeForm.name,
             description: schemeForm.description,
             scheme_type: schemeForm.scheme_type,
             condition_quantity: schemeForm.condition_quantity,
+            quantity_condition_type: schemeForm.quantity_condition_type,
             discount_percentage: schemeForm.discount_percentage,
             discount_amount: schemeForm.discount_amount,
             free_quantity: schemeForm.free_quantity,
@@ -404,6 +387,7 @@ export const SchemeMaster = () => {
             validity_days: schemeForm.validity_days,
             min_order_value: schemeForm.min_order_value,
             is_active: schemeForm.is_active,
+            show_in_portal: schemeForm.show_in_portal,
             start_date: schemeForm.start_date || null,
             end_date: schemeForm.end_date || null,
             applicability_type: schemeForm.applicability_type,
@@ -413,6 +397,9 @@ export const SchemeMaster = () => {
             per_product_discounts: perProductDiscounts,
             max_discount_per_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (Number(schemeForm.max_discount_per_unit) || 0)
+              : null,
+            discount_unit: schemeForm.scheme_type === 'manual_per_unit_discount'
+              ? (schemeForm.discount_unit || 'kg')
               : null,
             discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
@@ -537,7 +524,7 @@ export const SchemeMaster = () => {
     
     setSchemeForm({
       id: scheme.id,
-      product_id: scheme.product_id || (schemeAny.target_product_ids?.length === 1 ? schemeAny.target_product_ids[0] : ''),
+      product_id: scheme.product_id || '',
       variant_id: scheme.variant_id || 'all',
       category_id: scheme.category_id || '',
       name: scheme.name,
@@ -561,6 +548,7 @@ export const SchemeMaster = () => {
       validity_days: scheme.validity_days || null,
       min_order_value: scheme.min_order_value || 0,
       is_active: scheme.is_active,
+      show_in_portal: (scheme as any).show_in_portal ?? false,
       start_date: scheme.start_date || '',
       end_date: scheme.end_date || '',
       applicability_type: (schemeAny.applicability_type as 'global' | 'targeted' | 'hybrid') || 'global',
@@ -578,7 +566,12 @@ export const SchemeMaster = () => {
     });
     // Load applicability rules for this scheme
     loadApplicabilityRules(scheme.id);
+    // Ensure products list is populated for the edit dialog (multi-product selector)
+    if (products.length === 0) {
+      fetchProducts();
+    }
     setIsSchemeDialogOpen(true);
+
   };
 
   const loadApplicabilityRules = async (schemeId: string) => {
@@ -610,8 +603,7 @@ export const SchemeMaster = () => {
       const matchesSearch = 
         scheme.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         scheme.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        scheme.product_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        scheme.category_name?.toLowerCase().includes(searchQuery.toLowerCase());
+        scheme.product?.name?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesType = typeFilter === 'all' || scheme.scheme_type === typeFilter;
       
@@ -1002,7 +994,7 @@ export const SchemeMaster = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        {scheme.product_name || scheme.category_name || 'All Products'}
+                        {scheme.product?.name || scheme.category?.name || 'All Products'}
                       </TableCell>
                       <TableCell>
                         <Badge 
@@ -1166,6 +1158,8 @@ export const SchemeMaster = () => {
               <SchemePolicyConfig inline />
             </CardContent>
           </Card>
+
+          <OrderEditPolicyConfig />
         </TabsContent>
       </Tabs>
 

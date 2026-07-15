@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Calendar as CalendarIcon, FileText, Plus, TrendingUp, Route, CheckCircle, CalendarDays, MapPin, Users, Clock, Truck, ArrowUpDown, RefreshCw, Download, Sparkles, Loader2, BarChart3 } from "lucide-react";
@@ -38,14 +38,20 @@ import { schedulePrefetch } from "@/utils/backgroundProductPrefetch";
 import { Preferences } from "@capacitor/preferences";
 import { useConnectivity } from "@/hooks/useConnectivity";
 import { useProfilePermissions } from "@/hooks/useProfilePermissions";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { getLocalTodayDate, toLocalISODate } from "@/utils/dateUtils";
 import { SyncDataModal } from "@/components/SyncDataModal";
 import { InsightsPanel } from "@/components/visits/InsightsPanel";
+import { CarryForwardBanner } from "@/components/visits/CarryForwardBanner";
+import { MissedBeatsSection } from "@/components/visits/MissedBeatsSection";
 import { StartBeatButton } from "@/components/StartBeatButton";
 import { AddActivityModal } from "@/components/AddActivityModal";
-import { ActivityChooserModal } from "@/components/ActivityChooserModal";
+
 import { ActivityEventsTable } from "@/components/ActivityEventsTable";
+
+import { ActivityVisitDetail } from "@/components/ActivityVisitDetail";
+import { useActivityVisits } from "@/hooks/useActivityVisits";
 
 interface Visit {
   id: string;
@@ -194,7 +200,7 @@ export const MyVisits = () => {
   const [timelineDayStart, setTimelineDayStart] = useState<string>('08:00 AM');
   const [isVanStockOpen, setIsVanStockOpen] = useState(false);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
-  const [isActivityChooserOpen, setIsActivityChooserOpen] = useState(false);
+  
   const [initialRetailerOrder, setInitialRetailerOrder] = useState<string[]>([]);
   const [pointsEarnedToday, setPointsEarnedToday] = useState(0);
   const [pointsDetailsList, setPointsDetailsList] = useState<Array<{ retailerName: string; points: number; visitId: string | null }>>([]);
@@ -211,6 +217,7 @@ export const MyVisits = () => {
   const networkStatus = useConnectivity();
   const isOnline = networkStatus === 'online';
   const { permissions, hasModuleAccess, hasActionPermission, hasWidgetPermission } = useProfilePermissions();
+  const { can } = usePermissions();
   
   // Permission-based visibility: if user has a security profile, filter buttons
   const hasSecurityProfile = permissions.length > 0;
@@ -229,6 +236,18 @@ export const MyVisits = () => {
   const showGpsTrack = canShowAction('action_visit_gps_track');
   const showVanStock = canShowAction('action_visit_van_stock');
   const showActivity = canShowAction('action_visit_activity');
+  const [overdueFollowUpCount, setOverdueFollowUpCount] = useState(0);
+  useEffect(() => {
+    if (!user?.id) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    supabase
+      .from('activity_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('outcome', 'follow_up_needed')
+      .lte('follow_up_date', today)
+      .then(({ count }: any) => setOverdueFollowUpCount(count || 0));
+  }, [user?.id]);
   const showTodaysProgress = canShowWidget('widget_visit_todays_progress');
   const showInsightsTarget = !hasSecurityProfile || hasModuleAccess('target_');
 
@@ -237,6 +256,10 @@ export const MyVisits = () => {
   const isViewingSelf = selectedUserIds.length === 0 || (selectedUserIds.length === 1 && selectedUserIds[0] === user?.id);
   // Derive viewUserId for the hook: use the first selected non-self user, or 'self'
   const selectedViewUserId = isViewingSelf ? 'self' : selectedUserIds[0];
+   const activityViewUserId = isViewingSelf ? user?.id : selectedUserIds[0];
+   const { items: activityVisitCards, refresh: refreshActivityVisits } = useActivityVisits(activityViewUserId, selectedDate);
+   const [detailActivity, setDetailActivity] = useState<import('@/hooks/useActivityVisits').ActivityVisitCardModel | null>(null);
+
 
   // One-time fix: Restore cancelled visits to planned if day hasn't ended
   useEffect(() => {
@@ -313,9 +336,32 @@ export const MyVisits = () => {
     return hasLoadedOnce ? "No beats planned" : "";
   }, [optimizedBeatPlans, hasLoadedOnce]);
   
+  // Track transformed retailers per date to prevent flash-to-0 during same-date sync.
+  // Raw database rows must never enter this cache because the visit list expects
+  // fields such as retailerName rather than name.
+  const prevRetailersRef = React.useRef<{ user: string; date: string; items: any[] }>({
+    user: selectedViewUserId,
+    date: selectedDate,
+    items: [],
+  });
+
   // Process retailers from optimized data - single source of truth
   const retailers = useMemo(() => {
-    if (optimizedRetailers.length === 0) return [];
+    // SAFETY: Never return [] if we previously had retailers.
+    // optimizedRetailers can momentarily be [] during any hook re-sync cycle.
+    // Returning [] causes the entire visit list to vanish. Use previous value instead.
+    // Key by both user and date so switching to a subordinate doesn't show your list.
+    if (optimizedRetailers.length === 0) {
+      if (
+        prevRetailersRef.current.user === selectedViewUserId &&
+        prevRetailersRef.current.date === selectedDate &&
+        prevRetailersRef.current.items.length > 0
+      ) {
+        console.log('[MyVisits] optimizedRetailers temporarily empty — using previous', prevRetailersRef.current.items.length);
+        return prevRetailersRef.current.items;
+      }
+      return [];
+    }
     
     // CRITICAL FIX: Filter visits and orders by selectedDate to prevent stale data
     const dateFilteredVisits = optimizedVisits.filter(v => v.planned_date === selectedDate);
@@ -327,7 +373,7 @@ export const MyVisits = () => {
       console.warn(`[MyVisits] ⚠️ ${wrongDateVisits.length} visits with wrong dates in state, expected: ${selectedDate}`);
     }
     
-    return optimizedRetailers.map(retailer => {
+    const transformedRetailers = optimizedRetailers.map(retailer => {
       // Get the BEST visit for this retailer (handles duplicates)
       const retailerVisits = dateFilteredVisits.filter(v => v.retailer_id === retailer.id);
       const getVisitTime = (v: any) => new Date(v.updated_at || v.created_at || 0).getTime();
@@ -346,7 +392,26 @@ export const MyVisits = () => {
       const orders = dateFilteredOrders.filter(o => o.retailer_id === retailer.id);
       const totalOrderValue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
       const hasOrder = orders.length > 0;
-      
+
+      // Teammate activity (shared beats): the most recent teammate visit/order on this retailer
+      const teammateVisit = retailerVisits
+        .filter((v: any) => v?._source === 'teammate')
+        .sort((a: any, b: any) => getVisitTime(b) - getVisitTime(a))[0];
+      const teammateOrders = orders.filter((o: any) => o?._source === 'teammate');
+      const ownOrders = orders.filter((o: any) => o?._source !== 'teammate');
+      const teammateOrderValue = teammateOrders.reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
+      const teammateActor = (teammateVisit as any)?._actor || (teammateOrders[0] as any)?._actor;
+      const teammateActivity = teammateActor
+        ? {
+            userId: teammateActor.user_id as string,
+            name: teammateActor.name as string,
+            hasOrder: teammateOrders.length > 0,
+            orderValue: teammateOrderValue,
+            visitTime: teammateVisit?.check_in_time || teammateVisit?.updated_at || teammateVisit?.created_at,
+            ownActivity: ownOrders.length > 0 || retailerVisits.some((v: any) => v?._source !== 'teammate'),
+          }
+        : undefined;
+
       // Status priority: hasOrder (productive) > actual visit.status > planned
       let status: 'planned' | 'in-progress' | 'productive' | 'unproductive' | 'store-closed' | 'cancelled';
       if (hasOrder) {
@@ -366,7 +431,7 @@ export const MyVisits = () => {
         contactName: retailer.contact_name || '',
         retailerCategory: retailer.category || '',
         status,
-        visitType: 'Regular Visit',
+        visitType: visit?.visit_type || 'Regular Visit',
         createdAt: retailer.created_at || undefined,
         visitId: visit?.id,
         hasOrder,
@@ -379,9 +444,21 @@ export const MyVisits = () => {
         retailerLng: retailer.longitude != null ? Number(retailer.longitude) : undefined,
         pendingAmount: retailer.pending_amount || 0, // Include pending_amount from hook
         beatId: retailer.beat_id || undefined,
+        teammateActivity,
+        isCarryForward: !!(visit as any)?.is_carry_forward,
+        carriedFromDate: (visit as any)?.carried_from_date || undefined,
+        isRescheduled: !!(visit as any)?.is_rescheduled,
+        rescheduledFromDate: (visit as any)?.rescheduled_from_date || undefined,
       };
     });
-  }, [optimizedRetailers, optimizedVisits, optimizedOrders, selectedDate]);
+
+    // Store only the transformed shape, scoped to this date. Deferring avoids
+    // mutating a ref during render while retaining the same-date anti-flicker behavior.
+    Promise.resolve().then(() => {
+      prevRetailersRef.current = { user: selectedViewUserId, date: selectedDate, items: transformedRetailers };
+    });
+    return transformedRetailers;
+  }, [optimizedRetailers, optimizedVisits, optimizedOrders, selectedDate, selectedViewUserId]);
 
   // REMOVED: Don't clear retailers/beats on date change - causes flickering
   // The smart update in useVisitsDataOptimized handles this now
@@ -553,7 +630,7 @@ export const MyVisits = () => {
       const {
         data: orders,
         error: ordersError
-      } = await supabase.from('orders').select('retailer_id, total_amount, created_at, order_items(quantity)').eq('user_id', targetUserId).eq('status', 'confirmed').in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
+      } = await supabase.from('orders').select('retailer_id, total_amount, created_at, order_items!order_items_order_id_fkey(quantity)').eq('user_id', targetUserId).eq('status', 'confirmed').in('retailer_id', retailerIds).gte('created_at', dateStart.toISOString()).lte('created_at', dateEnd.toISOString());
       if (ordersError) throw ordersError;
 
       // Fetch retailer_visit_logs for accurate time tracking
@@ -688,7 +765,7 @@ export const MyVisits = () => {
         const [visitsResult, plannedRetailersResult] = await Promise.all([
           supabase.from('visits').select('*').eq('user_id', user.id).eq('planned_date', date),
           plannedBeatIds.length > 0 
-            ? supabase.from('retailers').select('id').eq('user_id', user.id).in('beat_id', plannedBeatIds)
+            ? supabase.from('retailers').select('id').in('beat_id', plannedBeatIds)
             : Promise.resolve({ data: [], error: null })
         ]);
 
@@ -715,7 +792,7 @@ export const MyVisits = () => {
           
           const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
           plannedRetailersData = cachedRetailers.filter((r: any) =>
-            r.user_id === user.id && plannedBeatIds.includes(r.beat_id)
+            plannedBeatIds.includes(r.beat_id)
           );
         } else {
           throw error;
@@ -731,9 +808,15 @@ export const MyVisits = () => {
       }
 
       if (allRetailerIds.size === 0) {
-        // NOTE: retailers is now derived via useMemo from optimized hook - no need to set state
-        setRetailerStats(new Map());
-        setInitialRetailerOrder([]);
+        // SAFETY: Don't early-return if we have planned beats but retailers haven't loaded yet.
+        // This was causing stats to clear when beatPlans hadn't synced yet.
+        // Only return early if there are truly no planned beats AND no visit retailers.
+        const hasBeatPlans = plannedBeatIds.length > 0;
+        if (!hasBeatPlans) {
+          setRetailerStats(new Map());
+          setInitialRetailerOrder([]);
+        }
+        // If hasBeatPlans but allRetailerIds is 0 — retailers still loading, don't clear
         return;
       }
 
@@ -751,21 +834,21 @@ export const MyVisits = () => {
       // Try online first, fallback to cache
       try {
         const [retailersResult, ordersForDateResult, allOrdersResult, allVisitsResult] = await Promise.all([
-          supabase.from('retailers').select('*').eq('user_id', user.id).in('id', Array.from(allRetailerIds)),
+          supabase.from('retailers').select('*').in('id', Array.from(allRetailerIds)),
           !isFutureDate 
-            ? supabase.from('orders')
+            ? // No user_id filter — RLS includes teammate orders on shared beats
+          supabase.from('orders')
                 .select('id, retailer_id, total_amount, created_at')
-                .eq('user_id', user.id)
-                .eq('status', 'confirmed')
+                .in('status', ['confirmed', 'delivered'])
                 .in('retailer_id', Array.from(allRetailerIds))
                 .gte('created_at', dateStart.toISOString())
                 .lte('created_at', dateEnd.toISOString())
             : Promise.resolve({ data: [], error: null }),
           !isFutureDate
-            ? supabase.from('orders')
+            ? // No user_id filter — includes all orders on shared beats
+          supabase.from('orders')
                 .select('retailer_id, total_amount, created_at')
-                .eq('user_id', user.id)
-                .eq('status', 'confirmed')
+                .in('status', ['confirmed', 'delivered'])
                 .in('retailer_id', Array.from(allRetailerIds))
                 .lte('created_at', date + 'T23:59:59.999Z')
             : Promise.resolve({ data: [], error: null }),
@@ -795,7 +878,7 @@ export const MyVisits = () => {
           console.log('📦 Loading retailers from cache');
           const cachedRetailers = await offlineStorage.getAll(STORES.RETAILERS);
           retailersData = cachedRetailers.filter((r: any) =>
-            r.user_id === user.id && allRetailerIds.has(r.id)
+            allRetailerIds.has(r.id)
           );
           
           // For offline, we can't get orders, so set empty arrays
@@ -932,82 +1015,156 @@ export const MyVisits = () => {
       console.error('Error loading visits for date:', error);
     }
   };
-  const handleDayChange = (day: string) => {
-    setSelectedDay(day);
-    const dayInfo = weekDays.find(d => d.day === day);
-    if (dayInfo) {
-      setSelectedDate(dayInfo.isoDate);
-    }
-  };
-  const handleCalendarSelect = (date: Date | undefined) => {
-    if (!date) return;
-    setCalendarDate(date);
-    const weekStart = startOfWeek(date, {
-      weekStartsOn: 0
-    });
-    setSelectedWeek(weekStart);
+  // Backdated-order gating for calendar selection
+  const [backdateCfg, setBackdateCfg] = useState<{ enabled: boolean; requireReason: boolean; mode: 'direct' | 'approval'; maxDays: number }>({ enabled: false, requireReason: true, mode: 'direct', maxDays: 0 });
+  const [backdateApprovalPrompt, setBackdateApprovalPrompt] = useState<{ isoDate: string } | null>(null);
+  const [backdateApprovalReason, setBackdateApprovalReason] = useState('');
+  const [backdateApprovalSubmitting, setBackdateApprovalSubmitting] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('operations_config')
+        .select('backdate_enabled, backdate_require_reason, backdate_mode, backdate_max_days')
+        .eq('id', 1)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setBackdateCfg({
+          enabled: !!data.backdate_enabled,
+          requireReason: data.backdate_require_reason !== false,
+          mode: (data.backdate_mode === 'approval' ? 'approval' : 'direct'),
+          maxDays: Number(data.backdate_max_days ?? 0),
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-    // Set the selected day to the picked date
+  const applyBackdateContext = useCallback(async (isoDate: string): Promise<boolean> => {
+    const today = getLocalTodayDate();
+    if (isoDate >= today) {
+      try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      return true;
+    }
+    // Past date selected. Only intercept if the feature is on; the RPC is the
+    // authoritative permission check, so freshly changed role permissions work
+    // even before client permission caches refresh.
+    if (!backdateCfg.enabled) {
+      try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      return true;
+    }
+    try {
+      const { data, error } = await supabase.rpc('can_backdate_order' as any, { p_date: isoDate });
+      if (error) throw error;
+      if (data === true) {
+        try {
+          sessionStorage.setItem('backdated_order_context', JSON.stringify({
+            date: isoDate,
+            requireReason: backdateCfg.requireReason,
+          }));
+        } catch {}
+        return true;
+      }
+      // Not directly allowed. Clear any stale context so past date is view-only.
+      try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      // In approval mode, still surface the request dialog, but allow viewing.
+      if (backdateCfg.mode === 'approval') {
+        setBackdateApprovalReason('');
+        setBackdateApprovalPrompt({ isoDate });
+      } else {
+        toast.info("Backdating isn't allowed for this date — showing past data (view only)");
+      }
+      return true;
+    } catch (e: any) {
+      try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      toast.info('Could not verify backdate permission — showing past data (view only)');
+      return true;
+    }
+  }, [backdateCfg]);
+
+  const submitBackdateApprovalRequest = useCallback(async () => {
+    if (!backdateApprovalPrompt) return;
+    const iso = backdateApprovalPrompt.isoDate;
+    const reason = backdateApprovalReason.trim();
+    if (backdateCfg.requireReason && !reason) {
+      toast.error('Please provide a reason');
+      return;
+    }
+    setBackdateApprovalSubmitting(true);
+    try {
+      const { error } = await supabase.rpc('request_backdate' as any, { p_date: iso, p_reason: reason || null });
+      if (error) throw error;
+      toast.success('Request sent to your manager');
+      setBackdateApprovalPrompt(null);
+      setBackdateApprovalReason('');
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not send request');
+    } finally {
+      setBackdateApprovalSubmitting(false);
+    }
+  }, [backdateApprovalPrompt, backdateApprovalReason, backdateCfg.requireReason]);
+
+  const isBackdateAllowedForDate = useCallback((isoDate: string): boolean => {
+    const today = getLocalTodayDate();
+    if (isoDate >= today) return true;
+    // Honor an already-validated backdate context for this date.
+    try {
+      const raw = sessionStorage.getItem('backdated_order_context');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.date === isoDate) return true;
+      }
+    } catch {}
+    // Fallback: config + permission + window check.
+    if (!backdateCfg.enabled) return false;
+    if (!can('order_backdate', 'create')) return false;
+    const minDate = new Date(today);
+    minDate.setDate(minDate.getDate() - Math.max(0, backdateCfg.maxDays));
+    return new Date(`${isoDate}T00:00:00`) >= minDate;
+  }, [backdateCfg, can]);
+
+  const handleDayChange = async (day: string) => {
+    const dayInfo = weekDays.find(d => d.day === day);
+    if (!dayInfo) { setSelectedDay(day); return; }
+    const ok = await applyBackdateContext(dayInfo.isoDate);
+    if (!ok) return;
+    setSelectedDay(day);
+    setSelectedDate(dayInfo.isoDate);
+  };
+  const handleCalendarSelect = async (date: Date | undefined) => {
+    if (!date) return;
+    const weekStart = startOfWeek(date, { weekStartsOn: 0 });
     const newWeekDays = getWeekDays(weekStart);
     const selectedDayInfo = newWeekDays.find(d => isSameDay(d.fullDate, date));
+    const iso = selectedDayInfo?.isoDate ?? toLocalISODate(date);
+    const ok = await applyBackdateContext(iso);
+    if (!ok) return;
+    setCalendarDate(date);
+    setSelectedWeek(weekStart);
     if (selectedDayInfo) {
       setSelectedDay(selectedDayInfo.day);
       setSelectedDate(selectedDayInfo.isoDate);
     }
   };
-  const navigateWeek = (direction: 'prev' | 'next') => {
+  const navigateWeek = async (direction: 'prev' | 'next') => {
     const newWeek = direction === 'prev' ? subWeeks(selectedWeek, 1) : addWeeks(selectedWeek, 1);
-    setSelectedWeek(newWeek);
-    setCalendarDate(newWeek);
-
-    // Keep the same day of week if possible, otherwise select the first day
     const newWeekDays = getWeekDays(newWeek);
     const sameWeekdayIndex = weekDays.findIndex(d => d.day === selectedDay);
     const targetDay = newWeekDays[sameWeekdayIndex] || newWeekDays[0];
+
+    const ok = await applyBackdateContext(targetDay.isoDate);
+    if (!ok) return;
+
+    setSelectedWeek(newWeek);
+    setCalendarDate(newWeek);
     setSelectedDay(targetDay.day);
     setSelectedDate(targetDay.isoDate);
   };
 
-  const handleAutoGeneratePlan = async () => {
+  const handleAutoGeneratePlan = () => {
     if (!user?.id) return;
-    
-    setIsGeneratingPlan(true);
-    const loadingToast = toast.loading('Generating optimized plan for this week and next...');
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('auto-generate-beat-plan', {
-        body: { 
-          userId: user.id,
-          forceRegenerate: true 
-        }
-      });
-      
-      if (error) throw error;
-      
-      toast.dismiss(loadingToast);
-      
-      const result = data?.results?.[0];
-      if (result?.status === 'success') {
-        const plansCreated = result.plansCreated || 0;
-        const prescheduled = result.prescheduledPreserved || 0;
-        
-        toast.success(`Created ${plansCreated} new plans, preserved ${prescheduled} pre-scheduled beats!`);
-        
-        // Navigate to rationale page with the plan result
-        navigate('/auto-plan-rationale', { state: { planResult: result } });
-      } else {
-        toast.error(result?.reason || 'Failed to generate plan');
-      }
-      
-      // Refresh current view
-      invalidateData?.();
-    } catch (error) {
-      console.error('Auto-generate error:', error);
-      toast.dismiss(loadingToast);
-      toast.error('Failed to generate plan. Please try again.');
-    } finally {
-      setIsGeneratingPlan(false);
-    }
+    // Preview-first flow: open the editor so the user can review/edit before saving.
+    navigate('/auto-plan-preview');
   };
 
   // Extract unique categories and locations for filter options
@@ -1039,8 +1196,11 @@ export const MyVisits = () => {
   const filteredVisits = useMemo(() => {
     // REMOVED: Don't return empty array when loading - show cached data while refreshing in background
     // if (dataLoading) return [];
+    const normalizedSearch = searchTerm.toLowerCase();
     const filtered = allVisits.filter(visit => {
-      const matchesSearch = visit.retailerName.toLowerCase().includes(searchTerm.toLowerCase()) || visit.phone.includes(searchTerm);
+      const retailerName = String(visit.retailerName || '');
+      const phone = String(visit.phone || '');
+      const matchesSearch = retailerName.toLowerCase().includes(normalizedSearch) || phone.includes(searchTerm);
       let matchesStatus = true;
       if (statusFilter === 'planned') {
         // Show planned, in-progress, and cancelled visits
@@ -1151,11 +1311,11 @@ export const MyVisits = () => {
         }
 
         // Fall back to A-Z only if no date info available
-        return a.retailerName.toLowerCase().localeCompare(b.retailerName.toLowerCase());
+        return String(a.retailerName || '').toLowerCase().localeCompare(String(b.retailerName || '').toLowerCase());
       }
 
-      const nameA = a.retailerName.toLowerCase();
-      const nameB = b.retailerName.toLowerCase();
+      const nameA = String(a.retailerName || '').toLowerCase();
+      const nameB = String(b.retailerName || '').toLowerCase();
 
       if (sortOrder === 'asc') {
         return nameA.localeCompare(nameB);
@@ -1168,11 +1328,24 @@ export const MyVisits = () => {
 
   // Use progressStats from the optimized hook for accurate counts
   // These are calculated directly from the database/cache with proper status logic
-  const plannedVisitsCount = progressStats.planned; // Pending visits (renamed from planned)
-  const productiveVisits = progressStats.productive;
-  const unproductiveVisits = progressStats.unproductive;
-  const totalPlannedVisits = progressStats.totalPlanned; // Total planned (doesn't change)
+  // Activity visits (visit_type='activity') are not included in progressStats, so merge them here.
+  const actProductive   = activityVisitCards.filter(a => a.status === 'productive').length;
+  const actUnproductive = activityVisitCards.filter(a => a.status === 'unproductive').length;
+  const actPending      = activityVisitCards.filter(a => !['productive','unproductive','cancelled'].includes(a.status ?? '')).length;
+  const actTotal        = activityVisitCards.filter(a => a.status !== 'cancelled').length;
+
+  const plannedVisitsCount = progressStats.planned + actPending; // Pending visits (renamed from planned)
+  const productiveVisits   = progressStats.productive + actProductive;
+  const unproductiveVisits = progressStats.unproductive + actUnproductive;
+  const totalPlannedVisits = progressStats.totalPlanned + actTotal; // Total planned (doesn't change)
   const totalOrderValue = progressStats.totalOrderValue;
+  // Teammate breakdown (shared beats). Only renders sub-labels when > 0.
+  const teamProductive = (progressStats as any).teamProductive || 0;
+  const teamUnproductive = (progressStats as any).teamUnproductive || 0;
+  const teamOrderValue = (progressStats as any).teamOrderValue || 0;
+  const mineProductive = Math.max(productiveVisits - teamProductive, 0);
+  const mineUnproductive = Math.max(unproductiveVisits - teamUnproductive, 0);
+  const mineOrderValue = Math.max(totalOrderValue - teamOrderValue, 0);
   const handleViewDetails = (visitId: string) => {
     window.location.href = `/visit/${visitId}`;
   };
@@ -1263,6 +1436,7 @@ export const MyVisits = () => {
                 }}
                 variant="onDark"
                 showAllTeam={false}
+                enableOnBehalf
               />
             </div>
           </CardHeader>
@@ -1280,14 +1454,7 @@ export const MyVisits = () => {
                       </Button>
                    </PopoverTrigger>
                    <PopoverContent className="w-auto p-0" align="start">
-                     <Calendar mode="single" selected={selectedWeek} onSelect={date => {
-                    if (date) {
-                      const weekStart = startOfWeek(date, {
-                        weekStartsOn: 0
-                      });
-                      setSelectedWeek(weekStart);
-                    }
-                  }} initialFocus className="pointer-events-auto" />
+                     <Calendar mode="single" selected={selectedWeek} onSelect={handleCalendarSelect} initialFocus className="pointer-events-auto" />
                    </PopoverContent>
                  </Popover>
                </div>
@@ -1311,6 +1478,7 @@ export const MyVisits = () => {
 
             {/* Quick Actions - Only show for own data, filtered by permissions */}
             {isViewingSelf && (() => {
+              const allBeatEnabled = isBackdateAllowedForDate(selectedDate);
               const row1Buttons = [
                 showAutoPlan && (
                   <Button key="auto-plan" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3" onClick={handleAutoGeneratePlan} disabled={isGeneratingPlan} title="AI generates optimized weekly beat plans">
@@ -1319,7 +1487,7 @@ export const MyVisits = () => {
                   </Button>
                 ),
                 showAllBeat && (
-                  <Button key="all-beat" variant="secondary" size="sm" className={`bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3 ${selectedDate < new Date().toISOString().split('T')[0] ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => navigate(`/beat-planning?date=${selectedDate}`)} disabled={selectedDate < new Date().toISOString().split('T')[0]}>
+                  <Button key="all-beat" variant="secondary" size="sm" className={`bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[10px] sm:text-sm h-8 sm:h-9 px-1.5 sm:px-3 ${!allBeatEnabled ? 'opacity-50 cursor-not-allowed' : ''}`} onClick={() => navigate(`/beat-planning?date=${selectedDate}`)} disabled={!allBeatEnabled}>
                     <Route size={12} className="mr-1 sm:mr-1.5" />
                     <span className="whitespace-nowrap">{t('visits.journeyPlan')}</span>
                   </Button>
@@ -1358,9 +1526,14 @@ export const MyVisits = () => {
                   </Button>
                 ),
                 showActivity && (
-                  <Button key="activity" variant="secondary" size="sm" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsActivityChooserOpen(true)}>
+                  <Button key="activity" variant="secondary" size="sm" className="relative bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 text-[9px] sm:text-sm h-8 sm:h-9 px-1 sm:px-3" onClick={() => setIsActivityModalOpen(true)}>
                     <Sparkles size={12} className="mr-0.5 sm:mr-1.5 flex-shrink-0" />
                     <span className="truncate">Activity</span>
+                    {overdueFollowUpCount > 0 && (
+                      <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] flex items-center justify-center rounded-full">
+                        {overdueFollowUpCount}
+                      </Badge>
+                    )}
                   </Button>
                 ),
               ].filter(Boolean);
@@ -1436,16 +1609,31 @@ export const MyVisits = () => {
                <button onClick={() => handleStatusClick("productive")} className={`p-2 sm:p-3 rounded-lg text-center transition-all transform hover:scale-105 flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px] ${statusFilter === "productive" ? "bg-success text-success-foreground shadow-lg shadow-success/25" : "bg-gradient-to-br from-success/10 to-success/20 hover:from-success/20 hover:to-success/30 border border-success/30 text-success"}`}>
                  <div className="text-base sm:text-xl font-bold leading-tight">{productiveVisits}</div>
                  <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.productive')}</div>
+                 {teamProductive > 0 && (
+                   <div className="text-[9px] sm:text-[10px] font-medium mt-0.5 leading-tight opacity-90">
+                     {mineProductive} mine · {teamProductive} team
+                   </div>
+                 )}
                </button>
                <button onClick={() => handleStatusClick("unproductive")} className={`p-2 sm:p-3 rounded-lg text-center transition-all transform hover:scale-105 flex flex-col items-center justify-center min-h-[70px] sm:min-h-[85px] ${statusFilter === "unproductive" ? "bg-destructive text-destructive-foreground shadow-lg shadow-destructive/25" : "bg-gradient-to-br from-destructive/10 to-destructive/20 hover:from-destructive/20 hover:to-destructive/30 border border-destructive/30 text-destructive"}`}>
                  <div className="text-base sm:text-xl font-bold leading-tight">{unproductiveVisits}</div>
-                 <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.unproductive')}</div>
-               </button>
-               
-               {/* Row 3: Total Order Value, Points Earned */}
+                  <div className="text-[9px] sm:text-xs font-medium opacity-80 mt-1 leading-tight">{t('visits.unproductive')}</div>
+                  {teamUnproductive > 0 && (
+                    <div className="text-[9px] sm:text-[10px] font-medium mt-0.5 leading-tight opacity-90">
+                      {mineUnproductive} mine · {teamUnproductive} team
+                    </div>
+                  )}
+                </button>
+                
+                {/* Row 3: Total Order Value, Points Earned */}
                <button onClick={() => navigate(`/today-summary?date=${selectedDate}`)} className="bg-gradient-to-r from-success/10 to-success/5 p-2 sm:p-3 rounded-lg border border-success/20 cursor-pointer hover:from-success/15 hover:to-success/10 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
                  <div className="text-base sm:text-xl font-bold text-success leading-tight">₹{Math.round(totalOrderValue).toLocaleString()}</div>
                  <div className="text-[9px] sm:text-xs text-success/80 font-medium mt-1 leading-tight">{t('visits.totalOrderValue')}</div>
+                 {teamOrderValue > 0 && (
+                   <div className="text-[9px] sm:text-[10px] font-medium text-success/70 mt-0.5 leading-tight">
+                     ₹{Math.round(mineOrderValue).toLocaleString()} mine · ₹{Math.round(teamOrderValue).toLocaleString()} team
+                   </div>
+                 )}
                </button>
                <button onClick={() => setIsPointsDialogOpen(true)} className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 p-2 sm:p-3 rounded-lg border border-amber-500/20 cursor-pointer hover:from-amber-500/15 hover:to-yellow-500/15 transition-all flex flex-col items-center justify-center text-center min-h-[70px] sm:min-h-[85px]">
                  <div className="text-base sm:text-xl font-bold text-amber-600 leading-tight">{pointsEarnedToday}</div>
@@ -1548,10 +1736,49 @@ export const MyVisits = () => {
             </Card>
           )}
           
+          <ActivityVisitDetail
+            open={!!detailActivity}
+            onOpenChange={(o) => { if (!o) setDetailActivity(null); }}
+            activity={detailActivity}
+            onChanged={() => {
+              refreshActivityVisits();
+              window.dispatchEvent(new CustomEvent('visitDataChanged'));
+            }}
+          />
+
           {/* Activity Events Table - shown above visit list, ONLY after parent data loads to prevent flicker */}
           {hasLoadedOnce && (isViewingSelf ? user?.id : selectedUserIds[0]) && (
-            <ActivityEventsTable userId={isViewingSelf ? user!.id : selectedUserIds[0]} selectedDate={selectedDate} onActivitiesLoaded={(count) => setHasActivities(count > 0)} />
+            <ActivityEventsTable
+              userId={isViewingSelf ? user!.id : selectedUserIds[0]}
+              selectedDate={selectedDate}
+              onActivitiesLoaded={(count) => setHasActivities(count > 0)}
+              onActivityChanged={() => {
+                refreshActivityVisits();
+                window.dispatchEvent(new CustomEvent('visitDataChanged'));
+              }}
+              onOpenDetail={(row, visitStatus) => setDetailActivity({
+                visitId: row.visit_id!,
+                activityEventId: row.id,
+                activityName: row.activity_name || 'Activity',
+                activityType: row.activity_type ?? null,
+                status: visitStatus?.status ?? (row as any).status ?? null,
+                checkInTime: visitStatus?.check_in_time ?? (row as any).check_in_time ?? null,
+                checkOutTime: visitStatus?.check_out_time ?? (row as any).check_out_time ?? null,
+                durationMinutes: row.duration_minutes ?? null,
+                remarks: row.remarks ?? null,
+                plannedDate: row.activity_date,
+              })}
+            />
           )}
+
+          {/* Carry-forward banner — visible only for self + today */}
+          {isViewingSelf && user?.id && selectedDate === getLocalTodayDate() && (
+            <CarryForwardBanner userId={user.id} date={selectedDate} variant="banner" />
+          )}
+
+          {/* Missed beat days — moved to Plan My Journey (/visits) */}
+
+
 
           {/* No visits message - ONLY after loading completes AND a brief settling period */}
           {!dataLoading && hasLoadedOnce && filteredVisits.length === 0 && !hasActivities && (plannedBeats.length === 0 || searchTerm !== '') ? <Card className="shadow-card">
@@ -1574,6 +1801,41 @@ export const MyVisits = () => {
         // Trigger data refresh
         window.dispatchEvent(new Event('visitDataChanged'));
       }} />
+
+        {/* Request backdate approval */}
+        <AlertDialog open={!!backdateApprovalPrompt} onOpenChange={(o) => { if (!o) setBackdateApprovalPrompt(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Request approval to backdate to {backdateApprovalPrompt?.isoDate}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This date is beyond the auto-allowed limit. Send a request to your manager.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {backdateCfg.requireReason && (
+              <div className="py-2">
+                <label className="text-sm font-medium">Reason</label>
+                <textarea
+                  className="mt-1 w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={backdateApprovalReason}
+                  onChange={(e) => setBackdateApprovalReason(e.target.value)}
+                  placeholder="Why do you need to backdate this order?"
+                />
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={backdateApprovalSubmitting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); submitBackdateApprovalRequest(); }}
+                disabled={backdateApprovalSubmitting}
+              >
+                {backdateApprovalSubmitting ? 'Sending…' : 'Send request'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
 
         {/* Orders Dialog */}
         <Dialog open={isOrdersDialogOpen} onOpenChange={setIsOrdersDialogOpen}>
@@ -1668,11 +1930,7 @@ export const MyVisits = () => {
 
         {/* Activity Modal */}
         <AddActivityModal open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen} />
-        <ActivityChooserModal
-          open={isActivityChooserOpen}
-          onOpenChange={setIsActivityChooserOpen}
-          onPickEvent={() => setIsActivityModalOpen(true)}
-        />
+
 
         {/* Clear Cache Confirmation Dialog */}
         <AlertDialog open={showClearCacheDialog} onOpenChange={setShowClearCacheDialog}>

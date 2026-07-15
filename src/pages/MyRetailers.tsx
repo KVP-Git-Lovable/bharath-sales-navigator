@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CompactMultiUserSelector } from "@/components/CompactMultiUserSelector";
 import { useSubordinates } from "@/hooks/useSubordinates";
+import { usePermissions } from "@/hooks/usePermissions";
 import { offlineStorage, STORES } from "@/lib/offlineStorage";
 import { buildRetailerIndex, filterRetailersIndexed, getUniqueValues, clearRetailerIndex } from "@/lib/retailerIndex";
 import { shouldSuppressError } from "@/utils/offlineErrorHandler";
@@ -12,7 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, Trash2, Calendar, Users, Check, ShoppingCart, Phone, CheckCircle2, CreditCard } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Calendar, Users, Check, ShoppingCart, Phone, CheckCircle2, CreditCard, Download } from "lucide-react";
+import { RetailerExportDialog } from "@/components/RetailerExportDialog";
 import { usePagination } from "@/hooks/usePagination";
 import { PaginationControls } from "@/components/ui/PaginationControls";
 import { VoiceSearchButton } from "@/components/VoiceSearchButton";
@@ -21,7 +23,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Layout } from "@/components/Layout";
 import { AddRetailerToVisitModal } from "@/components/AddRetailerToVisitModal";
-import { MassEditBeatsModal } from "@/components/MassEditBeatsModal";
+import { BeatTransferModal } from "@/components/BeatTransferModal";
 import { RetailerDetailModal } from "@/components/RetailerDetailModal";
 import { BulkImportRetailersModal } from "@/components/BulkImportRetailersModal";
 import { RetailerAnalytics } from "@/components/RetailerAnalytics";
@@ -31,6 +33,12 @@ import { moveToRecycleBin } from "@/utils/recycleBinUtils";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useDeleteConfirm } from "@/hooks/useDeleteConfirm";
 import { RetailersSkeleton } from "@/components/home/RetailersSkeleton";
+import { useOOBConfig } from "@/hooks/useOOBConfig";
+import { useTodaysBeatIds } from "@/hooks/useTodaysBeatIds";
+import { useMyTerritoryIds } from "@/hooks/useMyTerritoryIds";
+import { setOutOfBeatContext, clearOutOfBeatContext } from "@/lib/outOfBeatContext";
+import { Textarea } from "@/components/ui/textarea";
+import { AlertTriangle, MapPin } from "lucide-react";
 
 
 
@@ -63,15 +71,46 @@ interface Retailer {
   verified?: boolean;
   user_id?: string;
   owner_name?: string;
+  duplicate_risk_score?: number | null;
 }
 
 export const MyRetailers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+  const { can } = usePermissions();
+
   // Hierarchical user filter - multi-select
   const { isManager, subordinates, subordinateIds } = useSubordinates();
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // On-behalf ordering gate — shows/hides the "place order" affordance when viewing another user
+  const isViewingOther =
+    !!user && selectedUserIds.length === 1 && selectedUserIds[0] !== user.id;
+  const canPlaceForOther = can('order_on_behalf', 'create');
+  const canPlaceOrderForRow = (row: Retailer) =>
+    !isViewingOther || (canPlaceForOther && row.user_id !== user?.id);
+
+  // Out-of-beat ordering — gated by operations_config + permission
+  const { data: oobCfg } = useOOBConfig();
+  const canOOB = can('order_out_of_beat', 'create');
+  const canOOBAll = can('order_out_of_beat', 'view_all');
+  const oobEnabled = !!oobCfg?.oob_enabled && canOOB;
+  const oobVisibility = oobCfg?.oob_visibility ?? 'beat';
+  const isSelfView = !!user && selectedUserIds.length === 1 && selectedUserIds[0] === user.id;
+  const { data: todaysBeatIds } = useTodaysBeatIds();
+  const { data: myTerritoryIds } = useMyTerritoryIds();
+
+  // OOB place-order dialog state
+  const [oobDialogOpen, setOobDialogOpen] = useState(false);
+  const [oobDialogRetailer, setOobDialogRetailer] = useState<Retailer | null>(null);
+  const [oobReason, setOobReason] = useState('');
+  const [oobGps, setOobGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [oobGpsCapturing, setOobGpsCapturing] = useState(false);
+
+  const isInTodaysBeat = useCallback((beatId?: string | null) => {
+    if (!beatId) return false;
+    return !!todaysBeatIds && todaysBeatIds.has(beatId);
+  }, [todaysBeatIds]);
   
   // Track if initial data load is complete (prevents flickering)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -109,6 +148,7 @@ export const MyRetailers = () => {
   const [categoryFilter, setCategoryFilter] = useState<string | undefined>();
   const [retailTypeFilter, setRetailTypeFilter] = useState<string | undefined>();
   const [beatFilter, setBeatFilter] = useState<string | undefined>();
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'assigned' | 'unassigned' | 'shared'>('all');
 
   const [beatDialogOpen, setBeatDialogOpen] = useState(false);
   const [selectedRetailer, setSelectedRetailer] = useState<Retailer | null>(null);
@@ -159,6 +199,7 @@ export const MyRetailers = () => {
   // Delete confirmation dialog state
   const { isOpen: isDeleteOpen, itemId: deleteItemId, itemName: deleteItemName, openDeleteDialog, closeDeleteDialog, setOpen: setDeleteOpen } = useDeleteConfirm();
   const [isBulkDelete, setIsBulkDelete] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     document.title = "My Retailers | Manage and Assign Beats";
@@ -203,7 +244,7 @@ export const MyRetailers = () => {
         try {
           console.log('🔄 Fetching retailers from database for users:', userIds.length);
           
-          // Fetch all data in one go for better UX (avoid partial updates)
+          // Part 1: Fetch owned retailers (paginated)
           let allRetailers: any[] = [];
           let page = 0;
           let hasMore = true;
@@ -231,8 +272,62 @@ export const MyRetailers = () => {
               hasMore = false;
             }
           }
-          
+
+          // Part 2: Fetch retailers from beats shared with the current user
+          try {
+            const nowIso = new Date().toISOString();
+            const { data: sharedAccess } = await supabase
+              .from('beat_user_access')
+              .select('beat_id')
+              .eq('user_id', user.id)
+              .eq('is_active', true)
+              .or(`effective_to.is.null,effective_to.gt.${nowIso}`);
+
+            if (sharedAccess && sharedAccess.length > 0) {
+              const sharedBeatIds = Array.from(new Set(sharedAccess.map((a: any) => a.beat_id).filter(Boolean)));
+              if (sharedBeatIds.length > 0) {
+                const { data: beatRetailers } = await supabase
+                  .from('retailers')
+                  .select('*')
+                  .in('beat_id', sharedBeatIds)
+                  .order('name');
+                if (beatRetailers && beatRetailers.length > 0) {
+                  const map = new Map<string, any>();
+                  [...allRetailers, ...beatRetailers].forEach(r => map.set(r.id, r));
+                  allRetailers = Array.from(map.values());
+                }
+              }
+            }
+          } catch (sharedErr) {
+            console.warn('Shared beat retailers fetch failed (non-fatal):', sharedErr);
+          }
+
+          // Part 3: OOB widening — only when self-view + oob_enabled + permission
+          // 'territory' → include retailers in user's territories
+          // 'all' → search-driven; see search effect below
+          try {
+            if (oobEnabled && isSelfView && (oobVisibility === 'territory' || oobVisibility === 'all')) {
+              const terrIds = myTerritoryIds || [];
+              if (terrIds.length > 0) {
+                const { data: territoryRetailers } = await supabase
+                  .from('retailers')
+                  .select('*')
+                  .in('territory_id', terrIds as any)
+                  .order('name')
+                  .limit(2000);
+                if (territoryRetailers && territoryRetailers.length > 0) {
+                  const map = new Map<string, any>();
+                  [...allRetailers, ...territoryRetailers].forEach(r => map.set(r.id, r));
+                  allRetailers = Array.from(map.values());
+                }
+              }
+            }
+          } catch (oobErr) {
+            console.warn('OOB territory fetch failed (non-fatal):', oobErr);
+          }
+
           console.log('✅ Fetched total retailers:', allRetailers.length);
+          
           
           // Process and set all data at once (prevents flickering)
           setLoadingProgress('Processing...');
@@ -297,7 +392,7 @@ export const MyRetailers = () => {
       setInitialLoadComplete(true);
       loadingRef.current = false;
     }
-  }, [user]);
+  }, [user, oobEnabled, isSelfView, oobVisibility, myTerritoryIds]);
   
   // Stable ref for loadRetailers to avoid dependency issues
   const loadRetailersRef = useRef(loadRetailers);
@@ -309,6 +404,45 @@ export const MyRetailers = () => {
   const refreshRetailers = useCallback(() => {
     loadRetailersRef.current(selectedUserIds);
   }, [selectedUserIds]);
+
+  // OOB visibility='all' — search-driven merge (online only).
+  // When the user types ≥3 chars and view is self, look up matching retailers
+  // from the whole master (RLS gates to OOB scope) and merge into local state.
+  const oobAllOnline = oobEnabled && isSelfView && oobVisibility === 'all' && canOOBAll;
+  useEffect(() => {
+    if (!oobAllOnline) return;
+    if (!navigator.onLine) return;
+    const q = deferredSearch.trim();
+    if (q.length < 3) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const like = `%${q.replace(/[%_]/g, '')}%`;
+        const { data } = await supabase
+          .from('retailers')
+          .select('*')
+          .or(`name.ilike.${like},phone.ilike.${like}`)
+          .limit(50);
+        if (cancelled || !data || data.length === 0) return;
+        setRetailers(prev => {
+          const map = new Map<string, any>();
+          prev.forEach(r => map.set(r.id, r));
+          data.forEach((r: any) => {
+            if (!map.has(r.id)) {
+              map.set(r.id, { ...r, owner_name: userNameMap[r.user_id] || 'Other' });
+            }
+          });
+          const merged = Array.from(map.values());
+          buildRetailerIndex(merged);
+          return merged as Retailer[];
+        });
+      } catch (e) {
+        console.warn('OOB all-search fetch failed:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [oobAllOnline, deferredSearch, userNameMap]);
+
 
   // Debounce the loadRetailers call to prevent rapid firing
   const loadRetailersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -390,15 +524,21 @@ export const MyRetailers = () => {
       potential: potentialFilter || undefined,
       retailType: retailTypeFilter || undefined,
     });
-    
-    // If index has results, use them (much faster)
+
+    let results: Retailer[];
     if (indexedResults.length > 0 || (deferredSearch || beatFilter || categoryFilter || potentialFilter || retailTypeFilter)) {
-      return indexedResults.sort((a, b) => a.name.localeCompare(b.name));
+      results = indexedResults.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      results = retailers;
     }
-    
-    // Fallback to full array if no filters applied and index is empty
-    return retailers;
-  }, [retailers, deferredSearch, potentialFilter, categoryFilter, retailTypeFilter, beatFilter]);
+
+    if (statusFilter === 'active') return results.filter(r => (r.status || '').toLowerCase() !== 'inactive');
+    if (statusFilter === 'inactive') return results.filter(r => (r.status || '').toLowerCase() === 'inactive');
+    if (statusFilter === 'assigned') return results.filter(r => r.beat_id && r.beat_id !== 'unassigned' && r.beat_id.trim() !== '');
+    if (statusFilter === 'unassigned') return results.filter(r => !r.beat_id || r.beat_id === 'unassigned' || r.beat_id.trim() === '');
+    if (statusFilter === 'shared') return results.filter(r => user && r.user_id && r.user_id !== user.id);
+    return results;
+  }, [retailers, deferredSearch, potentialFilter, categoryFilter, retailTypeFilter, beatFilter, statusFilter, user]);
 
   // Pagination - 10 items per page
   const {
@@ -415,26 +555,52 @@ export const MyRetailers = () => {
     hasPrevPage,
   } = usePagination(filtered, { pageSize: 10 });
 
+  // Helper: a stored value like "beat_1781174542723_t9guh0881" is a raw beat_id slug, not a real name
+  const isBeatSlug = (s?: string | null) => !!s && /^beat_\d+_[a-z0-9]+$/i.test(s);
+  const formatBeatName = (r: { beat_name?: string | null; beat_id?: string | null }) => {
+    if (r.beat_name && !isBeatSlug(r.beat_name)) return r.beat_name;
+    if (r.beat_id && !isBeatSlug(r.beat_id) && r.beat_id !== 'unassigned' && r.beat_id.trim() !== '') {
+      return r.beat_id;
+    }
+    return 'Unassigned';
+  };
+
   const beats = useMemo(() => {
-    // Create a map of beat_id -> beat_name from all retailers
+    // Create a map of beat_id -> beat_name from all retailers (real names only)
     const beatMap = new Map<string, string>();
     retailers.forEach(r => {
-      if (r.beat_id) {
-        // Prioritize beat_name if available, otherwise use beat_id as fallback
-        const currentName = beatMap.get(r.beat_id);
-        const newName = r.beat_name || r.beat_id;
-        // Prefer actual names over beat_id-style strings
-        if (!currentName || (currentName.startsWith('beat_') && !newName.startsWith('beat_'))) {
-          beatMap.set(r.beat_id, newName);
-        }
+      if (!r.beat_id) return;
+      const newName = r.beat_name && !isBeatSlug(r.beat_name) ? r.beat_name : null;
+      if (!newName) return;
+      const currentName = beatMap.get(r.beat_id);
+      if (!currentName || isBeatSlug(currentName)) {
+        beatMap.set(r.beat_id, newName);
       }
     });
-    
+
     // Convert to array of objects sorted by display name
     return Array.from(beatMap.entries())
       .map(([beat_id, beat_name]) => ({ beat_id, beat_name }))
       .sort((a, b) => a.beat_name.localeCompare(b.beat_name));
   }, [retailers]);
+
+  // Retailer stats — Total includes retailers not yet assigned to a beat
+  const retailerStats = useMemo(() => {
+    const isUnassigned = (b?: string | null) => !b || b === 'unassigned' || b.trim() === '';
+    let active = 0, inactive = 0, unassigned = 0, assigned = 0, sharedWithMe = 0, myOwned = 0, duplicates = 0;
+    for (const r of retailers) {
+      const status = (r.status || '').toLowerCase();
+      if (status === 'inactive') inactive++; else active++;
+      if (isUnassigned(r.beat_id)) unassigned++; else assigned++;
+      if (user && r.user_id && r.user_id !== user.id) sharedWithMe++;
+      else myOwned++;
+      if ((r.duplicate_risk_score ?? 0) >= 70) duplicates++;
+    }
+    return { total: retailers.length, active, inactive, unassigned, assigned, sharedWithMe, myOwned, duplicates };
+  }, [retailers, user]);
+
+
+
 
   const openEdit = (retailer: Retailer) => {
     setSelectedRetailer(retailer);
@@ -656,6 +822,12 @@ export const MyRetailers = () => {
       toast({ title: 'Failed to save', description: error.message, variant: 'destructive' });
       return;
     }
+    if (data?.id) {
+      const { maybeTriggerWhatsAppVerification } = await import('@/utils/retailerVerificationTrigger');
+      maybeTriggerWhatsAppVerification(data.id, payload.phone);
+      const { sendRetailerWelcomeWhatsApp } = await import('@/utils/retailerWelcomeWhatsAppTrigger');
+      sendRetailerWelcomeWhatsApp(data.id, payload.phone);
+    }
     toast({ title: 'Added', description: `${newForm.name} saved successfully. Fill in additional details now.` });
     setAddOpen(false);
     setNewForm({ name: '', phone: '', address: '', entity_type: 'retailer', beat_id: '' });
@@ -678,6 +850,63 @@ export const MyRetailers = () => {
     }
   }, [location.state, retailers]);
 
+  // Navigate to Order Entry — either directly (in-beat) or via OOB confirm dialog
+  const handlePlaceOrder = useCallback((r: Retailer) => {
+    const inBeat = isInTodaysBeat(r.beat_id);
+    if (inBeat || !oobEnabled) {
+      clearOutOfBeatContext();
+      navigate(`/order-entry?phoneOrder=true&retailerId=${r.id}&retailer=${encodeURIComponent(r.name)}`);
+      return;
+    }
+    // Out-of-beat: open confirm dialog to capture reason + GPS as configured
+    setOobDialogRetailer(r);
+    setOobReason('');
+    setOobGps(null);
+    setOobDialogOpen(true);
+  }, [isInTodaysBeat, oobEnabled, navigate]);
+
+  const captureOobGps = useCallback(() => {
+    if (!('geolocation' in navigator)) {
+      toast({ title: 'GPS unavailable', description: 'This device does not support location.', variant: 'destructive' });
+      return;
+    }
+    setOobGpsCapturing(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setOobGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setOobGpsCapturing(false);
+      },
+      (err) => {
+        setOobGpsCapturing(false);
+        toast({ title: 'Location failed', description: err.message || 'Could not capture GPS.', variant: 'destructive' });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+
+  const confirmOobAndPlace = useCallback(() => {
+    if (!oobDialogRetailer) return;
+    if (oobCfg?.oob_require_reason && !oobReason.trim()) {
+      toast({ title: 'Reason required', description: 'Please enter a reason for the out-of-beat visit.', variant: 'destructive' });
+      return;
+    }
+    if (oobCfg?.oob_require_gps && !oobGps) {
+      toast({ title: 'GPS required', description: 'Please capture your location.', variant: 'destructive' });
+      return;
+    }
+    setOutOfBeatContext({
+      retailerId: oobDialogRetailer.id,
+      reason: oobReason.trim(),
+      gpsLat: oobGps?.lat,
+      gpsLng: oobGps?.lng,
+    });
+    const r = oobDialogRetailer;
+    setOobDialogOpen(false);
+    setOobDialogRetailer(null);
+    navigate(`/order-entry?phoneOrder=true&retailerId=${r.id}&retailer=${encodeURIComponent(r.name)}`);
+  }, [oobDialogRetailer, oobCfg, oobReason, oobGps, navigate]);
+
+
   // Show skeleton during initial load for smooth UX - no flicker
   if (!initialLoadComplete && loading) {
     return (
@@ -695,18 +924,99 @@ export const MyRetailers = () => {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 flex-wrap">
                 <CardTitle className="text-lg sm:text-xl font-bold whitespace-nowrap">My Retailers</CardTitle>
-                <span className="bg-primary-foreground/20 text-primary-foreground text-sm font-medium px-3 py-1 rounded-full whitespace-nowrap">
-                  {loading ? '...' : retailers.length.toLocaleString()} {retailers.length === 1 ? 'retailer' : 'retailers'}
-                </span>
               </div>
               <CompactMultiUserSelector
                 selectedUserIds={selectedUserIds}
                 onSelectionChange={setSelectedUserIds}
+                enableOnBehalf
                 className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20 hover:bg-primary-foreground/20 flex-shrink-0"
               />
             </div>
           </CardHeader>
         </Card>
+
+        {/* Stats Dashboard — includes retailers without a beat */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <Card
+            className={`text-center cursor-pointer hover:shadow-md transition-all ${statusFilter === 'all' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setStatusFilter('all')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-primary">{retailerStats.total.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Total Retailers</div>
+            </CardContent>
+          </Card>
+          <Card
+            className={`text-center cursor-pointer hover:shadow-md transition-all ${statusFilter === 'active' ? 'ring-2 ring-emerald-500' : ''}`}
+            onClick={() => setStatusFilter('active')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-emerald-600">{retailerStats.active.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Active</div>
+            </CardContent>
+          </Card>
+          <Card
+            className={`text-center cursor-pointer hover:shadow-md transition-all ${statusFilter === 'inactive' ? 'ring-2 ring-slate-500' : ''}`}
+            onClick={() => setStatusFilter('inactive')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-slate-600">{retailerStats.inactive.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Inactive</div>
+            </CardContent>
+          </Card>
+          <Card
+            className={`text-center cursor-pointer hover:shadow-md transition-all ${statusFilter === 'assigned' ? 'ring-2 ring-blue-500' : ''}`}
+            onClick={() => setStatusFilter('assigned')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-blue-600">{retailerStats.assigned.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">With Beat</div>
+            </CardContent>
+          </Card>
+          <Card
+            className={`text-center cursor-pointer hover:shadow-md transition-all ${statusFilter === 'unassigned' ? 'ring-2 ring-amber-500' : ''}`}
+            onClick={() => setStatusFilter('unassigned')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-amber-600">{retailerStats.unassigned.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Unassigned</div>
+            </CardContent>
+          </Card>
+          <Card
+            className={`text-center cursor-pointer hover:shadow-md transition-all ${statusFilter === 'shared' ? 'ring-2 ring-purple-500' : ''}`}
+            onClick={() => setStatusFilter('shared')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-purple-600">{retailerStats.sharedWithMe.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Shared With Me</div>
+            </CardContent>
+          </Card>
+          <Card className="text-center">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-indigo-600">{retailerStats.myOwned.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">My Owned</div>
+            </CardContent>
+          </Card>
+          <Card className="text-center">
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-rose-600">{retailerStats.duplicates.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground">Duplicate Suspects</div>
+              <div className="text-xs text-muted-foreground mt-1">Risk ≥70</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {statusFilter !== 'all' && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Filtered by: <strong className="text-foreground capitalize">{statusFilter}</strong></span>
+            <Button variant="ghost" size="sm" onClick={() => setStatusFilter('all')}>
+              Clear filter ×
+            </Button>
+          </div>
+        )}
+
+
+
 
 
         <Card>
@@ -719,6 +1029,7 @@ export const MyRetailers = () => {
               <VoiceSearchButton onSearchResult={(text) => setSearch(text)} />
               <Button 
                 variant="secondary" 
+                data-testid="add-retailer-button"
                 onClick={() => {
                   const originalReturnTo = location.state?.returnTo || '/my-retailers';
                   navigate('/add-retailer', { state: { returnTo: originalReturnTo } });
@@ -736,6 +1047,10 @@ export const MyRetailers = () => {
               <Button onClick={() => setBulkImportModalOpen(true)} variant="outline" size="sm" className="flex items-center gap-1">
                 <Plus size={16} />
                 Bulk Import
+              </Button>
+              <Button onClick={() => setExportOpen(true)} variant="outline" size="sm" className="flex items-center gap-1">
+                <Download size={16} />
+                Export Retailers
               </Button>
               {selectedRetailerIds.length > 0 && (
                 <Button onClick={handleBulkDeleteClick} variant="destructive" size="sm" className="flex items-center gap-1">
@@ -828,18 +1143,30 @@ export const MyRetailers = () => {
                             {r.verified && (
                               <CheckCircle2 className="h-4 w-4 text-blue-600" />
                             )}
+                            {r.user_id !== user?.id && (
+                              <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                                Shared
+                              </span>
+                            )}
+                            {oobEnabled && !isInTodaysBeat(r.beat_id) && (
+                              <span className="ml-1 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" /> Out of beat
+                              </span>
+                            )}
                           </h3>
                         </div>
                       <div className="flex items-center gap-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => navigate(`/order-entry?phoneOrder=true&retailerId=${r.id}&retailer=${encodeURIComponent(r.name)}`)}
-                          className="h-8 w-8 p-0"
-                          title="Phone Order"
-                        >
-                          <ShoppingCart className="h-4 w-4" />
-                        </Button>
+                        {canPlaceOrderForRow(r) && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handlePlaceOrder(r)}
+                            className="h-8 w-8 p-0"
+                            title={isViewingOther ? `Place order on behalf of ${r.owner_name || 'user'}` : (oobEnabled && !isInTodaysBeat(r.beat_id) ? 'Out-of-beat order' : 'Phone Order')}
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button 
                           size="sm" 
                           variant="ghost" 
@@ -876,7 +1203,7 @@ export const MyRetailers = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Beat:</span>
-                        <span>{r.beat_name || r.beat_id}</span>
+                        <span>{formatBeatName(r)}</span>
                       </div>
                       {selectedUserIds.length > 1 && r.owner_name && (
                         <div className="flex items-center gap-2">
@@ -963,7 +1290,7 @@ export const MyRetailers = () => {
                     const shortAddress = r.address.length > 30 ? r.address.substring(0, 30) + '...' : r.address;
                     const isAddressExpanded = expandedAddress === r.id;
                     
-                    const beatDisplay = r.beat_name || r.beat_id;
+                    const beatDisplay = formatBeatName(r);
                     const shortBeat = beatDisplay && beatDisplay.length > 15 ? beatDisplay.substring(0, 15) + '...' : beatDisplay;
                     const isBeatExpanded = expandedBeat === r.id;
                     
@@ -984,6 +1311,11 @@ export const MyRetailers = () => {
                             {r.name}
                             {r.verified && (
                               <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                            )}
+                            {r.user_id !== user?.id && (
+                              <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                                Shared
+                              </span>
                             )}
                           </div>
                         </TableCell>
@@ -1023,15 +1355,17 @@ export const MyRetailers = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              onClick={() => navigate(`/order-entry?phoneOrder=true&retailerId=${r.id}&retailer=${encodeURIComponent(r.name)}`)}
-                              className="h-8 w-8 p-0"
-                              title="Phone Order"
-                            >
-                              <ShoppingCart className="h-4 w-4" />
-                            </Button>
+                            {canPlaceOrderForRow(r) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handlePlaceOrder(r)}
+                                className="h-8 w-8 p-0"
+                                title={isViewingOther ? `Place order on behalf of ${r.owner_name || 'user'}` : (oobEnabled && !isInTodaysBeat(r.beat_id) ? 'Out-of-beat order' : 'Phone Order')}
+                              >
+                                <ShoppingCart className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button 
                               size="sm" 
                               variant="ghost" 
@@ -1107,12 +1441,10 @@ export const MyRetailers = () => {
           }}
         />
 
-        {/* Mass Edit Beats Modal */}
-        <MassEditBeatsModal
-          isOpen={massEditModalOpen}
-          onClose={() => setMassEditModalOpen(false)}
-          retailers={retailers}
-          beats={beats}
+        {/* Beat Transfer Modal */}
+        <BeatTransferModal
+          open={massEditModalOpen}
+          onOpenChange={setMassEditModalOpen}
           onSuccess={() => {
             refreshRetailers();
             setMassEditModalOpen(false);
@@ -1175,6 +1507,72 @@ export const MyRetailers = () => {
             : `Are you sure you want to delete "${deleteItemName}"? It will be moved to the recycle bin and can be restored later.`
           }
         />
+
+        <RetailerExportDialog
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          retailers={filtered as any}
+          filteredCount={filtered.length}
+        />
+
+        {/* Out-of-beat confirm dialog */}
+        <Dialog open={oobDialogOpen} onOpenChange={(v) => { if (!v) { setOobDialogOpen(false); setOobDialogRetailer(null); } }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-amber-700">
+                <AlertTriangle className="h-5 w-5" />
+                Out-of-beat order
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border border-amber-300 bg-amber-50 text-amber-900 px-3 py-2">
+                This retailer is outside today's planned beat.
+                {oobDialogRetailer && (
+                  <div className="mt-1 font-medium">{oobDialogRetailer.name}</div>
+                )}
+              </div>
+
+              {oobCfg?.oob_require_reason && (
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
+                    Reason <span className="text-destructive">*</span>
+                  </label>
+                  <Textarea
+                    value={oobReason}
+                    onChange={(e) => setOobReason(e.target.value)}
+                    placeholder="Why are you visiting this retailer today?"
+                    rows={3}
+                    maxLength={300}
+                  />
+                </div>
+              )}
+
+              {oobCfg?.oob_require_gps && (
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">
+                    Location <span className="text-destructive">*</span>
+                  </label>
+                  {oobGps ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>Captured: {oobGps.lat.toFixed(5)}, {oobGps.lng.toFixed(5)}</span>
+                      <Button size="sm" variant="ghost" onClick={captureOobGps} disabled={oobGpsCapturing}>Refresh</Button>
+                    </div>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={captureOobGps} disabled={oobGpsCapturing}>
+                      <MapPin className="h-4 w-4 mr-1" />
+                      {oobGpsCapturing ? 'Capturing…' : 'Capture GPS'}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => { setOobDialogOpen(false); setOobDialogRetailer(null); }}>Cancel</Button>
+              <Button onClick={confirmOobAndPlace}>Continue to order</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </section>
     </Layout>
   );

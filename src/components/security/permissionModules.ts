@@ -72,6 +72,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
           { name: 'admin_product_delete', label: 'Delete Product' },
           { name: 'admin_product_categories', label: 'Product Categories' },
           { name: 'admin_product_bulk_import', label: 'Product Bulk Import' },
+          { name: 'product_availability_settings', label: 'Product Availability Rules (manage)' },
         ]
       },
       {
@@ -225,6 +226,18 @@ export const PERMISSION_MODULES: PermissionModule[] = [
         subFeatures: [
           { name: 'admin_credit_scoring_config', label: 'Credit Scoring Configuration' },
           { name: 'admin_credit_limits', label: 'Credit Limits Management' },
+          { name: 'credit_note_settings', label: 'Credit Note Settings (approval config)' },
+        ]
+      },
+      {
+        name: 'admin_activity_master',
+        label: 'Activity Type Master',
+        subFeatures: [
+          { name: 'activity_type_settings', label: 'Activity Type Master (config)' },
+          { name: 'activity_attachments', label: 'Activity Attachments' },
+          { name: 'action_activity_create', label: 'Log / configure activity' },
+          { name: 'activity_team_view', label: 'View team activities (read = my team, view-all = everyone)' },
+          { name: 'action_activity_assign', label: 'Assign activities to team' },
         ]
       },
       {
@@ -425,6 +438,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       { name: 'analytics_date_range_picker', label: 'Date Range Picker' },
       { name: 'analytics_performance_calendar', label: 'Performance Calendar' },
       { name: 'analytics_leaderboard', label: 'Leaderboard' },
+      { name: 'analytics_field_activity', label: 'Analytics — Field Activity' },
     ]
   },
   {
@@ -612,6 +626,23 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       { name: 'user_mgmt_activate_deactivate', label: 'Activate / Deactivate' },
       { name: 'user_mgmt_reset_password', label: 'Reset Password' },
       { name: 'user_mgmt_hierarchy', label: 'Hierarchy Management' },
+    ]
+  },
+  {
+    name: 'operations',
+    label: 'Operations',
+    features: [
+      {
+        name: 'operations',
+        label: 'Operations',
+        subFeatures: [
+          { name: 'operations_config', label: 'Operations configuration' },
+          { name: 'order_backdate', label: 'Place backdated orders' },
+          { name: 'order_on_behalf', label: 'Place order on behalf' },
+          { name: 'order_out_of_beat', label: 'Place out-of-beat orders' },
+          { name: 'order_edit', label: 'Edit placed orders' },
+        ]
+      },
     ]
   },
 ];

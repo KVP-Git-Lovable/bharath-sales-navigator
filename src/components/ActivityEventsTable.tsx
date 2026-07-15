@@ -9,11 +9,18 @@ import { toast } from 'sonner';
 import { getLocalTodayDate } from '@/utils/dateUtils';
 import { Geolocation } from '@capacitor/geolocation';
 import { useNavigate } from 'react-router-dom';
+import { useActivityTypes } from '@/hooks/useActivityTypes';
+import { ActivityCompletionDialog } from '@/components/ActivityCompletionDialog';
 
 interface ActivityEventsTableProps {
   userId: string;
   selectedDate: string;
   onActivitiesLoaded?: (count: number) => void;
+  onActivityChanged?: () => void;
+  onOpenDetail?: (
+    activity: ActivityEvent,
+    visitStatus?: { status: string | null; check_in_time: string | null; check_out_time: string | null } | null,
+  ) => void;
 }
 
 interface VisitStatus {
@@ -22,15 +29,20 @@ interface VisitStatus {
   status: string | null;
 }
 
-const ACTIVITY_TYPE_COLORS: Record<string, string> = {
-  'Doctor Visit': 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
-  Celebration: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  Event: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  Promotion: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  Demo: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  Meeting: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  Other: 'bg-muted text-muted-foreground',
+// Tailwind class map by named color. Master activity_types may store either
+// a color name (e.g. "purple") or a hex string — we only use the name buckets.
+const COLOR_CLASS: Record<string, string> = {
+  rose:   'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
+  amber:  'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  blue:   'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  green:  'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+  purple: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  teal:   'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+  orange: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  gray:   'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
 };
+const NEUTRAL = COLOR_CLASS.gray;
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof Play }> = {
   planned: {
@@ -50,15 +62,28 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   },
 };
 
-export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }: ActivityEventsTableProps) => {
+export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, onActivityChanged, onOpenDetail }: ActivityEventsTableProps) => {
   const { fetchActivitiesForDate, updateActivityLocation } = useActivityEvents();
+  const { types: activityTypeMaster } = useActivityTypes();
   const navigate = useNavigate();
+
+  // Match incoming activity_type by name or code → master row.
+  const humanize = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const resolveTypeMeta = (key: string | null | undefined): { label: string; colorClass: string } => {
+    if (!key) return { label: 'Other', colorClass: NEUTRAL };
+    const hit = activityTypeMaster.find((t) => t.name === key || t.code === key);
+    return {
+      label: hit?.name ?? humanize(key),
+      colorClass: (hit?.color && COLOR_CLASS[hit.color]) || NEUTRAL,
+    };
+  };
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [visitStatuses, setVisitStatuses] = useState<Record<string, VisitStatus>>({});
   const [eventTotals, setEventTotals] = useState<Record<string, { revenue: number; orders: number }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [completionTarget, setCompletionTarget] = useState<{ id: string; visitId: string } | null>(null);
 
   const isToday = selectedDate === getLocalTodayDate();
   
@@ -179,6 +204,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
 
       toast.success('Activity started — tracking in progress');
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
+      onActivityChanged?.();
       await loadActivities();
     } catch (err) {
       console.error('[ActivityEventsTable] Start failed:', err);
@@ -188,40 +214,11 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
     }
   };
 
-  const handleCompleteActivity = async (activity: ActivityEvent) => {
+  const handleCompleteActivity = (activity: ActivityEvent) => {
     if (!activity.visit_id) return;
-    setActionLoading(activity.id + '-complete');
-    try {
-      const now = new Date().toISOString();
-      const gps = await captureGPS();
-
-      // Update visit to productive/completed with check_out_time
-      const { error: visitError } = await supabase
-        .from('visits')
-        .update({ 
-          check_out_time: now, 
-          status: 'productive',
-        } as any)
-        .eq('id', activity.visit_id);
-
-      if (visitError) throw visitError;
-
-      // Update activity_events with end location and time
-      await updateActivityLocation(activity.id, {
-        end_time: now,
-        ...(gps ? { end_latitude: gps.lat, end_longitude: gps.lng } : {}),
-      });
-
-      toast.success('Activity completed!');
-      window.dispatchEvent(new CustomEvent('visitDataChanged'));
-      await loadActivities();
-    } catch (err) {
-      console.error('[ActivityEventsTable] Complete failed:', err);
-      toast.error('Failed to complete activity');
-    } finally {
-      setActionLoading(null);
-    }
+    setCompletionTarget({ id: activity.id, visitId: activity.visit_id });
   };
+
 
   const formatTime = (isoString: string) => {
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -304,8 +301,10 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
             return (
               <div
                 key={activity.id}
-                className="rounded-2xl border bg-card p-4 hover:shadow-md transition-shadow"
+                id={`activity-event-${activity.id}`}
+                className="rounded-2xl border bg-card p-4 hover:shadow-md transition-shadow scroll-mt-24"
               >
+
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                   {/* Left: identity */}
                   <div className="flex items-center gap-3 lg:min-w-[220px]">
@@ -430,21 +429,61 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
           return (
             <div
               key={activity.id}
-              className="rounded-lg border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2"
+              id={`activity-event-${activity.id}`}
+              role={onOpenDetail ? 'button' : undefined}
+              tabIndex={onOpenDetail ? 0 : undefined}
+              onClick={onOpenDetail ? () => onOpenDetail(activity, visitStatus) : undefined}
+              onKeyDown={onOpenDetail ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenDetail(activity, visitStatus); }
+              } : undefined}
+              className={`rounded-lg border border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2 scroll-mt-24 ${onOpenDetail ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
             >
+
               {/* Top row: Name + Type Badge + Status */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm leading-tight">
-                    {activity.activity_name || activity.activity_type}
-                  </h4>
+              {(() => {
+                const meta = resolveTypeMeta(activity.activity_type);
+                return (
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm leading-tight">
+                        {activity.activity_name || activity.retailer_name || activity.distributor_name || activity.beat_name || meta.label}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge className={`text-[10px] px-2 py-0.5 ${meta.colorClass}`}>
+                        {meta.label}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Per-type summary lines */}
+              {activity.activity_type === 'customer_visit' && (activity.outcome || activity.follow_up_date) && (
+                <div className="text-xs text-muted-foreground">
+                  {activity.outcome && <span className="mr-2">Outcome: <span className="font-medium">{activity.outcome.replace(/_/g, ' ')}</span></span>}
+                  {activity.follow_up_date && <span>Follow-up: {activity.follow_up_date}</span>}
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Badge className={`text-[10px] px-2 py-0.5 ${ACTIVITY_TYPE_COLORS[activity.activity_type] || ACTIVITY_TYPE_COLORS.Other}`}>
-                    {activity.activity_type}
-                  </Badge>
+              )}
+              {activity.activity_type === 'beat_visit' && (
+                <div className="text-xs text-muted-foreground">
+                  {activity.shops_visited ?? 0}/{activity.shops_planned ?? '?'} shops
+                  {activity.km_travelled ? ` · ${activity.km_travelled} km` : ''}
                 </div>
-              </div>
+              )}
+              {activity.activity_type === 'joint_beat_visit' && (
+                <div className="text-xs text-muted-foreground">
+                  {activity.beat_name && <span>{activity.beat_name}</span>}
+                  {activity.rep_overall_outcome && <span className="ml-2">· {activity.rep_overall_outcome}</span>}
+                </div>
+              )}
+              {activity.activity_type === 'new_beat_survey' && (
+                <div className="text-xs text-muted-foreground">
+                  {activity.survey_total_shops ? `${activity.survey_total_shops} shops surveyed` : ''}
+                  {activity.survey_suggested_beat_count ? ` · ${activity.survey_suggested_beat_count} beats` : ''}
+                  {activity.survey_priority ? ` · ${activity.survey_priority} priority` : ''}
+                </div>
+              )}
 
               {/* Status Card */}
               <div className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium ${statusConfig.color}`}>
@@ -513,7 +552,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                     <Button
                       size="sm"
                       className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => handleStartActivity(activity)}
+                      onClick={(e) => { e.stopPropagation(); handleStartActivity(activity); }}
                       disabled={actionLoading === activity.id + '-start'}
                     >
                       {actionLoading === activity.id + '-start' ? (
@@ -530,7 +569,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
                     <Button
                       size="sm"
                       className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => handleCompleteActivity(activity)}
+                      onClick={(e) => { e.stopPropagation(); handleCompleteActivity(activity); }}
                       disabled={actionLoading === activity.id + '-complete'}
                     >
                       {actionLoading === activity.id + '-complete' ? (
@@ -547,6 +586,16 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded }
           );
         })}
       </CardContent>
+      {completionTarget && (
+        <ActivityCompletionDialog
+          open={!!completionTarget}
+          onOpenChange={(o) => { if (!o) setCompletionTarget(null); }}
+          activityId={completionTarget.id}
+          visitId={completionTarget.visitId}
+          onCompleted={() => { setCompletionTarget(null); onActivityChanged?.(); loadActivities(); }}
+        />
+      )}
     </Card>
   );
 };
+

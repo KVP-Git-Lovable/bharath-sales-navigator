@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -73,6 +73,8 @@ interface ProductFormData {
   barcode_image_url?: string;
   qr_code?: string;
   hsn_code?: string;
+  tax_master_id?: string | null;
+  gst_percentage?: number | null;
   is_focused_product: boolean;
   focused_type?: 'fixed_date' | 'recurring' | 'keep_open';
   focused_due_date: string;
@@ -85,10 +87,17 @@ interface ProductFormData {
   };
 }
 
+interface TaxMasterOption {
+  id: string;
+  name: string;
+  total_rate: number | null;
+}
+
 interface ProductFormFieldsProps {
   form: ProductFormData;
   categories: ProductCategory[];
   territories: Territory[];
+  taxMasters?: TaxMasterOption[];
   onFormChange: (updates: Partial<ProductFormData>) => void;
 }
 
@@ -96,11 +105,32 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
   form,
   categories,
   territories,
+  taxMasters = [],
   onFormChange
 }) => {
   const [territoryComboOpen, setTerritoryComboOpen] = useState(false);
   const [uploadingBarcode, setUploadingBarcode] = useState(false);
   const [recurringType, setRecurringType] = useState<'days' | 'weeks' | 'months'>('days');
+  const [uoms, setUoms] = useState<Array<{ id: string; code: string; name: string; category: string | null; is_base: boolean }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: enabled } = await supabase
+        .from('enabled_units')
+        .select('uom_id')
+        .eq('enabled', true);
+      const ids = (enabled || []).map((e: any) => e.uom_id);
+      let query = supabase.from('uom_master').select('id, code, name, category, is_base');
+      if (ids.length) query = query.in('id', ids);
+      const { data } = await query.order('name');
+      if (!cancelled && data) setUoms(data as any);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const baseUoms = uoms.filter((u) => u.is_base);
+  const allUoms = uoms;
 
   const handleBarcodeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -153,12 +183,14 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
           />
         </div>
         <div>
-          <Label htmlFor="product_number">Product Number</Label>
+          <Label htmlFor="product_number">
+            Manufacturer Code <span className="text-muted-foreground font-normal">(Optional)</span>
+          </Label>
           <Input
             id="product_number"
             value={form.product_number}
             onChange={(e) => onFormChange({ product_number: e.target.value })}
-            placeholder="Enter product number"
+            placeholder="e.g. MFG-KG-250"
           />
         </div>
       </div>
@@ -213,9 +245,15 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="kg">Kilogram (kg)</SelectItem>
-              <SelectItem value="ltr">Liter (ltr)</SelectItem>
-              <SelectItem value="pcs">Pieces (pcs)</SelectItem>
+              {(baseUoms.length ? baseUoms : allUoms).map((u) => (
+                <SelectItem key={u.id} value={u.code.toLowerCase()}>
+                  {u.name} ({u.code})
+                </SelectItem>
+              ))}
+              {/* Fallback if user has a legacy value not in master */}
+              {!allUoms.some((u) => u.code.toLowerCase() === form.base_unit) && form.base_unit && (
+                <SelectItem value={form.base_unit}>{form.base_unit}</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -226,9 +264,14 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="kg">Kilogram (kg)</SelectItem>
-              <SelectItem value="ltr">Liter (ltr)</SelectItem>
-              <SelectItem value="pcs">Pieces (pcs)</SelectItem>
+              {allUoms.map((u) => (
+                <SelectItem key={u.id} value={u.code.toLowerCase()}>
+                  {u.name} ({u.code})
+                </SelectItem>
+              ))}
+              {!allUoms.some((u) => u.code.toLowerCase() === form.unit) && form.unit && (
+                <SelectItem value={form.unit}>{form.unit}</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -281,6 +324,43 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
           placeholder="Enter HSN/SAC code"
         />
       </div>
+
+      {/* GST Bracket (Tax Master) */}
+      <div>
+        <Label htmlFor="tax_master_id">GST Bracket</Label>
+        <Select
+          value={form.tax_master_id || '__unassigned__'}
+          onValueChange={(v) => {
+            if (v === '__unassigned__') {
+              onFormChange({ tax_master_id: null });
+            } else {
+              const sel = taxMasters.find(t => t.id === v);
+              onFormChange({
+                tax_master_id: v,
+                gst_percentage: sel?.total_rate ?? form.gst_percentage ?? null,
+              });
+            }
+          }}
+        >
+          <SelectTrigger id="tax_master_id">
+            <SelectValue placeholder="Select GST bracket" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__unassigned__">— Unassigned (no tax) —</SelectItem>
+            {taxMasters.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}{t.total_rate != null ? ` (${t.total_rate}%)` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-1">
+          {form.tax_master_id
+            ? `Rate: ${form.gst_percentage ?? 0}% (auto-synced from bracket)`
+            : 'Unassigned — no GST will apply until a bracket is set.'}
+        </p>
+      </div>
+
 
       {/* Barcode Upload */}
       <div>

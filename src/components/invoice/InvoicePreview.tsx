@@ -1,4 +1,7 @@
 import { DisplaySettingsMap } from "@/hooks/useInvoiceDisplaySettings";
+import InvoiceStatusBadge from "./InvoiceStatusBadge";
+import { resolveLineTax } from "@/utils/taxCalc";
+
 
 // Number to words helper
 const numberToWords = (num: number): string => {
@@ -126,9 +129,14 @@ export default function InvoicePreview({
     
     return sum + qty * rate;
   }, 0);
-  const cgst = subtotal * 0.025;
-  const sgst = subtotal * 0.025;
-  const total = subtotal + cgst + sgst;
+  // Phase 4: read per-line stored tax from order_items; fall back to helper for legacy lines.
+  const lineTaxes = cartItems.map((it: any) => resolveLineTax(it));
+  const cgst = lineTaxes.reduce((s, l) => s + l.cgst, 0);
+  const sgst = lineTaxes.reduce((s, l) => s + l.sgst, 0);
+  const igst = lineTaxes.reduce((s, l) => s + l.igst, 0);
+  const cess = lineTaxes.reduce((s, l) => s + l.cess, 0);
+  const total = subtotal + cgst + sgst + igst + cess;
+
   
   // Amount in words
   const totalInWords = numberToWords(Math.round(total)) + ' Rupees Only';
@@ -183,6 +191,9 @@ export default function InvoicePreview({
 
   return (
     <div className={`p-6 rounded-lg ${styles.container} max-w-4xl mx-auto text-sm`}>
+      <div className="mb-3">
+        <InvoiceStatusBadge invoiceNumber={orderId} variant="banner" />
+      </div>
       {/* Header */}
       <div className={`${styles.header} p-4 rounded-t-lg flex justify-between items-center mb-6`}>
         <div className="flex items-center gap-4">
@@ -284,6 +295,8 @@ export default function InvoicePreview({
               )}
               <th className="border border-gray-300 p-2 text-center text-xs">QTY</th>
               <th className="border border-gray-300 p-2 text-right text-xs">PRICE</th>
+              <th className="border border-gray-300 p-2 text-center text-xs">CGST%</th>
+              <th className="border border-gray-300 p-2 text-center text-xs">SGST%</th>
               <th className="border border-gray-300 p-2 text-right text-xs">TOTAL</th>
             </tr>
           </thead>
@@ -306,6 +319,14 @@ export default function InvoicePreview({
               }
               
               const itemTotal = qty * rate;
+              const fallbackRate = Number(
+                (item as any).tax_rate_snapshot ??
+                (item as any).gst_percentage ??
+                0
+              ) || 0;
+              const cgstRate = Number((item as any).cgst_rate ?? (fallbackRate / 2)) || 0;
+              const sgstRate = Number((item as any).sgst_rate ?? (fallbackRate / 2)) || 0;
+              const igstRate = Number((item as any).igst_rate ?? 0) || 0;
               return (
                 <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                   <td className="border border-gray-300 p-2 text-center text-xs">{index + 1}</td>
@@ -320,6 +341,12 @@ export default function InvoicePreview({
                   <td className="border border-gray-300 p-2 text-right text-xs">
                     ₹{rate.toFixed(2)}
                   </td>
+                  <td className="border border-gray-300 p-2 text-center text-xs">
+                    {igstRate > 0 ? `IGST ${igstRate}%` : (cgstRate > 0 ? `${cgstRate}%` : '-')}
+                  </td>
+                  <td className="border border-gray-300 p-2 text-center text-xs">
+                    {igstRate > 0 ? '-' : (sgstRate > 0 ? `${sgstRate}%` : '-')}
+                  </td>
                   <td className="border border-gray-300 p-2 text-right text-xs">
                     ₹{itemTotal.toFixed(2)}
                   </td>
@@ -329,6 +356,55 @@ export default function InvoicePreview({
           </tbody>
         </table>
       </div>
+
+      {/* Rate-wise GST summary (GST compliant) */}
+      {(() => {
+        const groups = new Map<number, { taxable: number; cgst: number; sgst: number; igst: number; cess: number }>();
+        cartItems.forEach((it: any, i: number) => {
+          const lt = lineTaxes[i];
+          if (!lt || lt.taxRate <= 0) return;
+          const key = Number(lt.taxRate) || 0;
+          const g = groups.get(key) || { taxable: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 };
+          g.taxable += Number((lt as any).taxableAmount ?? 0) || 0;
+          g.cgst += lt.cgst; g.sgst += lt.sgst; g.igst += lt.igst; g.cess += lt.cess;
+          groups.set(key, g);
+        });
+        if (groups.size === 0) return null;
+        const rows = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+        return (
+          <div className="mb-4">
+            <h3 className="font-bold text-xs mb-2">GST RATE-WISE SUMMARY</h3>
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className={styles.tableHeader}>
+                  <th className="border border-gray-300 p-1 text-center">RATE</th>
+                  <th className="border border-gray-300 p-1 text-right">TAXABLE</th>
+                  <th className="border border-gray-300 p-1 text-right">CGST</th>
+                  <th className="border border-gray-300 p-1 text-right">SGST</th>
+                  {rows.some(([, v]) => v.igst > 0) && (
+                    <th className="border border-gray-300 p-1 text-right">IGST</th>
+                  )}
+                  <th className="border border-gray-300 p-1 text-right">TOTAL TAX</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([rate, v]) => (
+                  <tr key={rate}>
+                    <td className="border border-gray-300 p-1 text-center">{rate}%</td>
+                    <td className="border border-gray-300 p-1 text-right">₹{v.taxable.toFixed(2)}</td>
+                    <td className="border border-gray-300 p-1 text-right">₹{v.cgst.toFixed(2)}</td>
+                    <td className="border border-gray-300 p-1 text-right">₹{v.sgst.toFixed(2)}</td>
+                    {rows.some(([, vv]) => vv.igst > 0) && (
+                      <td className="border border-gray-300 p-1 text-right">₹{v.igst.toFixed(2)}</td>
+                    )}
+                    <td className="border border-gray-300 p-1 text-right">₹{(v.cgst + v.sgst + v.igst + v.cess).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
 
       {/* Scheme Details */}
       {schemeDetails && schemeDetails.trim() && (
@@ -350,18 +426,31 @@ export default function InvoicePreview({
           {isEnabled('totals_tax_breakdown') && (
             <>
               <div className="flex justify-between mb-2">
-                <span className="font-bold text-xs">SGST (2.5%)</span>
+                <span className="font-bold text-xs">SGST</span>
                 <span className="text-xs">₹{sgst.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between mb-3">
-                <span className="font-bold text-xs">CGST (2.5%)</span>
+              <div className="flex justify-between mb-2">
+                <span className="font-bold text-xs">CGST</span>
                 <span className="text-xs">₹{cgst.toFixed(2)}</span>
               </div>
+              {igst > 0 && (
+                <div className="flex justify-between mb-2">
+                  <span className="font-bold text-xs">IGST</span>
+                  <span className="text-xs">₹{igst.toFixed(2)}</span>
+                </div>
+              )}
+              {cess > 0 && (
+                <div className="flex justify-between mb-3">
+                  <span className="font-bold text-xs">CESS</span>
+                  <span className="text-xs">₹{cess.toFixed(2)}</span>
+                </div>
+              )}
             </>
           )}
           <div className={`${styles.totalBox} p-2 rounded flex justify-center items-center`}>
             <span className="font-bold text-sm">Total amount: ₹{Math.round(total)}</span>
           </div>
+
         </div>
       </div>
 

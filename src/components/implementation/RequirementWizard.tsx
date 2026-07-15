@@ -360,9 +360,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["Excel/Spreadsheet", "Paper-based", "Other SFA Tool", "No formal process"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={option} className="border-white/40" />
-                    <Label htmlFor={option} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={option} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -376,9 +376,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["Mobile App", "Paper forms", "Phone calls", "WhatsApp/SMS", "No tracking"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`visit-${option}`} className="border-white/40" />
-                    <Label htmlFor={`visit-${option}`} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={`visit-${option}`} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -420,17 +420,17 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 onValueChange={(v) => updateSalesOperations("gpsTracking", v)}
                 className="flex gap-4"
               >
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="yes" id="gps-yes" className="border-white/40" />
-                  <Label htmlFor="gps-yes" className="text-white/80 cursor-pointer flex-1">Yes</Label>
+                  <Label htmlFor="gps-yes" className="text-white/70">Yes</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="no" id="gps-no" className="border-white/40" />
-                  <Label htmlFor="gps-no" className="text-white/80 cursor-pointer flex-1">No</Label>
+                  <Label htmlFor="gps-no" className="text-white/70">No</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="partial" id="gps-partial" className="border-white/40" />
-                  <Label htmlFor="gps-partial" className="text-white/80 cursor-pointer flex-1">Partial</Label>
+                  <Label htmlFor="gps-partial" className="text-white/70">Partial</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -439,7 +439,7 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
               <Label className="text-white/80 mb-3 block">Reports submitted by FSRs (select all that apply)</Label>
               <div className="grid grid-cols-2 gap-2">
                 {["Daily Visit Report", "Order Summary", "Collection Report", "Stock Report", "Competition Report", "Expense Report"].map((report) => (
-                  <div key={report} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={report} className="flex items-center space-x-2">
                     <Checkbox
                       id={report}
                       checked={data.salesOperations.reportsSubmitted.includes(report)}
@@ -453,7 +453,7 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                       }}
                       className="border-white/40"
                     />
-                    <Label htmlFor={report} className="text-white/80 cursor-pointer flex-1 text-sm">{report}</Label>
+                    <Label htmlFor={report} className="text-white/70 text-sm">{report}</Label>
                   </div>
                 ))}
               </div>
@@ -472,9 +472,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["Paper-based", "Mobile App", "Phone/WhatsApp", "Email", "ERP Direct Entry"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`order-${option}`} className="border-white/40" />
-                    <Label htmlFor={`order-${option}`} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={`order-${option}`} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -524,13 +524,13 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 onValueChange={(v) => updateOrderManagement("pricingTiers", v)}
                 className="flex gap-4"
               >
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="yes" id="pricing-yes" className="border-white/40" />
-                  <Label htmlFor="pricing-yes" className="text-white/80 cursor-pointer flex-1">Yes</Label>
+                  <Label htmlFor="pricing-yes" className="text-white/70">Yes</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="no" id="pricing-no" className="border-white/40" />
-                  <Label htmlFor="pricing-no" className="text-white/80 cursor-pointer flex-1">No</Label>
+                  <Label htmlFor="pricing-no" className="text-white/70">No</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -580,9 +580,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["Phone/Call", "Email", "WhatsApp", "Portal/App", "Through Sales Rep"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`primary-${option}`} className="border-white/40" />
-                    <Label htmlFor={`primary-${option}`} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={`primary-${option}`} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -596,9 +596,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["Real-time system", "Periodic reports", "Manual stock-taking", "Not tracked"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`inv-${option}`} className="border-white/40" />
-                    <Label htmlFor={`inv-${option}`} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={`inv-${option}`} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -621,17 +621,17 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 onValueChange={(v) => updateDistributorNetwork("secondarySalesVisibility", v)}
                 className="flex gap-4"
               >
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="yes" id="secondary-yes" className="border-white/40" />
-                  <Label htmlFor="secondary-yes" className="text-white/80 cursor-pointer flex-1">Yes</Label>
+                  <Label htmlFor="secondary-yes" className="text-white/70">Yes</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="no" id="secondary-no" className="border-white/40" />
-                  <Label htmlFor="secondary-no" className="text-white/80 cursor-pointer flex-1">No</Label>
+                  <Label htmlFor="secondary-no" className="text-white/70">No</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="partial" id="secondary-partial" className="border-white/40" />
-                  <Label htmlFor="secondary-partial" className="text-white/80 cursor-pointer flex-1">Partial</Label>
+                  <Label htmlFor="secondary-partial" className="text-white/70">Partial</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -649,9 +649,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["Excel/Spreadsheet", "ERP System", "Custom Database", "Paper records", "Mobile App"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`master-${option}`} className="border-white/40" />
-                    <Label htmlFor={`master-${option}`} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={`master-${option}`} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -665,9 +665,9 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 className="space-y-2"
               >
                 {["A/B/C/D Classification", "Gold/Silver/Bronze", "Custom Classification", "No classification"].map((option) => (
-                  <div key={option} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={option} className="flex items-center space-x-2">
                     <RadioGroupItem value={option} id={`class-${option}`} className="border-white/40" />
-                    <Label htmlFor={`class-${option}`} className="text-white/80 cursor-pointer flex-1">{option}</Label>
+                    <Label htmlFor={`class-${option}`} className="text-white/70">{option}</Label>
                   </div>
                 ))}
               </RadioGroup>
@@ -690,17 +690,17 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                 onValueChange={(v) => updateRetailerManagement("loyaltyPrograms", v)}
                 className="flex gap-4"
               >
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="yes" id="loyalty-yes" className="border-white/40" />
-                  <Label htmlFor="loyalty-yes" className="text-white/80 cursor-pointer flex-1">Yes</Label>
+                  <Label htmlFor="loyalty-yes" className="text-white/70">Yes</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="no" id="loyalty-no" className="border-white/40" />
-                  <Label htmlFor="loyalty-no" className="text-white/80 cursor-pointer flex-1">No</Label>
+                  <Label htmlFor="loyalty-no" className="text-white/70">No</Label>
                 </div>
-                <div className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                <div className="flex items-center space-x-2">
                   <RadioGroupItem value="planned" id="loyalty-planned" className="border-white/40" />
-                  <Label htmlFor="loyalty-planned" className="text-white/80 cursor-pointer flex-1">Planned</Label>
+                  <Label htmlFor="loyalty-planned" className="text-white/70">Planned</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -735,7 +735,7 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                   "Scheme Performance",
                   "Competition Report",
                 ].map((report) => (
-                  <div key={report} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={report} className="flex items-center space-x-2">
                     <Checkbox
                       id={`report-${report}`}
                       checked={data.reporting.reportsGenerated.includes(report)}
@@ -749,7 +749,7 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                       }}
                       className="border-white/40"
                     />
-                    <Label htmlFor={`report-${report}`} className="text-white/80 cursor-pointer flex-1 text-sm">{report}</Label>
+                    <Label htmlFor={`report-${report}`} className="text-white/70 text-sm">{report}</Label>
                   </div>
                 ))}
               </div>
@@ -797,7 +797,7 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                   "Scheme Utilization",
                   "DSO (Days Sales Outstanding)",
                 ].map((kpi) => (
-                  <div key={kpi} className="flex items-center space-x-2 p-2 rounded-md hover:bg-white/5 cursor-pointer border border-transparent has-[[data-state=checked]]:border-amber-500/50 has-[[data-state=checked]]:bg-amber-500/10 transition-colors">
+                  <div key={kpi} className="flex items-center space-x-2">
                     <Checkbox
                       id={`kpi-${kpi}`}
                       checked={data.reporting.kpisTracked.includes(kpi)}
@@ -811,7 +811,7 @@ export function RequirementWizard({ data, onUpdate }: RequirementWizardProps) {
                       }}
                       className="border-white/40"
                     />
-                    <Label htmlFor={`kpi-${kpi}`} className="text-white/80 cursor-pointer flex-1 text-sm">{kpi}</Label>
+                    <Label htmlFor={`kpi-${kpi}`} className="text-white/70 text-sm">{kpi}</Label>
                   </div>
                 ))}
               </div>

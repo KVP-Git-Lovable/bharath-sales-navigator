@@ -1,10 +1,12 @@
 import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Palette, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, Building2, Palette, FileText, Globe, Loader2, ToggleRight } from "lucide-react";
 import CompanySettings from "@/components/invoice/CompanySettings";
 import HeaderBrandingSettings from "@/components/invoice/HeaderBrandingSettings";
 import DocumentSettings from "@/components/invoice/DocumentSettings";
+import RegionalSettings from "@/components/RegionalSettings";
+import { CompanyFeaturesTab } from "@/components/features/CompanyFeaturesTab";
 import { Layout } from "@/components/Layout";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 
@@ -30,13 +32,6 @@ export default function CompanyProfile() {
     <Layout>
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin-controls")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
           <div>
             <h1 className="text-2xl font-bold">Company Profile</h1>
             <p className="text-muted-foreground">
@@ -46,7 +41,7 @@ export default function CompanyProfile() {
         </div>
 
         <Tabs defaultValue="branding" className="space-y-4">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5">
             <TabsTrigger value="branding" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
               Header Branding
@@ -58,6 +53,14 @@ export default function CompanyProfile() {
             <TabsTrigger value="documents" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Document Settings
+            </TabsTrigger>
+            <TabsTrigger value="regional" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Regional
+            </TabsTrigger>
+            <TabsTrigger value="features" className="flex items-center gap-2">
+              <ToggleRight className="h-4 w-4" />
+              Features
             </TabsTrigger>
           </TabsList>
 
@@ -71,6 +74,14 @@ export default function CompanyProfile() {
 
           <TabsContent value="documents">
             <DocumentSettings />
+          </TabsContent>
+
+          <TabsContent value="regional">
+            <RegionalSettings />
+          </TabsContent>
+
+          <TabsContent value="features">
+            <CompanyFeaturesTab />
           </TabsContent>
         </Tabs>
       </div>

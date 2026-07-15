@@ -153,8 +153,11 @@ export default function PackingListManagement() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       draft: 'bg-muted text-muted-foreground',
+      picking: 'bg-orange-100 text-orange-800',
       packed: 'bg-blue-100 text-blue-800',
+      ready: 'bg-purple-100 text-purple-800',
       dispatched: 'bg-amber-100 text-amber-800',
+      delivered: 'bg-green-100 text-green-800',
       completed: 'bg-green-100 text-green-800'
     };
     return <Badge className={styles[status] || styles.draft}>{status.toUpperCase()}</Badge>;
@@ -163,8 +166,11 @@ export default function PackingListManagement() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'draft': return <Clock className="h-4 w-4 text-muted-foreground" />;
+      case 'picking': return <Package className="h-4 w-4 text-orange-600" />;
       case 'packed': return <PackageCheck className="h-4 w-4 text-blue-600" />;
+      case 'ready': return <PackageCheck className="h-4 w-4 text-purple-600" />;
       case 'dispatched': return <Truck className="h-4 w-4 text-amber-600" />;
+      case 'delivered': return <CheckCircle2 className="h-4 w-4 text-green-600" />;
       case 'completed': return <CheckCircle2 className="h-4 w-4 text-green-600" />;
       default: return <Package className="h-4 w-4" />;
     }
@@ -356,7 +362,7 @@ export default function PackingListManagement() {
                 <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
                   <div>
                     <p className="text-xs text-muted-foreground">Orders</p>
-                    <p className="font-semibold">{packingList.total_orders}</p>
+                    <p className="font-semibold">-</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Items</p>
