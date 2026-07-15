@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
@@ -20,13 +20,10 @@ export type Database = {
           created_at: string
           credit_day: number
           divisor: number
-          frequency: string
           id: string
           leave_type_id: string
           prorate_exits: boolean
-          prorate_joining: boolean
           prorate_new_joiners: boolean
-          round_mode: string
           rounding_mode: string
           updated_at: string
         }
@@ -35,13 +32,10 @@ export type Database = {
           created_at?: string
           credit_day?: number
           divisor?: number
-          frequency?: string
           id?: string
           leave_type_id: string
           prorate_exits?: boolean
-          prorate_joining?: boolean
           prorate_new_joiners?: boolean
-          round_mode?: string
           rounding_mode?: string
           updated_at?: string
         }
@@ -50,13 +44,10 @@ export type Database = {
           created_at?: string
           credit_day?: number
           divisor?: number
-          frequency?: string
           id?: string
           leave_type_id?: string
           prorate_exits?: boolean
-          prorate_joining?: boolean
           prorate_new_joiners?: boolean
-          round_mode?: string
           rounding_mode?: string
           updated_at?: string
         }
@@ -116,274 +107,112 @@ export type Database = {
           activity_date: string
           activity_name: string | null
           activity_place: string | null
-          activity_sub_type: string | null
           activity_type: string
-          actual_footfall: number | null
-          assigned_by: string | null
-          assignment_note: string | null
-          attendee_count: number | null
-          beat_id: string | null
-          beat_name: string | null
           budget: number | null
-          check_in_latitude: number | null
-          check_in_longitude: number | null
-          check_in_time: string | null
-          check_out_time: string | null
           collective_target: number | null
           comments: string | null
-          completed_at: string | null
-          completion_summary: string | null
-          contact_person: string | null
           created_at: string
           description: string | null
-          distributor_id: string | null
-          distributor_name: string | null
-          duration_minutes: number | null
           duration_type: string
           end_latitude: number | null
           end_longitude: number | null
           end_time: string | null
           event_name: string | null
-          expected_duration_minutes: number | null
           expected_footfall: string | null
-          follow_up_date: string | null
           from_date: string | null
           half_day_type: string | null
           id: string
           individual_target: number | null
-          joint_session_id: string | null
-          km_travelled: number | null
           landmark: string | null
-          location: string | null
-          outcome: string | null
           price_book_id: string | null
           remarks: string | null
-          rep_action_items: string | null
-          rep_followup_date: string | null
-          rep_improvement_areas: string | null
-          rep_overall_outcome: string | null
-          rep_rating_branding: number | null
-          rep_rating_market_intel: number | null
-          rep_rating_product_knowledge: number | null
-          rep_rating_retailer_relationship: number | null
-          rep_rating_scheme_communication: number | null
-          rep_strengths: string | null
           retailer_id: string | null
           retailer_name: string | null
-          sales_achieved: number | null
           sales_reps: string[] | null
           sales_target: number | null
-          shops_planned: number | null
-          shops_visited: number | null
           start_latitude: number | null
           start_longitude: number | null
           start_time: string | null
-          status: string
-          subordinate_user_id: string | null
-          survey_competition_brands: string | null
-          survey_competitor_count: number | null
-          survey_estimated_monthly_value: number | null
-          survey_market_type: string | null
-          survey_observations: string | null
-          survey_our_stock_shops: number | null
-          survey_priority: string | null
-          survey_proposed_beat_names: string[] | null
-          survey_recommendation: string | null
-          survey_shops_per_beat: number | null
-          survey_suggested_beat_count: number | null
-          survey_target_shops: number | null
-          survey_total_shops: number | null
+          status: string | null
           target_mode: string | null
           to_date: string | null
-          topic: string | null
           total_days: number | null
           user_id: string
-          visit_category: string | null
           visit_id: string | null
-          visit_purpose: string | null
-          voice_note_url: string | null
         }
         Insert: {
           activity_date?: string
           activity_name?: string | null
           activity_place?: string | null
-          activity_sub_type?: string | null
           activity_type?: string
-          actual_footfall?: number | null
-          assigned_by?: string | null
-          assignment_note?: string | null
-          attendee_count?: number | null
-          beat_id?: string | null
-          beat_name?: string | null
           budget?: number | null
-          check_in_latitude?: number | null
-          check_in_longitude?: number | null
-          check_in_time?: string | null
-          check_out_time?: string | null
           collective_target?: number | null
           comments?: string | null
-          completed_at?: string | null
-          completion_summary?: string | null
-          contact_person?: string | null
           created_at?: string
           description?: string | null
-          distributor_id?: string | null
-          distributor_name?: string | null
-          duration_minutes?: number | null
           duration_type?: string
           end_latitude?: number | null
           end_longitude?: number | null
           end_time?: string | null
           event_name?: string | null
-          expected_duration_minutes?: number | null
           expected_footfall?: string | null
-          follow_up_date?: string | null
           from_date?: string | null
           half_day_type?: string | null
           id?: string
           individual_target?: number | null
-          joint_session_id?: string | null
-          km_travelled?: number | null
           landmark?: string | null
-          location?: string | null
-          outcome?: string | null
           price_book_id?: string | null
           remarks?: string | null
-          rep_action_items?: string | null
-          rep_followup_date?: string | null
-          rep_improvement_areas?: string | null
-          rep_overall_outcome?: string | null
-          rep_rating_branding?: number | null
-          rep_rating_market_intel?: number | null
-          rep_rating_product_knowledge?: number | null
-          rep_rating_retailer_relationship?: number | null
-          rep_rating_scheme_communication?: number | null
-          rep_strengths?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
-          sales_achieved?: number | null
           sales_reps?: string[] | null
           sales_target?: number | null
-          shops_planned?: number | null
-          shops_visited?: number | null
           start_latitude?: number | null
           start_longitude?: number | null
           start_time?: string | null
-          status?: string
-          subordinate_user_id?: string | null
-          survey_competition_brands?: string | null
-          survey_competitor_count?: number | null
-          survey_estimated_monthly_value?: number | null
-          survey_market_type?: string | null
-          survey_observations?: string | null
-          survey_our_stock_shops?: number | null
-          survey_priority?: string | null
-          survey_proposed_beat_names?: string[] | null
-          survey_recommendation?: string | null
-          survey_shops_per_beat?: number | null
-          survey_suggested_beat_count?: number | null
-          survey_target_shops?: number | null
-          survey_total_shops?: number | null
+          status?: string | null
           target_mode?: string | null
           to_date?: string | null
-          topic?: string | null
           total_days?: number | null
           user_id: string
-          visit_category?: string | null
           visit_id?: string | null
-          visit_purpose?: string | null
-          voice_note_url?: string | null
         }
         Update: {
           activity_date?: string
           activity_name?: string | null
           activity_place?: string | null
-          activity_sub_type?: string | null
           activity_type?: string
-          actual_footfall?: number | null
-          assigned_by?: string | null
-          assignment_note?: string | null
-          attendee_count?: number | null
-          beat_id?: string | null
-          beat_name?: string | null
           budget?: number | null
-          check_in_latitude?: number | null
-          check_in_longitude?: number | null
-          check_in_time?: string | null
-          check_out_time?: string | null
           collective_target?: number | null
           comments?: string | null
-          completed_at?: string | null
-          completion_summary?: string | null
-          contact_person?: string | null
           created_at?: string
           description?: string | null
-          distributor_id?: string | null
-          distributor_name?: string | null
-          duration_minutes?: number | null
           duration_type?: string
           end_latitude?: number | null
           end_longitude?: number | null
           end_time?: string | null
           event_name?: string | null
-          expected_duration_minutes?: number | null
           expected_footfall?: string | null
-          follow_up_date?: string | null
           from_date?: string | null
           half_day_type?: string | null
           id?: string
           individual_target?: number | null
-          joint_session_id?: string | null
-          km_travelled?: number | null
           landmark?: string | null
-          location?: string | null
-          outcome?: string | null
           price_book_id?: string | null
           remarks?: string | null
-          rep_action_items?: string | null
-          rep_followup_date?: string | null
-          rep_improvement_areas?: string | null
-          rep_overall_outcome?: string | null
-          rep_rating_branding?: number | null
-          rep_rating_market_intel?: number | null
-          rep_rating_product_knowledge?: number | null
-          rep_rating_retailer_relationship?: number | null
-          rep_rating_scheme_communication?: number | null
-          rep_strengths?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
-          sales_achieved?: number | null
           sales_reps?: string[] | null
           sales_target?: number | null
-          shops_planned?: number | null
-          shops_visited?: number | null
           start_latitude?: number | null
           start_longitude?: number | null
           start_time?: string | null
-          status?: string
-          subordinate_user_id?: string | null
-          survey_competition_brands?: string | null
-          survey_competitor_count?: number | null
-          survey_estimated_monthly_value?: number | null
-          survey_market_type?: string | null
-          survey_observations?: string | null
-          survey_our_stock_shops?: number | null
-          survey_priority?: string | null
-          survey_proposed_beat_names?: string[] | null
-          survey_recommendation?: string | null
-          survey_shops_per_beat?: number | null
-          survey_suggested_beat_count?: number | null
-          survey_target_shops?: number | null
-          survey_total_shops?: number | null
+          status?: string | null
           target_mode?: string | null
           to_date?: string | null
-          topic?: string | null
           total_days?: number | null
           user_id?: string
-          visit_category?: string | null
           visit_id?: string | null
-          visit_purpose?: string | null
-          voice_note_url?: string | null
         }
         Relationships: [
           {
@@ -885,13 +714,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "approval_audit_log_approval_request_id_fkey"
-            columns: ["approval_request_id"]
-            isOneToOne: false
-            referencedRelation: "approval_requests"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "fk_audit_log_request"
             columns: ["approval_request_id"]
             isOneToOne: false
@@ -909,7 +731,6 @@ export type Database = {
           id: string
           max_levels: number
           skip_levels: boolean
-          specific_approver_id: string | null
           updated_at: string
           use_full_hierarchy: boolean
         }
@@ -921,7 +742,6 @@ export type Database = {
           id?: string
           max_levels?: number
           skip_levels?: boolean
-          specific_approver_id?: string | null
           updated_at?: string
           use_full_hierarchy?: boolean
         }
@@ -933,7 +753,6 @@ export type Database = {
           id?: string
           max_levels?: number
           skip_levels?: boolean
-          specific_approver_id?: string | null
           updated_at?: string
           use_full_hierarchy?: boolean
         }
@@ -1010,13 +829,6 @@ export type Database = {
           status?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "approval_steps_approval_request_id_fkey"
-            columns: ["approval_request_id"]
-            isOneToOne: false
-            referencedRelation: "approval_requests"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "fk_approval_steps_request"
             columns: ["approval_request_id"]
@@ -1151,10 +963,6 @@ export type Database = {
           face_verification_status: string | null
           face_verification_status_out: string | null
           id: string
-          locked: boolean
-          locked_at: string | null
-          locked_by: string | null
-          manual_override_reason: string | null
           notes: string | null
           regularized_request_id: string | null
           status: string
@@ -1178,10 +986,6 @@ export type Database = {
           face_verification_status?: string | null
           face_verification_status_out?: string | null
           id?: string
-          locked?: boolean
-          locked_at?: string | null
-          locked_by?: string | null
-          manual_override_reason?: string | null
           notes?: string | null
           regularized_request_id?: string | null
           status?: string
@@ -1205,10 +1009,6 @@ export type Database = {
           face_verification_status?: string | null
           face_verification_status_out?: string | null
           id?: string
-          locked?: boolean
-          locked_at?: string | null
-          locked_by?: string | null
-          manual_override_reason?: string | null
           notes?: string | null
           regularized_request_id?: string | null
           status?: string
@@ -1271,64 +1071,38 @@ export type Database = {
       attendance_user_monthly_summary: {
         Row: {
           absent_days: number
-          avg_daily_hours: number | null
-          created_at: string
           half_day_leave_days: number
           id: string
           leave_days: number
-          lop_days: number | null
           month: number
           present_days: number
           regularized_days: number
-          total_hours: number | null
-          updated_at: string
           user_id: string
-          working_days: number | null
           year: number
         }
         Insert: {
           absent_days?: number
-          avg_daily_hours?: number | null
-          created_at?: string
           half_day_leave_days?: number
           id?: string
           leave_days?: number
-          lop_days?: number | null
           month: number
           present_days?: number
           regularized_days?: number
-          total_hours?: number | null
-          updated_at?: string
           user_id: string
-          working_days?: number | null
           year: number
         }
         Update: {
           absent_days?: number
-          avg_daily_hours?: number | null
-          created_at?: string
           half_day_leave_days?: number
           id?: string
           leave_days?: number
-          lop_days?: number | null
           month?: number
           present_days?: number
           regularized_days?: number
-          total_hours?: number | null
-          updated_at?: string
           user_id?: string
-          working_days?: number | null
           year?: number
         }
-        Relationships: [
-          {
-            foreignKeyName: "attendance_user_monthly_summary_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       auto_end_day_policy: {
         Row: {
@@ -1459,7 +1233,7 @@ export type Database = {
           metadata: Json | null
           new_user_id: string | null
           old_user_id: string | null
-          performed_by: string
+          performed_by: string | null
         }
         Insert: {
           action: string
@@ -1469,7 +1243,7 @@ export type Database = {
           metadata?: Json | null
           new_user_id?: string | null
           old_user_id?: string | null
-          performed_by: string
+          performed_by?: string | null
         }
         Update: {
           action?: string
@@ -1479,7 +1253,7 @@ export type Database = {
           metadata?: Json | null
           new_user_id?: string | null
           old_user_id?: string | null
-          performed_by?: string
+          performed_by?: string | null
         }
         Relationships: []
       }
@@ -1680,7 +1454,7 @@ export type Database = {
         Insert: {
           average_km?: number | null
           average_time_minutes?: number | null
-          beat_id?: string
+          beat_id: string
           beat_name: string
           category?: string | null
           created_at?: string
@@ -2704,10 +2478,7 @@ export type Database = {
           bank_name: string | null
           contact_phone: string | null
           created_at: string | null
-          currency: string
-          date_format: string
           email: string | null
-          eway_threshold_value: number
           gstin: string | null
           header_logo_url: string | null
           header_name: string | null
@@ -2720,7 +2491,6 @@ export type Database = {
           qr_upi: string | null
           state: string | null
           terms_conditions: string | null
-          timezone: string
           updated_at: string | null
         }
         Insert: {
@@ -2730,10 +2500,7 @@ export type Database = {
           bank_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
-          currency?: string
-          date_format?: string
           email?: string | null
-          eway_threshold_value?: number
           gstin?: string | null
           header_logo_url?: string | null
           header_name?: string | null
@@ -2746,7 +2513,6 @@ export type Database = {
           qr_upi?: string | null
           state?: string | null
           terms_conditions?: string | null
-          timezone?: string
           updated_at?: string | null
         }
         Update: {
@@ -2756,10 +2522,7 @@ export type Database = {
           bank_name?: string | null
           contact_phone?: string | null
           created_at?: string | null
-          currency?: string
-          date_format?: string
           email?: string | null
-          eway_threshold_value?: number
           gstin?: string | null
           header_logo_url?: string | null
           header_name?: string | null
@@ -2772,7 +2535,6 @@ export type Database = {
           qr_upi?: string | null
           state?: string | null
           terms_conditions?: string | null
-          timezone?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -3281,250 +3043,6 @@ export type Database = {
           },
         ]
       }
-      copilot_conversations: {
-        Row: {
-          created_at: string
-          id: string
-          is_archived: boolean
-          is_pinned: boolean
-          last_message_at: string
-          metadata: Json
-          model: string | null
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_archived?: boolean
-          is_pinned?: boolean
-          last_message_at?: string
-          metadata?: Json
-          model?: string | null
-          title?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_archived?: boolean
-          is_pinned?: boolean
-          last_message_at?: string
-          metadata?: Json
-          model?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      copilot_feedback: {
-        Row: {
-          comment: string | null
-          created_at: string
-          id: string
-          message_id: string
-          rating: number
-          user_id: string
-        }
-        Insert: {
-          comment?: string | null
-          created_at?: string
-          id?: string
-          message_id: string
-          rating: number
-          user_id: string
-        }
-        Update: {
-          comment?: string | null
-          created_at?: string
-          id?: string
-          message_id?: string
-          rating?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "copilot_feedback_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "copilot_messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      copilot_messages: {
-        Row: {
-          content: string | null
-          conversation_id: string
-          created_at: string
-          id: string
-          latency_ms: number | null
-          model: string | null
-          parts: Json
-          role: string
-          token_count: number | null
-          user_id: string
-        }
-        Insert: {
-          content?: string | null
-          conversation_id: string
-          created_at?: string
-          id?: string
-          latency_ms?: number | null
-          model?: string | null
-          parts?: Json
-          role: string
-          token_count?: number | null
-          user_id: string
-        }
-        Update: {
-          content?: string | null
-          conversation_id?: string
-          created_at?: string
-          id?: string
-          latency_ms?: number | null
-          model?: string | null
-          parts?: Json
-          role?: string
-          token_count?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "copilot_messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "copilot_conversations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      copilot_tool_audit: {
-        Row: {
-          approved_at: string | null
-          args: Json
-          conversation_id: string | null
-          created_at: string
-          duration_ms: number | null
-          error: string | null
-          id: string
-          message_id: string | null
-          result: Json | null
-          status: string
-          tool_name: string
-          user_id: string
-          was_write: boolean
-        }
-        Insert: {
-          approved_at?: string | null
-          args?: Json
-          conversation_id?: string | null
-          created_at?: string
-          duration_ms?: number | null
-          error?: string | null
-          id?: string
-          message_id?: string | null
-          result?: Json | null
-          status?: string
-          tool_name: string
-          user_id: string
-          was_write?: boolean
-        }
-        Update: {
-          approved_at?: string | null
-          args?: Json
-          conversation_id?: string | null
-          created_at?: string
-          duration_ms?: number | null
-          error?: string | null
-          id?: string
-          message_id?: string | null
-          result?: Json | null
-          status?: string
-          tool_name?: string
-          user_id?: string
-          was_write?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "copilot_tool_audit_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "copilot_conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "copilot_tool_audit_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "copilot_messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      copilot_user_memory: {
-        Row: {
-          created_at: string
-          id: string
-          key: string
-          updated_at: string
-          user_id: string
-          value: Json
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          key: string
-          updated_at?: string
-          user_id: string
-          value: Json
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          key?: string
-          updated_at?: string
-          user_id?: string
-          value?: Json
-        }
-        Relationships: []
-      }
-      copilot_user_quotas: {
-        Row: {
-          created_at: string
-          daily_token_limit: number
-          daily_tool_call_limit: number
-          quota_reset_at: string
-          tokens_used_today: number
-          tool_calls_today: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          daily_token_limit?: number
-          daily_tool_call_limit?: number
-          quota_reset_at?: string
-          tokens_used_today?: number
-          tool_calls_today?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          daily_token_limit?: number
-          daily_tool_call_limit?: number
-          quota_reset_at?: string
-          tokens_used_today?: number
-          tool_calls_today?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       counter_customers: {
         Row: {
           address: string | null
@@ -3722,15 +3240,7 @@ export type Database = {
           start_date?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "coverage_permission_assignments_permission_set_id_fkey"
-            columns: ["permission_set_id"]
-            isOneToOne: false
-            referencedRelation: "permission_set_groups"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       credit_ledger: {
         Row: {
@@ -3856,7 +3366,7 @@ export type Database = {
           barcode: string | null
           cgst_amount: number | null
           created_at: string | null
-          credit_note_id: string
+          credit_note_id: string | null
           hsn_code: string | null
           id: string
           original_invoice_number: string | null
@@ -3869,13 +3379,12 @@ export type Database = {
           taxable_amount: number | null
           total: number | null
           unit: string | null
-          variant_id: string | null
         }
         Insert: {
           barcode?: string | null
           cgst_amount?: number | null
           created_at?: string | null
-          credit_note_id: string
+          credit_note_id?: string | null
           hsn_code?: string | null
           id?: string
           original_invoice_number?: string | null
@@ -3888,13 +3397,12 @@ export type Database = {
           taxable_amount?: number | null
           total?: number | null
           unit?: string | null
-          variant_id?: string | null
         }
         Update: {
           barcode?: string | null
           cgst_amount?: number | null
           created_at?: string | null
-          credit_note_id?: string
+          credit_note_id?: string | null
           hsn_code?: string | null
           id?: string
           original_invoice_number?: string | null
@@ -3907,7 +3415,6 @@ export type Database = {
           taxable_amount?: number | null
           total?: number | null
           unit?: string | null
-          variant_id?: string | null
         }
         Relationships: [
           {
@@ -3917,104 +3424,64 @@ export type Database = {
             referencedRelation: "credit_notes"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "credit_note_items_variant_id_fkey"
-            columns: ["variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
         ]
       }
       credit_notes: {
         Row: {
           amount_in_words: string | null
-          approval_request_id: string | null
-          approval_status: string
-          approved_at: string | null
-          approved_by: string | null
           cgst_total: number | null
           created_at: string | null
           created_by: string | null
           credit_note_date: string
           credit_note_number: string
           id: string
-          original_order_id: string | null
-          posted_to_ledger: boolean
-          reason: string
+          reason: string | null
           reason_notes: string | null
           retailer_id: string | null
           retailer_name: string | null
           sgst_total: number | null
-          status: string
+          status: string | null
           sub_total: number | null
           total_amount: number | null
           updated_at: string | null
         }
         Insert: {
           amount_in_words?: string | null
-          approval_request_id?: string | null
-          approval_status?: string
-          approved_at?: string | null
-          approved_by?: string | null
           cgst_total?: number | null
           created_at?: string | null
           created_by?: string | null
           credit_note_date?: string
           credit_note_number: string
           id?: string
-          original_order_id?: string | null
-          posted_to_ledger?: boolean
-          reason?: string
+          reason?: string | null
           reason_notes?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
           sgst_total?: number | null
-          status?: string
+          status?: string | null
           sub_total?: number | null
           total_amount?: number | null
           updated_at?: string | null
         }
         Update: {
           amount_in_words?: string | null
-          approval_request_id?: string | null
-          approval_status?: string
-          approved_at?: string | null
-          approved_by?: string | null
           cgst_total?: number | null
           created_at?: string | null
           created_by?: string | null
           credit_note_date?: string
           credit_note_number?: string
           id?: string
-          original_order_id?: string | null
-          posted_to_ledger?: boolean
-          reason?: string
+          reason?: string | null
           reason_notes?: string | null
           retailer_id?: string | null
           retailer_name?: string | null
           sgst_total?: number | null
-          status?: string
+          status?: string | null
           sub_total?: number | null
           total_amount?: number | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "credit_notes_original_order_id_fkey"
-            columns: ["original_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "credit_notes_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       custom_invoice_templates: {
         Row: {
@@ -4272,6 +3739,7 @@ export type Database = {
           anomaly_count: number
           check_name: string
           checked_at: string
+          details: Json | null
           id: string
           sample_ids: string[] | null
         }
@@ -4279,6 +3747,7 @@ export type Database = {
           anomaly_count: number
           check_name: string
           checked_at?: string
+          details?: Json | null
           id?: string
           sample_ids?: string[] | null
         }
@@ -4286,6 +3755,7 @@ export type Database = {
           anomaly_count?: number
           check_name?: string
           checked_at?: string
+          details?: Json | null
           id?: string
           sample_ids?: string[] | null
         }
@@ -4693,28 +4163,25 @@ export type Database = {
       }
       device_battery_logs: {
         Row: {
-          battery_level: number
-          created_at: string
+          battery_level: number | null
+          created_at: string | null
           id: string
-          is_charging: boolean
-          recorded_at: string
-          user_id: string
+          is_charging: boolean | null
+          user_id: string | null
         }
         Insert: {
-          battery_level: number
-          created_at?: string
+          battery_level?: number | null
+          created_at?: string | null
           id?: string
-          is_charging?: boolean
-          recorded_at?: string
-          user_id: string
+          is_charging?: boolean | null
+          user_id?: string | null
         }
         Update: {
-          battery_level?: number
-          created_at?: string
+          battery_level?: number | null
+          created_at?: string | null
           id?: string
-          is_charging?: boolean
-          recorded_at?: string
-          user_id?: string
+          is_charging?: boolean | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -4761,28 +4228,25 @@ export type Database = {
       }
       distributor_beat_mappings: {
         Row: {
-          beat_id: string
+          beat_id: string | null
           created_at: string
           created_by: string | null
           distributor_id: string
           id: string
-          updated_at: string
         }
         Insert: {
-          beat_id: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           distributor_id: string
           id?: string
-          updated_at?: string
         }
         Update: {
-          beat_id?: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           distributor_id?: string
           id?: string
-          updated_at?: string
         }
         Relationships: [
           {
@@ -5606,9 +5070,7 @@ export type Database = {
           available_quantity: number | null
           batch_number: string | null
           created_at: string
-          damaged_quantity: number
           distributor_id: string
-          expired_quantity: number
           expiry_date: string | null
           id: string
           last_issued_date: string | null
@@ -5616,27 +5078,24 @@ export type Database = {
           location: string | null
           manufacturing_date: string | null
           max_stock_level: number | null
-          product_id: string | null
+          product_id: string
           product_name: string
           quantity: number
           reorder_level: number | null
           reserved_quantity: number
           sku: string | null
           total_value: number | null
-          unit: string | null
+          unit: string
           unit_cost: number | null
           updated_at: string
           variant_id: string | null
           variant_name: string | null
-          warehouse_id: string | null
         }
         Insert: {
           available_quantity?: number | null
           batch_number?: string | null
           created_at?: string
-          damaged_quantity?: number
           distributor_id: string
-          expired_quantity?: number
           expiry_date?: string | null
           id?: string
           last_issued_date?: string | null
@@ -5644,27 +5103,24 @@ export type Database = {
           location?: string | null
           manufacturing_date?: string | null
           max_stock_level?: number | null
-          product_id?: string | null
+          product_id: string
           product_name: string
           quantity?: number
           reorder_level?: number | null
           reserved_quantity?: number
           sku?: string | null
           total_value?: number | null
-          unit?: string | null
+          unit?: string
           unit_cost?: number | null
           updated_at?: string
           variant_id?: string | null
           variant_name?: string | null
-          warehouse_id?: string | null
         }
         Update: {
           available_quantity?: number | null
           batch_number?: string | null
           created_at?: string
-          damaged_quantity?: number
           distributor_id?: string
-          expired_quantity?: number
           expiry_date?: string | null
           id?: string
           last_issued_date?: string | null
@@ -5672,19 +5128,18 @@ export type Database = {
           location?: string | null
           manufacturing_date?: string | null
           max_stock_level?: number | null
-          product_id?: string | null
+          product_id?: string
           product_name?: string
           quantity?: number
           reorder_level?: number | null
           reserved_quantity?: number
           sku?: string | null
           total_value?: number | null
-          unit?: string | null
+          unit?: string
           unit_cost?: number | null
           updated_at?: string
           variant_id?: string | null
           variant_name?: string | null
-          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -5708,18 +5163,10 @@ export type Database = {
             referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "distributor_inventory_warehouse_id_fkey"
-            columns: ["warehouse_id"]
-            isOneToOne: false
-            referencedRelation: "warehouses"
-            referencedColumns: ["id"]
-          },
         ]
       }
       distributor_inventory_transactions: {
         Row: {
-          balance_qty: number | null
           batch_number: string | null
           created_at: string
           created_by: string | null
@@ -5727,21 +5174,18 @@ export type Database = {
           expiry_date: string | null
           id: string
           notes: string | null
-          product_id: string | null
-          product_name: string | null
+          product_id: string
           quantity: number
           reference_id: string | null
           reference_number: string | null
           reference_type: string | null
           running_balance: number | null
-          transaction_type: string | null
+          transaction_type: string
           unit: string | null
           unit_cost: number | null
           variant_id: string | null
-          warehouse_id: string | null
         }
         Insert: {
-          balance_qty?: number | null
           batch_number?: string | null
           created_at?: string
           created_by?: string | null
@@ -5749,21 +5193,18 @@ export type Database = {
           expiry_date?: string | null
           id?: string
           notes?: string | null
-          product_id?: string | null
-          product_name?: string | null
+          product_id: string
           quantity: number
           reference_id?: string | null
           reference_number?: string | null
           reference_type?: string | null
           running_balance?: number | null
-          transaction_type?: string | null
+          transaction_type: string
           unit?: string | null
           unit_cost?: number | null
           variant_id?: string | null
-          warehouse_id?: string | null
         }
         Update: {
-          balance_qty?: number | null
           batch_number?: string | null
           created_at?: string
           created_by?: string | null
@@ -5771,18 +5212,16 @@ export type Database = {
           expiry_date?: string | null
           id?: string
           notes?: string | null
-          product_id?: string | null
-          product_name?: string | null
+          product_id?: string
           quantity?: number
           reference_id?: string | null
           reference_number?: string | null
           reference_type?: string | null
           running_balance?: number | null
-          transaction_type?: string | null
+          transaction_type?: string
           unit?: string | null
           unit_cost?: number | null
           variant_id?: string | null
-          warehouse_id?: string | null
         }
         Relationships: [
           {
@@ -5804,13 +5243,6 @@ export type Database = {
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "distributor_inventory_transactions_warehouse_id_fkey"
-            columns: ["warehouse_id"]
-            isOneToOne: false
-            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -5981,22 +5413,17 @@ export type Database = {
           bank_name: string | null
           cheque_date: string | null
           cheque_number: string | null
-          collected_by_user_id: string | null
           created_at: string
           created_by: string | null
           distributor_id: string
           id: string
           notes: string | null
-          operational_snapshot_user_id: string | null
-          owner_snapshot_user_id: string | null
           payment_date: string
           payment_mode: string
           receipt_number: string | null
           reference_number: string | null
           retailer_id: string
-          sales_credit_user_id: string | null
           status: string
-          unallocated_amount: number
           updated_at: string
         }
         Insert: {
@@ -6004,22 +5431,17 @@ export type Database = {
           bank_name?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
-          collected_by_user_id?: string | null
           created_at?: string
           created_by?: string | null
           distributor_id: string
           id?: string
           notes?: string | null
-          operational_snapshot_user_id?: string | null
-          owner_snapshot_user_id?: string | null
           payment_date?: string
           payment_mode?: string
           receipt_number?: string | null
           reference_number?: string | null
           retailer_id: string
-          sales_credit_user_id?: string | null
           status?: string
-          unallocated_amount?: number
           updated_at?: string
         }
         Update: {
@@ -6027,22 +5449,17 @@ export type Database = {
           bank_name?: string | null
           cheque_date?: string | null
           cheque_number?: string | null
-          collected_by_user_id?: string | null
           created_at?: string
           created_by?: string | null
           distributor_id?: string
           id?: string
           notes?: string | null
-          operational_snapshot_user_id?: string | null
-          owner_snapshot_user_id?: string | null
           payment_date?: string
           payment_mode?: string
           receipt_number?: string | null
           reference_number?: string | null
           retailer_id?: string
-          sales_credit_user_id?: string | null
           status?: string
-          unallocated_amount?: number
           updated_at?: string
         }
         Relationships: [
@@ -6115,7 +5532,7 @@ export type Database = {
           created_at: string
           credit_days: number
           credit_limit: number
-          distributor_id: string | null
+          distributor_id: string
           id: string
           is_active: boolean
           retailer_id: string
@@ -6125,7 +5542,7 @@ export type Database = {
           created_at?: string
           credit_days?: number
           credit_limit?: number
-          distributor_id?: string | null
+          distributor_id: string
           id?: string
           is_active?: boolean
           retailer_id: string
@@ -6135,7 +5552,7 @@ export type Database = {
           created_at?: string
           credit_days?: number
           credit_limit?: number
-          distributor_id?: string | null
+          distributor_id?: string
           id?: string
           is_active?: boolean
           retailer_id?: string
@@ -6622,10 +6039,7 @@ export type Database = {
           invoice_date: string
           invoice_number: string
           notes: string | null
-          operational_snapshot_user_id: string | null
           order_id: string | null
-          owner_snapshot_user_id: string | null
-          payment_status: string
           pdf_url: string | null
           retailer_id: string
           sgst_amount: number
@@ -6644,10 +6058,7 @@ export type Database = {
           invoice_date?: string
           invoice_number: string
           notes?: string | null
-          operational_snapshot_user_id?: string | null
           order_id?: string | null
-          owner_snapshot_user_id?: string | null
-          payment_status?: string
           pdf_url?: string | null
           retailer_id: string
           sgst_amount?: number
@@ -6666,10 +6077,7 @@ export type Database = {
           invoice_date?: string
           invoice_number?: string
           notes?: string | null
-          operational_snapshot_user_id?: string | null
           order_id?: string | null
-          owner_snapshot_user_id?: string | null
-          payment_status?: string
           pdf_url?: string | null
           retailer_id?: string
           sgst_amount?: number
@@ -6828,7 +6236,6 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           auth_user_id: string | null
-          can_deliver: boolean
           created_at: string
           designation: string | null
           distributor_id: string
@@ -6850,7 +6257,6 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           auth_user_id?: string | null
-          can_deliver?: boolean
           created_at?: string
           designation?: string | null
           distributor_id: string
@@ -6872,7 +6278,6 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           auth_user_id?: string | null
-          can_deliver?: boolean
           created_at?: string
           designation?: string | null
           distributor_id?: string
@@ -6916,8 +6321,6 @@ export type Database = {
           coverage_area: string | null
           created_at: string
           credit_limit: number | null
-          currency: string
-          date_format: string
           distribution_experience_years: number | null
           distribution_level: string | null
           distributor_status: string | null
@@ -6953,8 +6356,6 @@ export type Database = {
           terms_conditions: string | null
           territory_id: string | null
           threats: string | null
-          timezone: string
-          type_id: string | null
           updated_at: string
           weakness: string | null
           years_of_relationship: number | null
@@ -6974,8 +6375,6 @@ export type Database = {
           coverage_area?: string | null
           created_at?: string
           credit_limit?: number | null
-          currency?: string
-          date_format?: string
           distribution_experience_years?: number | null
           distribution_level?: string | null
           distributor_status?: string | null
@@ -7011,8 +6410,6 @@ export type Database = {
           terms_conditions?: string | null
           territory_id?: string | null
           threats?: string | null
-          timezone?: string
-          type_id?: string | null
           updated_at?: string
           weakness?: string | null
           years_of_relationship?: number | null
@@ -7032,8 +6429,6 @@ export type Database = {
           coverage_area?: string | null
           created_at?: string
           credit_limit?: number | null
-          currency?: string
-          date_format?: string
           distribution_experience_years?: number | null
           distribution_level?: string | null
           distributor_status?: string | null
@@ -7069,20 +6464,11 @@ export type Database = {
           terms_conditions?: string | null
           territory_id?: string | null
           threats?: string | null
-          timezone?: string
-          type_id?: string | null
           updated_at?: string
           weakness?: string | null
           years_of_relationship?: number | null
         }
         Relationships: [
-          {
-            foreignKeyName: "distributors_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "distributors_parent_id_fkey"
             columns: ["parent_id"]
@@ -7095,13 +6481,6 @@ export type Database = {
             columns: ["territory_id"]
             isOneToOne: false
             referencedRelation: "territories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "distributors_type_id_fkey"
-            columns: ["type_id"]
-            isOneToOne: false
-            referencedRelation: "distributor_types"
             referencedColumns: ["id"]
           },
         ]
@@ -7515,7 +6894,15 @@ export type Database = {
           uom_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "enabled_units_uom_id_fkey"
+            columns: ["uom_id"]
+            isOneToOne: true
+            referencedRelation: "uom_master"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       event_stock_audit: {
         Row: {
@@ -7915,7 +7302,6 @@ export type Database = {
           max_additional_expense_per_day: number | null
           max_additional_expense_per_month: number | null
           name: string
-          ta_per_km_rate: number | null
           ta_type: string | null
           updated_at: string
         }
@@ -7928,7 +7314,6 @@ export type Database = {
           max_additional_expense_per_day?: number | null
           max_additional_expense_per_month?: number | null
           name: string
-          ta_per_km_rate?: number | null
           ta_type?: string | null
           updated_at?: string
         }
@@ -7941,7 +7326,6 @@ export type Database = {
           max_additional_expense_per_day?: number | null
           max_additional_expense_per_month?: number | null
           name?: string
-          ta_per_km_rate?: number | null
           ta_type?: string | null
           updated_at?: string
         }
@@ -8137,49 +7521,30 @@ export type Database = {
       }
       feature_flag_audit: {
         Row: {
-          action: string | null
           changed_at: string
           changed_by: string
-          company_id: string | null
           feature_flag_id: string
           id: string
           new_value: boolean
           old_value: boolean
-          scope_id: string | null
-          scope_type: string | null
         }
         Insert: {
-          action?: string | null
           changed_at?: string
           changed_by: string
-          company_id?: string | null
           feature_flag_id: string
           id?: string
           new_value: boolean
           old_value: boolean
-          scope_id?: string | null
-          scope_type?: string | null
         }
         Update: {
-          action?: string | null
           changed_at?: string
           changed_by?: string
-          company_id?: string | null
           feature_flag_id?: string
           id?: string
           new_value?: boolean
           old_value?: boolean
-          scope_id?: string | null
-          scope_type?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "feature_flag_audit_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "feature_flag_audit_feature_flag_id_fkey"
             columns: ["feature_flag_id"]
@@ -8411,14 +7776,12 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           enable_quantity: boolean | null
-          enable_retailer_activation: boolean
           enable_revenue: boolean | null
           enable_visits: boolean | null
           enabled_parameters: Json | null
           fy_year: number
           id: string
           is_locked: boolean | null
-          plan_status: string
           quantity_unit: string | null
           setup_completed: boolean | null
           target_end_month: number
@@ -8426,7 +7789,6 @@ export type Database = {
           target_plan_name: string | null
           target_start_month: number
           total_quantity_target: number | null
-          total_retailer_activation_target: number | null
           total_revenue_target: number | null
           total_visits_target: number | null
           updated_at: string | null
@@ -8435,14 +7797,12 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           enable_quantity?: boolean | null
-          enable_retailer_activation?: boolean
           enable_revenue?: boolean | null
           enable_visits?: boolean | null
           enabled_parameters?: Json | null
           fy_year: number
           id?: string
           is_locked?: boolean | null
-          plan_status?: string
           quantity_unit?: string | null
           setup_completed?: boolean | null
           target_end_month?: number
@@ -8450,7 +7810,6 @@ export type Database = {
           target_plan_name?: string | null
           target_start_month?: number
           total_quantity_target?: number | null
-          total_retailer_activation_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
           updated_at?: string | null
@@ -8459,14 +7818,12 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           enable_quantity?: boolean | null
-          enable_retailer_activation?: boolean
           enable_revenue?: boolean | null
           enable_visits?: boolean | null
           enabled_parameters?: Json | null
           fy_year?: number
           id?: string
           is_locked?: boolean | null
-          plan_status?: string
           quantity_unit?: string | null
           setup_completed?: boolean | null
           target_end_month?: number
@@ -8474,7 +7831,6 @@ export type Database = {
           target_plan_name?: string | null
           target_start_month?: number
           total_quantity_target?: number | null
-          total_retailer_activation_target?: number | null
           total_revenue_target?: number | null
           total_visits_target?: number | null
           updated_at?: string | null
@@ -8639,10 +7995,10 @@ export type Database = {
           game_id: string | null
           id: string
           metadata: Json | null
-          points: number
+          points: number | null
           reference_id: string | null
           reference_type: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           action_id?: string | null
@@ -8650,10 +8006,10 @@ export type Database = {
           game_id?: string | null
           id?: string
           metadata?: Json | null
-          points: number
+          points?: number | null
           reference_id?: string | null
           reference_type?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           action_id?: string | null
@@ -8661,10 +8017,10 @@ export type Database = {
           game_id?: string | null
           id?: string
           metadata?: Json | null
-          points?: number
+          points?: number | null
           reference_id?: string | null
           reference_type?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -8772,45 +8128,30 @@ export type Database = {
       geocoding_jobs: {
         Row: {
           address: string | null
-          created_at: string
-          error_message: string | null
-          failed_count: number
-          geocoded_count: number
+          created_at: string | null
           id: string
           latitude: number | null
           longitude: number | null
-          processed_records: number
-          status: string
-          total_records: number
-          updated_at: string
+          status: string | null
+          updated_at: string | null
         }
         Insert: {
           address?: string | null
-          created_at?: string
-          error_message?: string | null
-          failed_count?: number
-          geocoded_count?: number
+          created_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
-          processed_records?: number
-          status?: string
-          total_records?: number
-          updated_at?: string
+          status?: string | null
+          updated_at?: string | null
         }
         Update: {
           address?: string | null
-          created_at?: string
-          error_message?: string | null
-          failed_count?: number
-          geocoded_count?: number
+          created_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
-          processed_records?: number
-          status?: string
-          total_records?: number
-          updated_at?: string
+          status?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -9009,7 +8350,6 @@ export type Database = {
       grn_items: {
         Row: {
           batch_number: string | null
-          conversion_to_base: number | null
           created_at: string | null
           damaged_quantity: number
           expiry_date: string | null
@@ -9019,21 +8359,16 @@ export type Database = {
           ordered_quantity: number
           product_id: string
           product_name: string
-          received_base_qty: number | null
           received_quantity: number
           return_reason: string | null
-          returned_base_qty: number | null
           returned_quantity: number
           unit: string
           unit_price: number
-          uom_code: string | null
-          uom_id: string | null
           variant_id: string | null
           variant_name: string | null
         }
         Insert: {
           batch_number?: string | null
-          conversion_to_base?: number | null
           created_at?: string | null
           damaged_quantity?: number
           expiry_date?: string | null
@@ -9043,21 +8378,16 @@ export type Database = {
           ordered_quantity?: number
           product_id: string
           product_name: string
-          received_base_qty?: number | null
           received_quantity?: number
           return_reason?: string | null
-          returned_base_qty?: number | null
           returned_quantity?: number
           unit?: string
           unit_price?: number
-          uom_code?: string | null
-          uom_id?: string | null
           variant_id?: string | null
           variant_name?: string | null
         }
         Update: {
           batch_number?: string | null
-          conversion_to_base?: number | null
           created_at?: string | null
           damaged_quantity?: number
           expiry_date?: string | null
@@ -9067,15 +8397,11 @@ export type Database = {
           ordered_quantity?: number
           product_id?: string
           product_name?: string
-          received_base_qty?: number | null
           received_quantity?: number
           return_reason?: string | null
-          returned_base_qty?: number | null
           returned_quantity?: number
           unit?: string
           unit_price?: number
-          uom_code?: string | null
-          uom_id?: string | null
           variant_id?: string | null
           variant_name?: string | null
         }
@@ -9239,7 +8565,6 @@ export type Database = {
           quantity_unit: string | null
           root_user_id: string
           status: string | null
-          target_plan_id: string | null
           total_quantity_target: number
           total_revenue_target: number
           updated_at: string | null
@@ -9253,7 +8578,6 @@ export type Database = {
           quantity_unit?: string | null
           root_user_id: string
           status?: string | null
-          target_plan_id?: string | null
           total_quantity_target?: number
           total_revenue_target?: number
           updated_at?: string | null
@@ -9267,7 +8591,6 @@ export type Database = {
           quantity_unit?: string | null
           root_user_id?: string
           status?: string | null
-          target_plan_id?: string | null
           total_quantity_target?: number
           total_revenue_target?: number
           updated_at?: string | null
@@ -9278,13 +8601,6 @@ export type Database = {
             columns: ["root_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "hierarchy_targets_target_plan_id_fkey"
-            columns: ["target_plan_id"]
-            isOneToOne: false
-            referencedRelation: "target_plans"
             referencedColumns: ["id"]
           },
         ]
@@ -10508,8 +9824,6 @@ export type Database = {
       invoices: {
         Row: {
           amount_in_words: string | null
-          cancellation_reason: string | null
-          cancelled_at: string | null
           company_id: string | null
           created_at: string | null
           created_by: string | null
@@ -10522,10 +9836,8 @@ export type Database = {
           order_id: string | null
           owner_id_snapshot: string | null
           place_of_supply: string | null
-          revises_invoice_id: string | null
           status: string | null
           sub_total: number | null
-          superseded_by_invoice_id: string | null
           terms: string | null
           total_amount: number | null
           total_tax: number | null
@@ -10534,8 +9846,6 @@ export type Database = {
         }
         Insert: {
           amount_in_words?: string | null
-          cancellation_reason?: string | null
-          cancelled_at?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -10548,10 +9858,8 @@ export type Database = {
           order_id?: string | null
           owner_id_snapshot?: string | null
           place_of_supply?: string | null
-          revises_invoice_id?: string | null
           status?: string | null
           sub_total?: number | null
-          superseded_by_invoice_id?: string | null
           terms?: string | null
           total_amount?: number | null
           total_tax?: number | null
@@ -10560,8 +9868,6 @@ export type Database = {
         }
         Update: {
           amount_in_words?: string | null
-          cancellation_reason?: string | null
-          cancelled_at?: string | null
           company_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -10574,10 +9880,8 @@ export type Database = {
           order_id?: string | null
           owner_id_snapshot?: string | null
           place_of_supply?: string | null
-          revises_invoice_id?: string | null
           status?: string | null
           sub_total?: number | null
-          superseded_by_invoice_id?: string | null
           terms?: string | null
           total_amount?: number | null
           total_tax?: number | null
@@ -10604,20 +9908,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoices_revises_invoice_id_fkey"
-            columns: ["revises_invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoices_superseded_by_invoice_id_fkey"
-            columns: ["superseded_by_invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -11191,8 +10481,6 @@ export type Database = {
           encashment_limit: number | null
           id: string
           is_active: boolean | null
-          last_update_effective_date: string | null
-          last_update_mode: string | null
           leave_type_id: string
           max_carry_forward: number | null
           max_leaves_per_month: number | null
@@ -11215,8 +10503,6 @@ export type Database = {
           encashment_limit?: number | null
           id?: string
           is_active?: boolean | null
-          last_update_effective_date?: string | null
-          last_update_mode?: string | null
           leave_type_id: string
           max_carry_forward?: number | null
           max_leaves_per_month?: number | null
@@ -11239,8 +10525,6 @@ export type Database = {
           encashment_limit?: number | null
           id?: string
           is_active?: boolean | null
-          last_update_effective_date?: string | null
-          last_update_mode?: string | null
           leave_type_id?: string
           max_carry_forward?: number | null
           max_leaves_per_month?: number | null
@@ -11266,7 +10550,7 @@ export type Database = {
         Row: {
           allow_negative_balance: boolean | null
           carry_forward_expiry_months: number | null
-          created_at: string
+          created_at: string | null
           custom_reset_cycle: string | null
           enable_carry_forward: boolean | null
           id: string
@@ -11282,7 +10566,7 @@ export type Database = {
         Insert: {
           allow_negative_balance?: boolean | null
           carry_forward_expiry_months?: number | null
-          created_at?: string
+          created_at?: string | null
           custom_reset_cycle?: string | null
           enable_carry_forward?: boolean | null
           id?: string
@@ -11298,7 +10582,7 @@ export type Database = {
         Update: {
           allow_negative_balance?: boolean | null
           carry_forward_expiry_months?: number | null
-          created_at?: string
+          created_at?: string | null
           custom_reset_cycle?: string | null
           enable_carry_forward?: boolean | null
           id?: string
@@ -11311,15 +10595,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "leave_type_policy_override_leave_type_id_fkey"
-            columns: ["leave_type_id"]
-            isOneToOne: true
-            referencedRelation: "leave_types"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       leave_types: {
         Row: {
@@ -11524,13 +10800,11 @@ export type Database = {
           id: string
           is_active: boolean
           message_template: string
-          name: string | null
+          name: string
           notification_channel: string
           receiver_role: string | null
           receiver_type: string
           receiver_user_id: string | null
-          retailer_target_ids: string[] | null
-          retailer_target_type: string | null
           source_table: string
           title_template: string
           updated_at: string
@@ -11542,13 +10816,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           message_template?: string
-          name?: string | null
+          name: string
           notification_channel?: string
           receiver_role?: string | null
           receiver_type?: string
           receiver_user_id?: string | null
-          retailer_target_ids?: string[] | null
-          retailer_target_type?: string | null
           source_table: string
           title_template?: string
           updated_at?: string
@@ -11560,13 +10832,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           message_template?: string
-          name?: string | null
+          name?: string
           notification_channel?: string
           receiver_role?: string | null
           receiver_type?: string
           receiver_user_id?: string | null
-          retailer_target_ids?: string[] | null
-          retailer_target_type?: string | null
           source_table?: string
           title_template?: string
           updated_at?: string
@@ -11587,11 +10857,8 @@ export type Database = {
           id: string
           is_read: boolean | null
           message: string
-          metadata: Json
           related_id: string | null
           related_table: string | null
-          retailer_id: string | null
-          target_portal: string | null
           title: string
           type: string | null
           user_id: string | null
@@ -11601,11 +10868,8 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message: string
-          metadata?: Json
           related_id?: string | null
           related_table?: string | null
-          retailer_id?: string | null
-          target_portal?: string | null
           title: string
           type?: string | null
           user_id?: string | null
@@ -11615,24 +10879,13 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           message?: string
-          metadata?: Json
           related_id?: string | null
           related_table?: string | null
-          retailer_id?: string | null
-          target_portal?: string | null
           title?: string
           type?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "notifications_retailer_id_fkey"
-            columns: ["retailer_id"]
-            isOneToOne: false
-            referencedRelation: "retailers"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       onboarding_tasks: {
         Row: {
@@ -12093,7 +11346,7 @@ export type Database = {
           product_id?: string | null
           product_name?: string | null
           quantity: number
-          rate: number
+          rate?: number
           sgst_amount?: number | null
           sgst_rate?: number | null
           tax_master_id?: string | null
@@ -12144,20 +11397,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_items_product_fk"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_items_variant_id_fkey"
             columns: ["variant_id"]
             isOneToOne: false
@@ -12195,7 +11434,7 @@ export type Database = {
           edited_at: string | null
           event_id: string | null
           id: string
-          idempotency_key: string
+          idempotency_key: string | null
           invoice_generated_at: string | null
           invoice_number: string | null
           is_backdated: boolean
@@ -12260,7 +11499,7 @@ export type Database = {
           edited_at?: string | null
           event_id?: string | null
           id?: string
-          idempotency_key: string
+          idempotency_key?: string | null
           invoice_generated_at?: string | null
           invoice_number?: string | null
           is_backdated?: boolean
@@ -12289,7 +11528,7 @@ export type Database = {
           sales_channel?: string
           short_items?: Json | null
           status?: string
-          subtotal: number
+          subtotal?: number
           territory_id?: string | null
           total_amount: number
           updated_at?: string
@@ -12325,7 +11564,7 @@ export type Database = {
           edited_at?: string | null
           event_id?: string | null
           id?: string
-          idempotency_key?: string
+          idempotency_key?: string | null
           invoice_generated_at?: string | null
           invoice_number?: string | null
           is_backdated?: boolean
@@ -12385,27 +11624,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_parent_order_id_fkey"
-            columns: ["parent_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_replaced_by_order_id_fkey"
-            columns: ["replaced_by_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_replaces_order_id_fkey"
-            columns: ["replaces_order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "orders_retailer_id_fkey"
             columns: ["retailer_id"]
             isOneToOne: false
@@ -12419,48 +11637,45 @@ export type Database = {
           agent_id: string | null
           beat_ids: string[] | null
           completed_at: string | null
-          created_at: string
+          created_at: string | null
           dispatched_at: string | null
           id: string
-          order_count: number
-          packing_list_id: string
-          status: string
+          order_count: number | null
+          packing_list_id: string | null
+          status: string | null
           territory_ids: string[] | null
-          total_load_qty: number
-          total_load_value: number
-          updated_at: string
+          total_load_qty: number | null
+          total_load_value: number | null
           van_id: string | null
         }
         Insert: {
           agent_id?: string | null
           beat_ids?: string[] | null
           completed_at?: string | null
-          created_at?: string
+          created_at?: string | null
           dispatched_at?: string | null
           id?: string
-          order_count?: number
-          packing_list_id: string
-          status?: string
+          order_count?: number | null
+          packing_list_id?: string | null
+          status?: string | null
           territory_ids?: string[] | null
-          total_load_qty?: number
-          total_load_value?: number
-          updated_at?: string
+          total_load_qty?: number | null
+          total_load_value?: number | null
           van_id?: string | null
         }
         Update: {
           agent_id?: string | null
           beat_ids?: string[] | null
           completed_at?: string | null
-          created_at?: string
+          created_at?: string | null
           dispatched_at?: string | null
           id?: string
-          order_count?: number
-          packing_list_id?: string
-          status?: string
+          order_count?: number | null
+          packing_list_id?: string | null
+          status?: string | null
           territory_ids?: string[] | null
-          total_load_qty?: number
-          total_load_value?: number
-          updated_at?: string
+          total_load_qty?: number | null
+          total_load_value?: number | null
           van_id?: string | null
         }
         Relationships: [
@@ -12588,61 +11803,43 @@ export type Database = {
       }
       packing_list_items: {
         Row: {
-          approved_qty: number | null
-          base_qty: number | null
           batch_number: string | null
-          conversion_to_base: number | null
-          created_at: string
+          created_at: string | null
           expiry_date: string | null
           id: string
-          ordered_qty: number
+          ordered_qty: number | null
           packing_list_id: string | null
-          picked_qty: number
+          picked_qty: number | null
           product_id: string
           product_name: string
-          short_qty: number
+          short_qty: number | null
           unit: string | null
-          uom_code: string | null
-          uom_id: string | null
-          updated_at: string
         }
         Insert: {
-          approved_qty?: number | null
-          base_qty?: number | null
           batch_number?: string | null
-          conversion_to_base?: number | null
-          created_at?: string
+          created_at?: string | null
           expiry_date?: string | null
           id?: string
-          ordered_qty?: number
+          ordered_qty?: number | null
           packing_list_id?: string | null
-          picked_qty?: number
+          picked_qty?: number | null
           product_id: string
           product_name: string
-          short_qty?: number
+          short_qty?: number | null
           unit?: string | null
-          uom_code?: string | null
-          uom_id?: string | null
-          updated_at?: string
         }
         Update: {
-          approved_qty?: number | null
-          base_qty?: number | null
           batch_number?: string | null
-          conversion_to_base?: number | null
-          created_at?: string
+          created_at?: string | null
           expiry_date?: string | null
           id?: string
-          ordered_qty?: number
+          ordered_qty?: number | null
           packing_list_id?: string | null
-          picked_qty?: number
+          picked_qty?: number | null
           product_id?: string
           product_name?: string
-          short_qty?: number
+          short_qty?: number | null
           unit?: string | null
-          uom_code?: string | null
-          uom_id?: string | null
-          updated_at?: string
         }
         Relationships: [
           {
@@ -12685,148 +11882,53 @@ export type Database = {
       }
       packing_lists: {
         Row: {
-          assigned_agent_id: string | null
-          assigned_delivery_user_id: string | null
           created_at: string | null
           created_by: string | null
-          delivered_at: string | null
           delivery_date: string
-          dispatch_date: string | null
-          dispatch_destination: string | null
-          dispatch_driver: string | null
-          dispatch_mode: string | null
-          dispatch_notes: string | null
-          dispatch_vehicle: string | null
-          dispatched_at: string | null
           distributor_id: string | null
-          driver_phone: string | null
           id: string
-          lr_gr_number: string | null
           notes: string | null
-          order_type: string
-          packing_confirmed_at: string | null
-          packing_confirmed_by: string | null
           packing_list_number: string
-          packing_notes: string | null
-          pod_confirmed_at: string | null
-          pod_confirmed_by: string | null
-          pod_notes: string | null
-          pod_photo_url: string | null
-          pod_signature_url: string | null
-          route_id: string | null
           status: string
-          total_items: number
+          total_items: number | null
           total_orders: number | null
-          total_packages: number | null
           total_value: number | null
-          total_weight_kg: number | null
-          transporter_name: string | null
           updated_at: string | null
-          vehicle_type: string | null
-          warehouse_id: string | null
         }
         Insert: {
-          assigned_agent_id?: string | null
-          assigned_delivery_user_id?: string | null
           created_at?: string | null
           created_by?: string | null
-          delivered_at?: string | null
           delivery_date: string
-          dispatch_date?: string | null
-          dispatch_destination?: string | null
-          dispatch_driver?: string | null
-          dispatch_mode?: string | null
-          dispatch_notes?: string | null
-          dispatch_vehicle?: string | null
-          dispatched_at?: string | null
           distributor_id?: string | null
-          driver_phone?: string | null
           id?: string
-          lr_gr_number?: string | null
           notes?: string | null
-          order_type?: string
-          packing_confirmed_at?: string | null
-          packing_confirmed_by?: string | null
           packing_list_number?: string
-          packing_notes?: string | null
-          pod_confirmed_at?: string | null
-          pod_confirmed_by?: string | null
-          pod_notes?: string | null
-          pod_photo_url?: string | null
-          pod_signature_url?: string | null
-          route_id?: string | null
           status?: string
-          total_items?: number
+          total_items?: number | null
           total_orders?: number | null
-          total_packages?: number | null
           total_value?: number | null
-          total_weight_kg?: number | null
-          transporter_name?: string | null
           updated_at?: string | null
-          vehicle_type?: string | null
-          warehouse_id?: string | null
         }
         Update: {
-          assigned_agent_id?: string | null
-          assigned_delivery_user_id?: string | null
           created_at?: string | null
           created_by?: string | null
-          delivered_at?: string | null
           delivery_date?: string
-          dispatch_date?: string | null
-          dispatch_destination?: string | null
-          dispatch_driver?: string | null
-          dispatch_mode?: string | null
-          dispatch_notes?: string | null
-          dispatch_vehicle?: string | null
-          dispatched_at?: string | null
           distributor_id?: string | null
-          driver_phone?: string | null
           id?: string
-          lr_gr_number?: string | null
           notes?: string | null
-          order_type?: string
-          packing_confirmed_at?: string | null
-          packing_confirmed_by?: string | null
           packing_list_number?: string
-          packing_notes?: string | null
-          pod_confirmed_at?: string | null
-          pod_confirmed_by?: string | null
-          pod_notes?: string | null
-          pod_photo_url?: string | null
-          pod_signature_url?: string | null
-          route_id?: string | null
           status?: string
-          total_items?: number
+          total_items?: number | null
           total_orders?: number | null
-          total_packages?: number | null
           total_value?: number | null
-          total_weight_kg?: number | null
-          transporter_name?: string | null
           updated_at?: string | null
-          vehicle_type?: string | null
-          warehouse_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "packing_lists_assigned_delivery_user_id_fkey"
-            columns: ["assigned_delivery_user_id"]
-            isOneToOne: false
-            referencedRelation: "distributor_users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "packing_lists_distributor_id_fkey"
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "packing_lists_warehouse_id_fkey"
-            columns: ["warehouse_id"]
-            isOneToOne: false
-            referencedRelation: "warehouses"
             referencedColumns: ["id"]
           },
         ]
@@ -13068,9 +12170,9 @@ export type Database = {
           can_read: boolean
           can_view_all: boolean
           created_at: string
-          group_id: string
+          group_id: string | null
           id: string
-          object_name: string
+          object_name: string | null
           permission_key: string | null
         }
         Insert: {
@@ -13081,9 +12183,9 @@ export type Database = {
           can_read?: boolean
           can_view_all?: boolean
           created_at?: string
-          group_id: string
+          group_id?: string | null
           id?: string
-          object_name: string
+          object_name?: string | null
           permission_key?: string | null
         }
         Update: {
@@ -13094,71 +12196,49 @@ export type Database = {
           can_read?: boolean
           can_view_all?: boolean
           created_at?: string
-          group_id?: string
+          group_id?: string | null
           id?: string
-          object_name?: string
+          object_name?: string | null
           permission_key?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "permission_set_group_permissions_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "permission_set_groups"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       permission_set_group_users: {
         Row: {
-          created_at: string
-          group_id: string
+          group_id: string | null
           id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
-          group_id: string
+          group_id?: string | null
           id?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
-          group_id?: string
+          group_id?: string | null
           id?: string
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "permission_set_group_users_group_id_fkey"
-            columns: ["group_id"]
-            isOneToOne: false
-            referencedRelation: "permission_set_groups"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       permission_set_groups: {
         Row: {
-          created_at: string
+          created_at: string | null
           description: string | null
           id: string
-          name: string
-          updated_at: string
+          name: string | null
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
-          name: string
-          updated_at?: string
+          name?: string | null
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           description?: string | null
           id?: string
-          name?: string
-          updated_at?: string
+          name?: string | null
         }
         Relationships: []
       }
@@ -13329,13 +12409,11 @@ export type Database = {
           created_at: string | null
           district: string | null
           id: string
-          is_custom_area: boolean
           latitude: number | null
           longitude: number | null
           officename: string
           pincode: string
           statename: string | null
-          taluka: string | null
           territory_po: string | null
           updated_at: string | null
         }
@@ -13343,13 +12421,11 @@ export type Database = {
           created_at?: string | null
           district?: string | null
           id?: string
-          is_custom_area?: boolean
           latitude?: number | null
           longitude?: number | null
           officename: string
           pincode: string
           statename?: string | null
-          taluka?: string | null
           territory_po?: string | null
           updated_at?: string | null
         }
@@ -13357,13 +12433,11 @@ export type Database = {
           created_at?: string | null
           district?: string | null
           id?: string
-          is_custom_area?: boolean
           latitude?: number | null
           longitude?: number | null
           officename?: string
           pincode?: string
           statename?: string | null
-          taluka?: string | null
           territory_po?: string | null
           updated_at?: string | null
         }
@@ -13470,158 +12544,69 @@ export type Database = {
       }
       pm_ai_insights: {
         Row: {
-          content: Json
-          created_at: string
-          created_by: string | null
-          expires_at: string | null
+          created_at: string | null
           id: string
           insight_text: string | null
-          insight_type: string
-          project_id: string
+          project_id: string | null
         }
         Insert: {
-          content?: Json
-          created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
+          created_at?: string | null
           id?: string
           insight_text?: string | null
-          insight_type: string
-          project_id: string
+          project_id?: string | null
         }
         Update: {
-          content?: Json
-          created_at?: string
-          created_by?: string | null
-          expires_at?: string | null
+          created_at?: string | null
           id?: string
           insight_text?: string | null
-          insight_type?: string
-          project_id?: string
+          project_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_ai_insights_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "pm_projects"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_ideas: {
         Row: {
-          ai_evaluation: Json | null
-          created_at: string
+          created_at: string | null
           created_by: string | null
           description: string | null
           id: string
-          priority: string | null
-          project_id: string
-          status: string
-          submitted_by: string
-          title: string
-          updated_at: string
+          title: string | null
         }
         Insert: {
-          ai_evaluation?: Json | null
-          created_at?: string
+          created_at?: string | null
           created_by?: string | null
           description?: string | null
           id?: string
-          priority?: string | null
-          project_id: string
-          status?: string
-          submitted_by: string
-          title: string
-          updated_at?: string
+          title?: string | null
         }
         Update: {
-          ai_evaluation?: Json | null
-          created_at?: string
+          created_at?: string | null
           created_by?: string | null
           description?: string | null
           id?: string
-          priority?: string | null
-          project_id?: string
-          status?: string
-          submitted_by?: string
-          title?: string
-          updated_at?: string
+          title?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_ideas_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "pm_projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_ideas_submitted_by_fkey"
-            columns: ["submitted_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_knowledge_documents: {
         Row: {
           content: string | null
-          created_at: string
-          description: string | null
-          document_name: string
-          file_name: string | null
-          file_url: string | null
+          created_at: string | null
           id: string
-          project_id: string
           title: string | null
-          updated_at: string
-          uploaded_by: string
         }
         Insert: {
           content?: string | null
-          created_at?: string
-          description?: string | null
-          document_name: string
-          file_name?: string | null
-          file_url?: string | null
+          created_at?: string | null
           id?: string
-          project_id: string
           title?: string | null
-          updated_at?: string
-          uploaded_by: string
         }
         Update: {
           content?: string | null
-          created_at?: string
-          description?: string | null
-          document_name?: string
-          file_name?: string | null
-          file_url?: string | null
+          created_at?: string | null
           id?: string
-          project_id?: string
           title?: string | null
-          updated_at?: string
-          uploaded_by?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_knowledge_documents_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "pm_projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_knowledge_documents_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_milestones: {
         Row: {
@@ -13711,69 +12696,27 @@ export type Database = {
       }
       pm_project_resources: {
         Row: {
-          budget_allocated: number | null
-          cost_rate: number | null
-          created_at: string
-          deployment_type: string
+          created_at: string | null
           id: string
-          project_id: string
-          release_date: string | null
+          project_id: string | null
           resource_name: string | null
-          role: string
-          selling_rate: number | null
-          start_date: string | null
-          updated_at: string
           url: string | null
-          user_id: string
         }
         Insert: {
-          budget_allocated?: number | null
-          cost_rate?: number | null
-          created_at?: string
-          deployment_type?: string
+          created_at?: string | null
           id?: string
-          project_id: string
-          release_date?: string | null
+          project_id?: string | null
           resource_name?: string | null
-          role?: string
-          selling_rate?: number | null
-          start_date?: string | null
-          updated_at?: string
           url?: string | null
-          user_id: string
         }
         Update: {
-          budget_allocated?: number | null
-          cost_rate?: number | null
-          created_at?: string
-          deployment_type?: string
+          created_at?: string | null
           id?: string
-          project_id?: string
-          release_date?: string | null
+          project_id?: string | null
           resource_name?: string | null
-          role?: string
-          selling_rate?: number | null
-          start_date?: string | null
-          updated_at?: string
           url?: string | null
-          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_project_resources_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "pm_projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_project_resources_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_projects: {
         Row: {
@@ -13790,7 +12733,6 @@ export type Database = {
           name: string
           owner_id: string | null
           priority: Database["public"]["Enums"]["pm_priority"]
-          source_template_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["pm_project_status"]
           template_name: string | null
@@ -13810,7 +12752,6 @@ export type Database = {
           name: string
           owner_id?: string | null
           priority?: Database["public"]["Enums"]["pm_priority"]
-          source_template_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["pm_project_status"]
           template_name?: string | null
@@ -13830,7 +12771,6 @@ export type Database = {
           name?: string
           owner_id?: string | null
           priority?: Database["public"]["Enums"]["pm_priority"]
-          source_template_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["pm_project_status"]
           template_name?: string | null
@@ -13851,18 +12791,10 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "pm_projects_source_template_id_fkey"
-            columns: ["source_template_id"]
-            isOneToOne: false
-            referencedRelation: "pm_templates"
-            referencedColumns: ["id"]
-          },
         ]
       }
       pm_risks: {
         Row: {
-          ai_generated: boolean | null
           created_at: string
           description: string | null
           id: string
@@ -13876,7 +12808,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          ai_generated?: boolean | null
           created_at?: string
           description?: string | null
           id?: string
@@ -13890,7 +12821,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          ai_generated?: boolean | null
           created_at?: string
           description?: string | null
           id?: string
@@ -13922,41 +12852,24 @@ export type Database = {
       }
       pm_sections: {
         Row: {
-          color: string | null
-          created_at: string
           id: string
-          name: string
-          position: number
-          project_id: string
-          updated_at: string
+          name: string | null
+          position: number | null
+          project_id: string | null
         }
         Insert: {
-          color?: string | null
-          created_at?: string
           id?: string
-          name: string
-          position?: number
-          project_id: string
-          updated_at?: string
+          name?: string | null
+          position?: number | null
+          project_id?: string | null
         }
         Update: {
-          color?: string | null
-          created_at?: string
           id?: string
-          name?: string
-          position?: number
-          project_id?: string
-          updated_at?: string
+          name?: string | null
+          position?: number | null
+          project_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_sections_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "pm_projects"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_sprints: {
         Row: {
@@ -14064,90 +12977,42 @@ export type Database = {
       }
       pm_task_attachments: {
         Row: {
-          created_at: string
-          file_name: string
-          file_size: number | null
-          file_type: string | null
-          file_url: string
+          created_at: string | null
+          file_url: string | null
           id: string
-          note: string | null
-          task_id: string
-          uploaded_by: string | null
+          task_id: string | null
         }
         Insert: {
-          created_at?: string
-          file_name: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url: string
+          created_at?: string | null
+          file_url?: string | null
           id?: string
-          note?: string | null
-          task_id: string
-          uploaded_by?: string | null
+          task_id?: string | null
         }
         Update: {
-          created_at?: string
-          file_name?: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url?: string
+          created_at?: string | null
+          file_url?: string | null
           id?: string
-          note?: string | null
-          task_id?: string
-          uploaded_by?: string | null
+          task_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_task_attachments_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "pm_tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_task_attachments_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_task_collaborators: {
         Row: {
-          created_at: string
           id: string
-          task_id: string
-          user_id: string
+          task_id: string | null
+          user_id: string | null
         }
         Insert: {
-          created_at?: string
           id?: string
-          task_id: string
-          user_id: string
+          task_id?: string | null
+          user_id?: string | null
         }
         Update: {
-          created_at?: string
           id?: string
-          task_id?: string
-          user_id?: string
+          task_id?: string | null
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_task_collaborators_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "pm_tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_task_collaborators_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_task_comments: {
         Row: {
@@ -14291,7 +13156,6 @@ export type Database = {
         Row: {
           assignee_id: string | null
           block_reason: string | null
-          collaborator_id: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -14305,7 +13169,6 @@ export type Database = {
           priority: Database["public"]["Enums"]["pm_priority"]
           project_id: string
           reporter_id: string | null
-          section_id: string | null
           sort_order: number | null
           sprint_id: string | null
           start_date: string | null
@@ -14319,7 +13182,6 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           block_reason?: string | null
-          collaborator_id?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -14333,7 +13195,6 @@ export type Database = {
           priority?: Database["public"]["Enums"]["pm_priority"]
           project_id: string
           reporter_id?: string | null
-          section_id?: string | null
           sort_order?: number | null
           sprint_id?: string | null
           start_date?: string | null
@@ -14347,7 +13208,6 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           block_reason?: string | null
-          collaborator_id?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -14361,7 +13221,6 @@ export type Database = {
           priority?: Database["public"]["Enums"]["pm_priority"]
           project_id?: string
           reporter_id?: string | null
-          section_id?: string | null
           sort_order?: number | null
           sprint_id?: string | null
           start_date?: string | null
@@ -14376,13 +13235,6 @@ export type Database = {
           {
             foreignKeyName: "pm_tasks_assignee_id_fkey"
             columns: ["assignee_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_tasks_collaborator_id_fkey"
-            columns: ["collaborator_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -14423,13 +13275,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pm_tasks_section_id_fkey"
-            columns: ["section_id"]
-            isOneToOne: false
-            referencedRelation: "pm_sections"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "pm_tasks_sprint_id_fkey"
             columns: ["sprint_id"]
             isOneToOne: false
@@ -14440,251 +13285,108 @@ export type Database = {
       }
       pm_template_attachments: {
         Row: {
-          created_at: string
-          file_name: string
-          file_size: number | null
-          file_type: string | null
-          file_url: string
+          file_url: string | null
           id: string
-          note: string | null
-          task_id: string
-          template_id: string
           template_task_id: string | null
-          uploaded_by: string
         }
         Insert: {
-          created_at?: string
-          file_name: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url: string
+          file_url?: string | null
           id?: string
-          note?: string | null
-          task_id: string
-          template_id: string
           template_task_id?: string | null
-          uploaded_by: string
         }
         Update: {
-          created_at?: string
-          file_name?: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url?: string
+          file_url?: string | null
           id?: string
-          note?: string | null
-          task_id?: string
-          template_id?: string
           template_task_id?: string | null
-          uploaded_by?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_template_attachments_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "pm_template_tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_template_attachments_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "pm_templates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_template_dependencies: {
         Row: {
-          created_at: string
-          dependency_type: string
-          depends_on_task_id: string
+          depends_on_task_id: string | null
           id: string
-          task_id: string
-          template_id: string
+          task_id: string | null
         }
         Insert: {
-          created_at?: string
-          dependency_type?: string
-          depends_on_task_id: string
+          depends_on_task_id?: string | null
           id?: string
-          task_id: string
-          template_id: string
+          task_id?: string | null
         }
         Update: {
-          created_at?: string
-          dependency_type?: string
-          depends_on_task_id?: string
+          depends_on_task_id?: string | null
           id?: string
-          task_id?: string
-          template_id?: string
+          task_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_template_dependencies_depends_on_task_id_fkey"
-            columns: ["depends_on_task_id"]
-            isOneToOne: false
-            referencedRelation: "pm_template_tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_template_dependencies_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "pm_template_tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_template_dependencies_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "pm_templates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_template_sections: {
         Row: {
-          color: string
-          created_at: string
           id: string
-          name: string
-          position: number
-          template_id: string
+          name: string | null
+          template_id: string | null
         }
         Insert: {
-          color?: string
-          created_at?: string
           id?: string
-          name: string
-          position?: number
-          template_id: string
+          name?: string | null
+          template_id?: string | null
         }
         Update: {
-          color?: string
-          created_at?: string
           id?: string
-          name?: string
-          position?: number
-          template_id?: string
+          name?: string | null
+          template_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_template_sections_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "pm_templates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_template_tasks: {
         Row: {
-          created_at: string
-          description: string | null
-          duration_days: number
-          estimated_hours: number | null
           id: string
-          parent_task_id: string | null
           position: number | null
-          priority: string
-          section_id: string | null
-          sort_order: number
-          tags: string[] | null
-          template_id: string
           template_section_id: string | null
-          title: string
-          type: string
+          title: string | null
         }
         Insert: {
-          created_at?: string
-          description?: string | null
-          duration_days?: number
-          estimated_hours?: number | null
           id?: string
-          parent_task_id?: string | null
           position?: number | null
-          priority?: string
-          section_id?: string | null
-          sort_order?: number
-          tags?: string[] | null
-          template_id: string
           template_section_id?: string | null
-          title: string
-          type?: string
+          title?: string | null
         }
         Update: {
-          created_at?: string
-          description?: string | null
-          duration_days?: number
-          estimated_hours?: number | null
           id?: string
-          parent_task_id?: string | null
           position?: number | null
-          priority?: string
-          section_id?: string | null
-          sort_order?: number
-          tags?: string[] | null
-          template_id?: string
           template_section_id?: string | null
-          title?: string
-          type?: string
+          title?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pm_template_tasks_parent_task_id_fkey"
-            columns: ["parent_task_id"]
-            isOneToOne: false
-            referencedRelation: "pm_template_tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_template_tasks_section_id_fkey"
-            columns: ["section_id"]
-            isOneToOne: false
-            referencedRelation: "pm_template_sections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pm_template_tasks_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "pm_templates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       pm_templates: {
         Row: {
-          created_at: string
+          created_at: string | null
           created_by: string
           description: string | null
           id: string
-          name: string
+          name: string | null
           updated_at: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           created_by: string
           description?: string | null
           id?: string
-          name: string
+          name?: string | null
           updated_at?: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           created_by?: string
           description?: string | null
           id?: string
-          name?: string
+          name?: string | null
           updated_at?: string
         }
         Relationships: []
       }
       pm_time_logs: {
         Row: {
-          allocation: string
           created_at: string
           date: string
           description: string | null
@@ -14693,10 +13395,8 @@ export type Database = {
           project_id: string
           task_id: string
           user_id: string
-          work_type: string | null
         }
         Insert: {
-          allocation?: string
           created_at?: string
           date?: string
           description?: string | null
@@ -14705,10 +13405,8 @@ export type Database = {
           project_id: string
           task_id: string
           user_id: string
-          work_type?: string | null
         }
         Update: {
-          allocation?: string
           created_at?: string
           date?: string
           description?: string | null
@@ -14717,7 +13415,6 @@ export type Database = {
           project_id?: string
           task_id?: string
           user_id?: string
-          work_type?: string | null
         }
         Relationships: [
           {
@@ -14791,7 +13488,6 @@ export type Database = {
           price_book_id: string
           product_id: string
           uom: string | null
-          uom_id: string | null
           updated_at: string
           variant_id: string | null
         }
@@ -14806,7 +13502,6 @@ export type Database = {
           price_book_id: string
           product_id: string
           uom?: string | null
-          uom_id?: string | null
           updated_at?: string
           variant_id?: string | null
         }
@@ -14821,7 +13516,6 @@ export type Database = {
           price_book_id?: string
           product_id?: string
           uom?: string | null
-          uom_id?: string | null
           updated_at?: string
           variant_id?: string | null
         }
@@ -14998,11 +13692,7 @@ export type Database = {
       }
       primary_order_items: {
         Row: {
-          approved_qty: number | null
-          backorder_qty: number | null
-          base_qty: number | null
           batch_number: string | null
-          conversion_to_base: number | null
           created_at: string
           damaged_quantity: number | null
           discount_percent: number | null
@@ -15010,27 +13700,19 @@ export type Database = {
           id: string
           line_total: number
           order_id: string
-          ordered_qty: number | null
           product_id: string
           product_name: string
           quantity: number
           received_quantity: number | null
-          rejected_qty: number | null
           sku: string | null
           tax_percent: number | null
           unit: string
           unit_price: number
-          uom_code: string | null
-          uom_id: string | null
           variant_id: string | null
           variant_name: string | null
         }
         Insert: {
-          approved_qty?: number | null
-          backorder_qty?: number | null
-          base_qty?: number | null
           batch_number?: string | null
-          conversion_to_base?: number | null
           created_at?: string
           damaged_quantity?: number | null
           discount_percent?: number | null
@@ -15038,27 +13720,19 @@ export type Database = {
           id?: string
           line_total?: number
           order_id: string
-          ordered_qty?: number | null
           product_id: string
           product_name: string
           quantity?: number
           received_quantity?: number | null
-          rejected_qty?: number | null
           sku?: string | null
           tax_percent?: number | null
           unit?: string
           unit_price?: number
-          uom_code?: string | null
-          uom_id?: string | null
           variant_id?: string | null
           variant_name?: string | null
         }
         Update: {
-          approved_qty?: number | null
-          backorder_qty?: number | null
-          base_qty?: number | null
           batch_number?: string | null
-          conversion_to_base?: number | null
           created_at?: string
           damaged_quantity?: number | null
           discount_percent?: number | null
@@ -15066,18 +13740,14 @@ export type Database = {
           id?: string
           line_total?: number
           order_id?: string
-          ordered_qty?: number | null
           product_id?: string
           product_name?: string
           quantity?: number
           received_quantity?: number | null
-          rejected_qty?: number | null
           sku?: string | null
           tax_percent?: number | null
           unit?: string
           unit_price?: number
-          uom_code?: string | null
-          uom_id?: string | null
           variant_id?: string | null
           variant_name?: string | null
         }
@@ -15194,47 +13864,24 @@ export type Database = {
       primary_orders: {
         Row: {
           actual_delivery_date: string | null
-          advance_amount: number | null
-          advance_payment_date: string | null
-          advance_reference: string | null
           approved_at: string | null
           approved_by: string | null
-          available_credit_at_order: number | null
           created_at: string
           created_by_user_id: string | null
-          credit_limit: number | null
-          credit_limit_at_order: number | null
-          credit_snapshot: Json | null
           discount_amount: number
           dispatch_reference: string | null
           dispatched_at: string | null
           distributor_id: string
           expected_delivery_date: string | null
           id: string
-          is_backorder: boolean | null
           notes: string | null
           order_date: string
           order_number: string
-          outstanding_at_order: number | null
-          packing_list_id: string | null
-          parent_order_id: string | null
-          payment_mode: string | null
-          payment_proof_url: string | null
           payment_status: string
-          payment_term: string | null
           payment_terms: string | null
           shipping_address: string | null
-          shipping_address_source: string | null
-          shipping_contact_person: string | null
-          shipping_contact_phone: string | null
-          shipping_latitude: number | null
-          shipping_longitude: number | null
-          shipping_saved_address_id: string | null
-          shipping_warehouse_id: string | null
-          source_distributor_id: string | null
           status: string
           subtotal: number
-          target_distributor_id: string | null
           tax_amount: number
           total_amount: number
           transporter_name: string | null
@@ -15243,47 +13890,24 @@ export type Database = {
         }
         Insert: {
           actual_delivery_date?: string | null
-          advance_amount?: number | null
-          advance_payment_date?: string | null
-          advance_reference?: string | null
           approved_at?: string | null
           approved_by?: string | null
-          available_credit_at_order?: number | null
           created_at?: string
           created_by_user_id?: string | null
-          credit_limit?: number | null
-          credit_limit_at_order?: number | null
-          credit_snapshot?: Json | null
           discount_amount?: number
           dispatch_reference?: string | null
           dispatched_at?: string | null
           distributor_id: string
           expected_delivery_date?: string | null
           id?: string
-          is_backorder?: boolean | null
           notes?: string | null
           order_date?: string
           order_number: string
-          outstanding_at_order?: number | null
-          packing_list_id?: string | null
-          parent_order_id?: string | null
-          payment_mode?: string | null
-          payment_proof_url?: string | null
           payment_status?: string
-          payment_term?: string | null
           payment_terms?: string | null
           shipping_address?: string | null
-          shipping_address_source?: string | null
-          shipping_contact_person?: string | null
-          shipping_contact_phone?: string | null
-          shipping_latitude?: number | null
-          shipping_longitude?: number | null
-          shipping_saved_address_id?: string | null
-          shipping_warehouse_id?: string | null
-          source_distributor_id?: string | null
           status?: string
           subtotal?: number
-          target_distributor_id?: string | null
           tax_amount?: number
           total_amount?: number
           transporter_name?: string | null
@@ -15292,47 +13916,24 @@ export type Database = {
         }
         Update: {
           actual_delivery_date?: string | null
-          advance_amount?: number | null
-          advance_payment_date?: string | null
-          advance_reference?: string | null
           approved_at?: string | null
           approved_by?: string | null
-          available_credit_at_order?: number | null
           created_at?: string
           created_by_user_id?: string | null
-          credit_limit?: number | null
-          credit_limit_at_order?: number | null
-          credit_snapshot?: Json | null
           discount_amount?: number
           dispatch_reference?: string | null
           dispatched_at?: string | null
           distributor_id?: string
           expected_delivery_date?: string | null
           id?: string
-          is_backorder?: boolean | null
           notes?: string | null
           order_date?: string
           order_number?: string
-          outstanding_at_order?: number | null
-          packing_list_id?: string | null
-          parent_order_id?: string | null
-          payment_mode?: string | null
-          payment_proof_url?: string | null
           payment_status?: string
-          payment_term?: string | null
           payment_terms?: string | null
           shipping_address?: string | null
-          shipping_address_source?: string | null
-          shipping_contact_person?: string | null
-          shipping_contact_phone?: string | null
-          shipping_latitude?: number | null
-          shipping_longitude?: number | null
-          shipping_saved_address_id?: string | null
-          shipping_warehouse_id?: string | null
-          source_distributor_id?: string | null
           status?: string
           subtotal?: number
-          target_distributor_id?: string | null
           tax_amount?: number
           total_amount?: number
           transporter_name?: string | null
@@ -15343,41 +13944,6 @@ export type Database = {
           {
             foreignKeyName: "primary_orders_distributor_id_fkey"
             columns: ["distributor_id"]
-            isOneToOne: false
-            referencedRelation: "distributors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "primary_orders_packing_list_id_fkey"
-            columns: ["packing_list_id"]
-            isOneToOne: false
-            referencedRelation: "packing_lists"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "primary_orders_parent_order_id_fkey"
-            columns: ["parent_order_id"]
-            isOneToOne: false
-            referencedRelation: "primary_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "primary_orders_shipping_saved_address_id_fkey"
-            columns: ["shipping_saved_address_id"]
-            isOneToOne: false
-            referencedRelation: "distributor_saved_addresses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "primary_orders_shipping_warehouse_id_fkey"
-            columns: ["shipping_warehouse_id"]
-            isOneToOne: false
-            referencedRelation: "warehouses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "primary_orders_target_distributor_id_fkey"
-            columns: ["target_distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
             referencedColumns: ["id"]
@@ -15714,7 +14280,6 @@ export type Database = {
           description: string | null
           discount_amount: number | null
           discount_percentage: number | null
-          discount_unit: string | null
           discount_value_type: string | null
           end_date: string | null
           exclusion_group: string | null
@@ -15730,10 +14295,7 @@ export type Database = {
           name: string
           per_product_discounts: Json | null
           priority: number | null
-          product_id: string | null
-          quantity_condition_type: string | null
           scheme_type: string
-          show_in_portal: boolean | null
           source: string | null
           start_date: string | null
           target_product_ids: string[] | null
@@ -15757,7 +14319,6 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
-          discount_unit?: string | null
           discount_value_type?: string | null
           end_date?: string | null
           exclusion_group?: string | null
@@ -15773,10 +14334,7 @@ export type Database = {
           name: string
           per_product_discounts?: Json | null
           priority?: number | null
-          product_id?: string | null
-          quantity_condition_type?: string | null
           scheme_type?: string
-          show_in_portal?: boolean | null
           source?: string | null
           start_date?: string | null
           target_product_ids?: string[] | null
@@ -15800,7 +14358,6 @@ export type Database = {
           description?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
-          discount_unit?: string | null
           discount_value_type?: string | null
           end_date?: string | null
           exclusion_group?: string | null
@@ -15816,10 +14373,7 @@ export type Database = {
           name?: string
           per_product_discounts?: Json | null
           priority?: number | null
-          product_id?: string | null
-          quantity_condition_type?: string | null
           scheme_type?: string
-          show_in_portal?: boolean | null
           source?: string | null
           start_date?: string | null
           target_product_ids?: string[] | null
@@ -15846,13 +14400,6 @@ export type Database = {
           {
             foreignKeyName: "product_schemes_free_product_id_fkey"
             columns: ["free_product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_schemes_product_id_fkey"
-            columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
             referencedColumns: ["id"]
@@ -15922,14 +14469,8 @@ export type Database = {
           barcode_image_url: string | null
           base_unit: string | null
           base_unit_category: string | null
-          brand: string | null
-          category_id: string | null
-          country_of_origin: string | null
           created_at: string
-          created_by: string | null
           default_sales_uom_id: string | null
-          description: string | null
-          discontinued_date: string | null
           discount_amount: number | null
           discount_percentage: number | null
           focused_due_date: string | null
@@ -15937,49 +14478,29 @@ export type Database = {
           focused_target_quantity: number | null
           focused_territories: string[] | null
           focused_type: string | null
-          gst_percentage: number | null
           hsn_code: string | null
           id: string
           is_active: boolean | null
-          is_discontinued: boolean | null
           is_focused_product: boolean | null
-          manufacturer: string | null
           net_volume_ml: number | null
           net_weight_g: number | null
           price: number
           price_basis_uom_id: string | null
-          product_id: string
-          product_type: string | null
+          product_id: string | null
           qr_code: string | null
-          reorder_level: number | null
-          reorder_quantity: number | null
           sku: string
-          sku_image_url: string | null
-          standard_cost: number | null
           stock_quantity: number
-          tax_master_id: string | null
           uom_id: string | null
           updated_at: string
-          updated_by: string | null
-          variant_cost: number | null
-          variant_name: string
-          variant_tax_rate: number | null
-          variant_type: string | null
-          variant_weight_g: number | null
+          variant_name: string | null
         }
         Insert: {
           barcode?: string | null
           barcode_image_url?: string | null
           base_unit?: string | null
           base_unit_category?: string | null
-          brand?: string | null
-          category_id?: string | null
-          country_of_origin?: string | null
           created_at?: string
-          created_by?: string | null
           default_sales_uom_id?: string | null
-          description?: string | null
-          discontinued_date?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
           focused_due_date?: string | null
@@ -15987,49 +14508,29 @@ export type Database = {
           focused_target_quantity?: number | null
           focused_territories?: string[] | null
           focused_type?: string | null
-          gst_percentage?: number | null
           hsn_code?: string | null
           id?: string
           is_active?: boolean | null
-          is_discontinued?: boolean | null
           is_focused_product?: boolean | null
-          manufacturer?: string | null
           net_volume_ml?: number | null
           net_weight_g?: number | null
           price?: number
           price_basis_uom_id?: string | null
-          product_id: string
-          product_type?: string | null
+          product_id?: string | null
           qr_code?: string | null
-          reorder_level?: number | null
-          reorder_quantity?: number | null
           sku: string
-          sku_image_url?: string | null
-          standard_cost?: number | null
           stock_quantity?: number
-          tax_master_id?: string | null
           uom_id?: string | null
           updated_at?: string
-          updated_by?: string | null
-          variant_cost?: number | null
-          variant_name: string
-          variant_tax_rate?: number | null
-          variant_type?: string | null
-          variant_weight_g?: number | null
+          variant_name?: string | null
         }
         Update: {
           barcode?: string | null
           barcode_image_url?: string | null
           base_unit?: string | null
           base_unit_category?: string | null
-          brand?: string | null
-          category_id?: string | null
-          country_of_origin?: string | null
           created_at?: string
-          created_by?: string | null
           default_sales_uom_id?: string | null
-          description?: string | null
-          discontinued_date?: string | null
           discount_amount?: number | null
           discount_percentage?: number | null
           focused_due_date?: string | null
@@ -16037,44 +14538,23 @@ export type Database = {
           focused_target_quantity?: number | null
           focused_territories?: string[] | null
           focused_type?: string | null
-          gst_percentage?: number | null
           hsn_code?: string | null
           id?: string
           is_active?: boolean | null
-          is_discontinued?: boolean | null
           is_focused_product?: boolean | null
-          manufacturer?: string | null
           net_volume_ml?: number | null
           net_weight_g?: number | null
           price?: number
           price_basis_uom_id?: string | null
-          product_id?: string
-          product_type?: string | null
+          product_id?: string | null
           qr_code?: string | null
-          reorder_level?: number | null
-          reorder_quantity?: number | null
           sku?: string
-          sku_image_url?: string | null
-          standard_cost?: number | null
           stock_quantity?: number
-          tax_master_id?: string | null
           uom_id?: string | null
           updated_at?: string
-          updated_by?: string | null
-          variant_cost?: number | null
-          variant_name?: string
-          variant_tax_rate?: number | null
-          variant_type?: string | null
-          variant_weight_g?: number | null
+          variant_name?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "product_variants_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "product_categories"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "product_variants_default_sales_uom_id_fkey"
             columns: ["default_sales_uom_id"]
@@ -16096,13 +14576,6 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "product_variants_tax_master_id_fkey"
-            columns: ["tax_master_id"]
-            isOneToOne: false
-            referencedRelation: "tax_masters"
-            referencedColumns: ["id"]
-          },
         ]
       }
       products: {
@@ -16111,159 +14584,99 @@ export type Database = {
           barcode_image_url: string | null
           base_unit: string | null
           base_unit_category: string
-          brand: string | null
           category_id: string | null
           closing_stock: number | null
           conversion_factor: number | null
-          cost_currency: string | null
-          country_of_origin: string | null
           created_at: string
-          created_by: string | null
           default_purchase_uom_id: string | null
           default_sales_uom_id: string | null
           description: string | null
-          discontinuation_reason: string | null
-          discontinued_date: string | null
           focused_due_date: string | null
           focused_recurring_config: Json | null
           focused_target_quantity: number | null
           focused_territories: string[] | null
           focused_type: string | null
-          gross_weight_g: number | null
-          gst_percentage: number | null
           hsn_code: string | null
           id: string
           is_active: boolean | null
-          is_discontinued: boolean | null
           is_focused_product: boolean | null
-          last_cost_update: string | null
-          manufacturer: string | null
           name: string
           net_volume_ml: number | null
           net_weight_g: number | null
-          opening_stock: number | null
-          packaging_weight_g: number | null
           price_basis_uom_id: string | null
-          primary_supplier_id: string | null
           product_number: string | null
-          product_type: string | null
           qr_code: string | null
           rate: number
-          reorder_level: number | null
-          reorder_quantity: number | null
           sku: string
           sku_image_url: string | null
-          standard_cost: number | null
-          tax_master_id: string | null
           unit: string
           updated_at: string
-          updated_by: string | null
         }
         Insert: {
           barcode?: string | null
           barcode_image_url?: string | null
           base_unit?: string | null
           base_unit_category?: string
-          brand?: string | null
           category_id?: string | null
           closing_stock?: number | null
           conversion_factor?: number | null
-          cost_currency?: string | null
-          country_of_origin?: string | null
           created_at?: string
-          created_by?: string | null
           default_purchase_uom_id?: string | null
           default_sales_uom_id?: string | null
           description?: string | null
-          discontinuation_reason?: string | null
-          discontinued_date?: string | null
           focused_due_date?: string | null
           focused_recurring_config?: Json | null
           focused_target_quantity?: number | null
           focused_territories?: string[] | null
           focused_type?: string | null
-          gross_weight_g?: number | null
-          gst_percentage?: number | null
           hsn_code?: string | null
           id?: string
           is_active?: boolean | null
-          is_discontinued?: boolean | null
           is_focused_product?: boolean | null
-          last_cost_update?: string | null
-          manufacturer?: string | null
           name: string
           net_volume_ml?: number | null
           net_weight_g?: number | null
-          opening_stock?: number | null
-          packaging_weight_g?: number | null
           price_basis_uom_id?: string | null
-          primary_supplier_id?: string | null
           product_number?: string | null
-          product_type?: string | null
           qr_code?: string | null
           rate?: number
-          reorder_level?: number | null
-          reorder_quantity?: number | null
           sku: string
           sku_image_url?: string | null
-          standard_cost?: number | null
-          tax_master_id?: string | null
           unit?: string
           updated_at?: string
-          updated_by?: string | null
         }
         Update: {
           barcode?: string | null
           barcode_image_url?: string | null
           base_unit?: string | null
           base_unit_category?: string
-          brand?: string | null
           category_id?: string | null
           closing_stock?: number | null
           conversion_factor?: number | null
-          cost_currency?: string | null
-          country_of_origin?: string | null
           created_at?: string
-          created_by?: string | null
           default_purchase_uom_id?: string | null
           default_sales_uom_id?: string | null
           description?: string | null
-          discontinuation_reason?: string | null
-          discontinued_date?: string | null
           focused_due_date?: string | null
           focused_recurring_config?: Json | null
           focused_target_quantity?: number | null
           focused_territories?: string[] | null
           focused_type?: string | null
-          gross_weight_g?: number | null
-          gst_percentage?: number | null
           hsn_code?: string | null
           id?: string
           is_active?: boolean | null
-          is_discontinued?: boolean | null
           is_focused_product?: boolean | null
-          last_cost_update?: string | null
-          manufacturer?: string | null
           name?: string
           net_volume_ml?: number | null
           net_weight_g?: number | null
-          opening_stock?: number | null
-          packaging_weight_g?: number | null
           price_basis_uom_id?: string | null
-          primary_supplier_id?: string | null
           product_number?: string | null
-          product_type?: string | null
           qr_code?: string | null
           rate?: number
-          reorder_level?: number | null
-          reorder_quantity?: number | null
           sku?: string
           sku_image_url?: string | null
-          standard_cost?: number | null
-          tax_master_id?: string | null
           unit?: string
           updated_at?: string
-          updated_by?: string | null
         }
         Relationships: [
           {
@@ -16271,13 +14684,6 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "product_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_tax_master_id_fkey"
-            columns: ["tax_master_id"]
-            isOneToOne: false
-            referencedRelation: "tax_masters"
             referencedColumns: ["id"]
           },
         ]
@@ -16323,46 +14729,46 @@ export type Database = {
       }
       profile_object_permissions: {
         Row: {
-          can_create: boolean | null
-          can_delete: boolean | null
-          can_edit: boolean | null
-          can_modify_all: boolean | null
-          can_read: boolean | null
-          can_view_all: boolean | null
-          created_at: string | null
+          can_create: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_modify_all: boolean
+          can_read: boolean
+          can_view_all: boolean
+          created_at: string
           id: string
           object_name: string
           parent_module: string | null
           permission_type: string
-          profile_id: string | null
+          profile_id: string
         }
         Insert: {
-          can_create?: boolean | null
-          can_delete?: boolean | null
-          can_edit?: boolean | null
-          can_modify_all?: boolean | null
-          can_read?: boolean | null
-          can_view_all?: boolean | null
-          created_at?: string | null
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_modify_all?: boolean
+          can_read?: boolean
+          can_view_all?: boolean
+          created_at?: string
           id?: string
           object_name: string
           parent_module?: string | null
           permission_type?: string
-          profile_id?: string | null
+          profile_id: string
         }
         Update: {
-          can_create?: boolean | null
-          can_delete?: boolean | null
-          can_edit?: boolean | null
-          can_modify_all?: boolean | null
-          can_read?: boolean | null
-          can_view_all?: boolean | null
-          created_at?: string | null
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_modify_all?: boolean
+          can_read?: boolean
+          can_view_all?: boolean
+          created_at?: string
           id?: string
           object_name?: string
           parent_module?: string | null
           permission_type?: string
-          profile_id?: string | null
+          profile_id?: string
         }
         Relationships: [
           {
@@ -16386,13 +14792,12 @@ export type Database = {
           emergency_contact_phone: string | null
           facebook_url: string | null
           full_name: string
-          hint_answer: string | null
-          hint_question: string | null
+          hint_answer: string
+          hint_question: string
           id: string
           instagram_url: string | null
           interests: string[] | null
           invitation_token: string | null
-          is_active: boolean
           learning_goals: string[] | null
           linkedin_url: string | null
           must_change_password: boolean | null
@@ -16422,13 +14827,12 @@ export type Database = {
           emergency_contact_phone?: string | null
           facebook_url?: string | null
           full_name: string
-          hint_answer?: string | null
-          hint_question?: string | null
+          hint_answer: string
+          hint_question: string
           id: string
           instagram_url?: string | null
           interests?: string[] | null
           invitation_token?: string | null
-          is_active?: boolean
           learning_goals?: string[] | null
           linkedin_url?: string | null
           must_change_password?: boolean | null
@@ -16458,13 +14862,12 @@ export type Database = {
           emergency_contact_phone?: string | null
           facebook_url?: string | null
           full_name?: string
-          hint_answer?: string | null
-          hint_question?: string | null
+          hint_answer?: string
+          hint_question?: string
           id?: string
           instagram_url?: string | null
           interests?: string[] | null
           invitation_token?: string | null
-          is_active?: boolean
           learning_goals?: string[] | null
           linkedin_url?: string | null
           must_change_password?: boolean | null
@@ -16483,15 +14886,7 @@ export type Database = {
           username?: string
           work_location?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "role_definitions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       push_config: {
         Row: {
@@ -16681,3693 +15076,6 @@ export type Database = {
           platform?: string
           token?: string
           updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_activity_attachments: {
-        Row: {
-          activity_event_id: string
-          created_at: string
-          file_name: string | null
-          file_path: string
-          file_size: number | null
-          file_type: string | null
-          id: string
-          qa_run_id: string | null
-          uploaded_by: string | null
-        }
-        Insert: {
-          activity_event_id: string
-          created_at?: string
-          file_name?: string | null
-          file_path: string
-          file_size?: number | null
-          file_type?: string | null
-          id?: string
-          qa_run_id?: string | null
-          uploaded_by?: string | null
-        }
-        Update: {
-          activity_event_id?: string
-          created_at?: string
-          file_name?: string | null
-          file_path?: string
-          file_size?: number | null
-          file_type?: string | null
-          id?: string
-          qa_run_id?: string | null
-          uploaded_by?: string | null
-        }
-        Relationships: []
-      }
-      qa_activity_events: {
-        Row: {
-          activity_date: string
-          activity_name: string | null
-          activity_place: string | null
-          activity_sub_type: string | null
-          activity_type: string
-          actual_footfall: number | null
-          attendee_count: number | null
-          beat_id: string | null
-          beat_name: string | null
-          budget: number | null
-          check_in_latitude: number | null
-          check_in_longitude: number | null
-          check_in_time: string | null
-          check_out_time: string | null
-          collective_target: number | null
-          comments: string | null
-          completed_at: string | null
-          contact_person: string | null
-          created_at: string
-          description: string | null
-          distributor_id: string | null
-          distributor_name: string | null
-          duration_minutes: number | null
-          duration_type: string
-          end_latitude: number | null
-          end_longitude: number | null
-          end_time: string | null
-          event_name: string | null
-          expected_footfall: string | null
-          follow_up_date: string | null
-          from_date: string | null
-          half_day_type: string | null
-          id: string
-          individual_target: number | null
-          joint_session_id: string | null
-          km_travelled: number | null
-          landmark: string | null
-          location: string | null
-          outcome: string | null
-          price_book_id: string | null
-          qa_run_id: string | null
-          remarks: string | null
-          rep_action_items: string | null
-          rep_followup_date: string | null
-          rep_improvement_areas: string | null
-          rep_overall_outcome: string | null
-          rep_rating_branding: number | null
-          rep_rating_market_intel: number | null
-          rep_rating_product_knowledge: number | null
-          rep_rating_retailer_relationship: number | null
-          rep_rating_scheme_communication: number | null
-          rep_strengths: string | null
-          retailer_id: string | null
-          retailer_name: string | null
-          sales_achieved: number | null
-          sales_reps: string[] | null
-          sales_target: number | null
-          shops_planned: number | null
-          shops_visited: number | null
-          start_latitude: number | null
-          start_longitude: number | null
-          start_time: string | null
-          status: string
-          subordinate_user_id: string | null
-          survey_competition_brands: string | null
-          survey_competitor_count: number | null
-          survey_estimated_monthly_value: number | null
-          survey_market_type: string | null
-          survey_observations: string | null
-          survey_our_stock_shops: number | null
-          survey_priority: string | null
-          survey_proposed_beat_names: string[] | null
-          survey_recommendation: string | null
-          survey_shops_per_beat: number | null
-          survey_suggested_beat_count: number | null
-          survey_target_shops: number | null
-          survey_total_shops: number | null
-          target_mode: string | null
-          to_date: string | null
-          topic: string | null
-          total_days: number | null
-          user_id: string
-          visit_category: string | null
-          visit_id: string | null
-          visit_purpose: string | null
-        }
-        Insert: {
-          activity_date?: string
-          activity_name?: string | null
-          activity_place?: string | null
-          activity_sub_type?: string | null
-          activity_type?: string
-          actual_footfall?: number | null
-          attendee_count?: number | null
-          beat_id?: string | null
-          beat_name?: string | null
-          budget?: number | null
-          check_in_latitude?: number | null
-          check_in_longitude?: number | null
-          check_in_time?: string | null
-          check_out_time?: string | null
-          collective_target?: number | null
-          comments?: string | null
-          completed_at?: string | null
-          contact_person?: string | null
-          created_at?: string
-          description?: string | null
-          distributor_id?: string | null
-          distributor_name?: string | null
-          duration_minutes?: number | null
-          duration_type?: string
-          end_latitude?: number | null
-          end_longitude?: number | null
-          end_time?: string | null
-          event_name?: string | null
-          expected_footfall?: string | null
-          follow_up_date?: string | null
-          from_date?: string | null
-          half_day_type?: string | null
-          id?: string
-          individual_target?: number | null
-          joint_session_id?: string | null
-          km_travelled?: number | null
-          landmark?: string | null
-          location?: string | null
-          outcome?: string | null
-          price_book_id?: string | null
-          qa_run_id?: string | null
-          remarks?: string | null
-          rep_action_items?: string | null
-          rep_followup_date?: string | null
-          rep_improvement_areas?: string | null
-          rep_overall_outcome?: string | null
-          rep_rating_branding?: number | null
-          rep_rating_market_intel?: number | null
-          rep_rating_product_knowledge?: number | null
-          rep_rating_retailer_relationship?: number | null
-          rep_rating_scheme_communication?: number | null
-          rep_strengths?: string | null
-          retailer_id?: string | null
-          retailer_name?: string | null
-          sales_achieved?: number | null
-          sales_reps?: string[] | null
-          sales_target?: number | null
-          shops_planned?: number | null
-          shops_visited?: number | null
-          start_latitude?: number | null
-          start_longitude?: number | null
-          start_time?: string | null
-          status?: string
-          subordinate_user_id?: string | null
-          survey_competition_brands?: string | null
-          survey_competitor_count?: number | null
-          survey_estimated_monthly_value?: number | null
-          survey_market_type?: string | null
-          survey_observations?: string | null
-          survey_our_stock_shops?: number | null
-          survey_priority?: string | null
-          survey_proposed_beat_names?: string[] | null
-          survey_recommendation?: string | null
-          survey_shops_per_beat?: number | null
-          survey_suggested_beat_count?: number | null
-          survey_target_shops?: number | null
-          survey_total_shops?: number | null
-          target_mode?: string | null
-          to_date?: string | null
-          topic?: string | null
-          total_days?: number | null
-          user_id: string
-          visit_category?: string | null
-          visit_id?: string | null
-          visit_purpose?: string | null
-        }
-        Update: {
-          activity_date?: string
-          activity_name?: string | null
-          activity_place?: string | null
-          activity_sub_type?: string | null
-          activity_type?: string
-          actual_footfall?: number | null
-          attendee_count?: number | null
-          beat_id?: string | null
-          beat_name?: string | null
-          budget?: number | null
-          check_in_latitude?: number | null
-          check_in_longitude?: number | null
-          check_in_time?: string | null
-          check_out_time?: string | null
-          collective_target?: number | null
-          comments?: string | null
-          completed_at?: string | null
-          contact_person?: string | null
-          created_at?: string
-          description?: string | null
-          distributor_id?: string | null
-          distributor_name?: string | null
-          duration_minutes?: number | null
-          duration_type?: string
-          end_latitude?: number | null
-          end_longitude?: number | null
-          end_time?: string | null
-          event_name?: string | null
-          expected_footfall?: string | null
-          follow_up_date?: string | null
-          from_date?: string | null
-          half_day_type?: string | null
-          id?: string
-          individual_target?: number | null
-          joint_session_id?: string | null
-          km_travelled?: number | null
-          landmark?: string | null
-          location?: string | null
-          outcome?: string | null
-          price_book_id?: string | null
-          qa_run_id?: string | null
-          remarks?: string | null
-          rep_action_items?: string | null
-          rep_followup_date?: string | null
-          rep_improvement_areas?: string | null
-          rep_overall_outcome?: string | null
-          rep_rating_branding?: number | null
-          rep_rating_market_intel?: number | null
-          rep_rating_product_knowledge?: number | null
-          rep_rating_retailer_relationship?: number | null
-          rep_rating_scheme_communication?: number | null
-          rep_strengths?: string | null
-          retailer_id?: string | null
-          retailer_name?: string | null
-          sales_achieved?: number | null
-          sales_reps?: string[] | null
-          sales_target?: number | null
-          shops_planned?: number | null
-          shops_visited?: number | null
-          start_latitude?: number | null
-          start_longitude?: number | null
-          start_time?: string | null
-          status?: string
-          subordinate_user_id?: string | null
-          survey_competition_brands?: string | null
-          survey_competitor_count?: number | null
-          survey_estimated_monthly_value?: number | null
-          survey_market_type?: string | null
-          survey_observations?: string | null
-          survey_our_stock_shops?: number | null
-          survey_priority?: string | null
-          survey_proposed_beat_names?: string[] | null
-          survey_recommendation?: string | null
-          survey_shops_per_beat?: number | null
-          survey_suggested_beat_count?: number | null
-          survey_target_shops?: number | null
-          survey_total_shops?: number | null
-          target_mode?: string | null
-          to_date?: string | null
-          topic?: string | null
-          total_days?: number | null
-          user_id?: string
-          visit_category?: string | null
-          visit_id?: string | null
-          visit_purpose?: string | null
-        }
-        Relationships: []
-      }
-      qa_ai_feature_feedback: {
-        Row: {
-          created_at: string | null
-          feature: string
-          feedback_type: string
-          id: string
-          qa_run_id: string | null
-          retailer_id: string | null
-          user_id: string | null
-          visit_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          feature: string
-          feedback_type: string
-          id?: string
-          qa_run_id?: string | null
-          retailer_id?: string | null
-          user_id?: string | null
-          visit_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          feature?: string
-          feedback_type?: string
-          id?: string
-          qa_run_id?: string | null
-          retailer_id?: string | null
-          user_id?: string | null
-          visit_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_attendance: {
-        Row: {
-          check_in_address: string | null
-          check_in_location: Json | null
-          check_in_photo_url: string | null
-          check_in_time: string | null
-          check_out_address: string | null
-          check_out_location: Json | null
-          check_out_photo_url: string | null
-          check_out_time: string | null
-          created_at: string
-          date: string
-          face_match_confidence: number | null
-          face_match_confidence_out: number | null
-          face_verification_status: string | null
-          face_verification_status_out: string | null
-          id: string
-          locked: boolean
-          locked_at: string | null
-          locked_by: string | null
-          manual_override_reason: string | null
-          notes: string | null
-          qa_run_id: string | null
-          regularized_request_id: string | null
-          status: string
-          total_hours: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          check_in_address?: string | null
-          check_in_location?: Json | null
-          check_in_photo_url?: string | null
-          check_in_time?: string | null
-          check_out_address?: string | null
-          check_out_location?: Json | null
-          check_out_photo_url?: string | null
-          check_out_time?: string | null
-          created_at?: string
-          date?: string
-          face_match_confidence?: number | null
-          face_match_confidence_out?: number | null
-          face_verification_status?: string | null
-          face_verification_status_out?: string | null
-          id?: string
-          locked?: boolean
-          locked_at?: string | null
-          locked_by?: string | null
-          manual_override_reason?: string | null
-          notes?: string | null
-          qa_run_id?: string | null
-          regularized_request_id?: string | null
-          status?: string
-          total_hours?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          check_in_address?: string | null
-          check_in_location?: Json | null
-          check_in_photo_url?: string | null
-          check_in_time?: string | null
-          check_out_address?: string | null
-          check_out_location?: Json | null
-          check_out_photo_url?: string | null
-          check_out_time?: string | null
-          created_at?: string
-          date?: string
-          face_match_confidence?: number | null
-          face_match_confidence_out?: number | null
-          face_verification_status?: string | null
-          face_verification_status_out?: string | null
-          id?: string
-          locked?: boolean
-          locked_at?: string | null
-          locked_by?: string | null
-          manual_override_reason?: string | null
-          notes?: string | null
-          qa_run_id?: string | null
-          regularized_request_id?: string | null
-          status?: string
-          total_hours?: number | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_beat_allowances: {
-        Row: {
-          average_km: number | null
-          average_time_minutes: number | null
-          beat_id: string
-          beat_name: string
-          created_at: string
-          daily_allowance: number
-          id: string
-          qa_run_id: string | null
-          travel_allowance: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          average_km?: number | null
-          average_time_minutes?: number | null
-          beat_id: string
-          beat_name: string
-          created_at?: string
-          daily_allowance?: number
-          id?: string
-          qa_run_id?: string | null
-          travel_allowance?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          average_km?: number | null
-          average_time_minutes?: number | null
-          beat_id?: string
-          beat_name?: string
-          created_at?: string
-          daily_allowance?: number
-          id?: string
-          qa_run_id?: string | null
-          travel_allowance?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_beat_audit_log: {
-        Row: {
-          action: string
-          beat_id: string
-          created_at: string | null
-          id: string
-          metadata: Json | null
-          new_user_id: string | null
-          old_user_id: string | null
-          performed_by: string
-          qa_run_id: string | null
-        }
-        Insert: {
-          action: string
-          beat_id: string
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          new_user_id?: string | null
-          old_user_id?: string | null
-          performed_by: string
-          qa_run_id?: string | null
-        }
-        Update: {
-          action?: string
-          beat_id?: string
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          new_user_id?: string | null
-          old_user_id?: string | null
-          performed_by?: string
-          qa_run_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_beat_plans: {
-        Row: {
-          beat_data: Json
-          beat_id: string
-          beat_name: string
-          created_at: string
-          id: string
-          joint_sales_manager_id: string | null
-          plan_date: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          beat_data?: Json
-          beat_id: string
-          beat_name: string
-          created_at?: string
-          id?: string
-          joint_sales_manager_id?: string | null
-          plan_date: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          beat_data?: Json
-          beat_id?: string
-          beat_name?: string
-          created_at?: string
-          id?: string
-          joint_sales_manager_id?: string | null
-          plan_date?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_beats: {
-        Row: {
-          average_km: number | null
-          average_time_minutes: number | null
-          beat_id: string
-          beat_name: string
-          category: string | null
-          created_at: string
-          created_by: string | null
-          deactivated_at: string | null
-          deactivated_by: string | null
-          distributor_id: string | null
-          id: string
-          is_active: boolean | null
-          owner_id: string | null
-          owner_name: string | null
-          reactivated_at: string | null
-          reactivated_by: string | null
-          territory_id: string | null
-          transferred_at: string | null
-          transferred_by: string | null
-          travel_allowance: number | null
-          updated_at: string
-          updated_by: string | null
-          user_id: string | null
-        }
-        Insert: {
-          average_km?: number | null
-          average_time_minutes?: number | null
-          beat_id?: string
-          beat_name: string
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          deactivated_at?: string | null
-          deactivated_by?: string | null
-          distributor_id?: string | null
-          id?: string
-          is_active?: boolean | null
-          owner_id?: string | null
-          owner_name?: string | null
-          reactivated_at?: string | null
-          reactivated_by?: string | null
-          territory_id?: string | null
-          transferred_at?: string | null
-          transferred_by?: string | null
-          travel_allowance?: number | null
-          updated_at?: string
-          updated_by?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          average_km?: number | null
-          average_time_minutes?: number | null
-          beat_id?: string
-          beat_name?: string
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          deactivated_at?: string | null
-          deactivated_by?: string | null
-          distributor_id?: string | null
-          id?: string
-          is_active?: boolean | null
-          owner_id?: string | null
-          owner_name?: string | null
-          reactivated_at?: string | null
-          reactivated_by?: string | null
-          territory_id?: string | null
-          transferred_at?: string | null
-          transferred_by?: string | null
-          travel_allowance?: number | null
-          updated_at?: string
-          updated_by?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_custom_tests: {
-        Row: {
-          ai_plan: string | null
-          ai_result: string | null
-          created_at: string
-          created_by: string | null
-          error_message: string | null
-          id: string
-          page_context: string | null
-          pass: boolean | null
-          prompt: string
-          run_at: string | null
-          status: string
-          steps_taken: Json | null
-          test_run_id: string | null
-        }
-        Insert: {
-          ai_plan?: string | null
-          ai_result?: string | null
-          created_at?: string
-          created_by?: string | null
-          error_message?: string | null
-          id?: string
-          page_context?: string | null
-          pass?: boolean | null
-          prompt: string
-          run_at?: string | null
-          status?: string
-          steps_taken?: Json | null
-          test_run_id?: string | null
-        }
-        Update: {
-          ai_plan?: string | null
-          ai_result?: string | null
-          created_at?: string
-          created_by?: string | null
-          error_message?: string | null
-          id?: string
-          page_context?: string | null
-          pass?: boolean | null
-          prompt?: string
-          run_at?: string | null
-          status?: string
-          steps_taken?: Json | null
-          test_run_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_daily_beat_plans: {
-        Row: {
-          assigned_by: string
-          assigned_user_id: string
-          assignment_type: string
-          beat_id: string
-          created_at: string
-          id: string
-          notes: string | null
-          plan_date: string
-          status: string
-        }
-        Insert: {
-          assigned_by: string
-          assigned_user_id: string
-          assignment_type: string
-          beat_id: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          plan_date: string
-          status?: string
-        }
-        Update: {
-          assigned_by?: string
-          assigned_user_id?: string
-          assignment_type?: string
-          beat_id?: string
-          created_at?: string
-          id?: string
-          notes?: string | null
-          plan_date?: string
-          status?: string
-        }
-        Relationships: []
-      }
-      qa_distributor_attachments: {
-        Row: {
-          created_at: string | null
-          distributor_id: string | null
-          file_name: string
-          file_size: number | null
-          file_type: string | null
-          file_url: string
-          id: string
-          qa_run_id: string | null
-          uploaded_by: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          distributor_id?: string | null
-          file_name: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url: string
-          id?: string
-          qa_run_id?: string | null
-          uploaded_by?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          distributor_id?: string | null
-          file_name?: string
-          file_size?: number | null
-          file_type?: string | null
-          file_url?: string
-          id?: string
-          qa_run_id?: string | null
-          uploaded_by?: string | null
-        }
-        Relationships: []
-      }
-      qa_distributor_business_plan_month_products: {
-        Row: {
-          business_plan_id: string
-          created_at: string
-          id: string
-          month_name: string
-          month_number: number
-          percentage: number
-          product_id: string
-          product_name: string
-          qa_run_id: string | null
-          quantity_target: number | null
-          revenue_target: number | null
-          updated_at: string
-        }
-        Insert: {
-          business_plan_id: string
-          created_at?: string
-          id?: string
-          month_name: string
-          month_number: number
-          percentage?: number
-          product_id: string
-          product_name: string
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          revenue_target?: number | null
-          updated_at?: string
-        }
-        Update: {
-          business_plan_id?: string
-          created_at?: string
-          id?: string
-          month_name?: string
-          month_number?: number
-          percentage?: number
-          product_id?: string
-          product_name?: string
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          revenue_target?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      qa_distributor_business_plan_months: {
-        Row: {
-          business_plan_id: string
-          created_at: string
-          id: string
-          month_name: string
-          month_number: number
-          qa_run_id: string | null
-          quantity_target: number | null
-          target_revenue: number | null
-          updated_at: string
-        }
-        Insert: {
-          business_plan_id: string
-          created_at?: string
-          id?: string
-          month_name: string
-          month_number: number
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          target_revenue?: number | null
-          updated_at?: string
-        }
-        Update: {
-          business_plan_id?: string
-          created_at?: string
-          id?: string
-          month_name?: string
-          month_number?: number
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          target_revenue?: number | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      qa_distributor_business_plan_products: {
-        Row: {
-          business_plan_id: string
-          created_at: string
-          id: string
-          product_id: string
-          product_name: string
-          qa_run_id: string | null
-          quantity_target: number | null
-          revenue_target: number | null
-        }
-        Insert: {
-          business_plan_id: string
-          created_at?: string
-          id?: string
-          product_id: string
-          product_name: string
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          revenue_target?: number | null
-        }
-        Update: {
-          business_plan_id?: string
-          created_at?: string
-          id?: string
-          product_id?: string
-          product_name?: string
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          revenue_target?: number | null
-        }
-        Relationships: []
-      }
-      qa_distributor_business_plan_retailers: {
-        Row: {
-          business_plan_id: string
-          created_at: string
-          growth_percent: number | null
-          id: string
-          last_year_revenue: number | null
-          qa_run_id: string | null
-          quantity_target: number | null
-          retailer_id: string
-          retailer_name: string
-          target_revenue: number | null
-        }
-        Insert: {
-          business_plan_id: string
-          created_at?: string
-          growth_percent?: number | null
-          id?: string
-          last_year_revenue?: number | null
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          retailer_id: string
-          retailer_name: string
-          target_revenue?: number | null
-        }
-        Update: {
-          business_plan_id?: string
-          created_at?: string
-          growth_percent?: number | null
-          id?: string
-          last_year_revenue?: number | null
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          retailer_id?: string
-          retailer_name?: string
-          target_revenue?: number | null
-        }
-        Relationships: []
-      }
-      qa_distributor_business_plans: {
-        Row: {
-          coverage_target: string | null
-          created_at: string
-          distributor_id: string
-          id: string
-          notes: string | null
-          qa_run_id: string | null
-          quantity_target: number | null
-          quantity_unit: string | null
-          revenue_target: number | null
-          territory_target: string | null
-          updated_at: string
-          year: number
-        }
-        Insert: {
-          coverage_target?: string | null
-          created_at?: string
-          distributor_id: string
-          id?: string
-          notes?: string | null
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          quantity_unit?: string | null
-          revenue_target?: number | null
-          territory_target?: string | null
-          updated_at?: string
-          year: number
-        }
-        Update: {
-          coverage_target?: string | null
-          created_at?: string
-          distributor_id?: string
-          id?: string
-          notes?: string | null
-          qa_run_id?: string | null
-          quantity_target?: number | null
-          quantity_unit?: string | null
-          revenue_target?: number | null
-          territory_target?: string | null
-          updated_at?: string
-          year?: number
-        }
-        Relationships: []
-      }
-      qa_distributor_contacts: {
-        Row: {
-          address: string | null
-          birth_date: string | null
-          contact_name: string
-          created_at: string | null
-          designation: string | null
-          distributor_id: string | null
-          email: string | null
-          id: string
-          is_active: boolean | null
-          is_primary: boolean | null
-          phone: string | null
-          qa_run_id: string | null
-          reports_to: string | null
-          role: string | null
-          seniority: string | null
-          updated_at: string | null
-          years_of_experience: number | null
-          years_with_distributor: number | null
-        }
-        Insert: {
-          address?: string | null
-          birth_date?: string | null
-          contact_name: string
-          created_at?: string | null
-          designation?: string | null
-          distributor_id?: string | null
-          email?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_primary?: boolean | null
-          phone?: string | null
-          qa_run_id?: string | null
-          reports_to?: string | null
-          role?: string | null
-          seniority?: string | null
-          updated_at?: string | null
-          years_of_experience?: number | null
-          years_with_distributor?: number | null
-        }
-        Update: {
-          address?: string | null
-          birth_date?: string | null
-          contact_name?: string
-          created_at?: string | null
-          designation?: string | null
-          distributor_id?: string | null
-          email?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_primary?: boolean | null
-          phone?: string | null
-          qa_run_id?: string | null
-          reports_to?: string | null
-          role?: string | null
-          seniority?: string | null
-          updated_at?: string | null
-          years_of_experience?: number | null
-          years_with_distributor?: number | null
-        }
-        Relationships: []
-      }
-      qa_distributor_evaluation_tasks: {
-        Row: {
-          attachment_urls: string[] | null
-          completed_date: string | null
-          created_at: string
-          created_by: string | null
-          distributor_id: string
-          due_date: string | null
-          id: string
-          notes: string | null
-          owner_user_id: string | null
-          qa_run_id: string | null
-          status: string
-          task_key: string
-          task_label: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          attachment_urls?: string[] | null
-          completed_date?: string | null
-          created_at?: string
-          created_by?: string | null
-          distributor_id: string
-          due_date?: string | null
-          id?: string
-          notes?: string | null
-          owner_user_id?: string | null
-          qa_run_id?: string | null
-          status?: string
-          task_key: string
-          task_label: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          attachment_urls?: string[] | null
-          completed_date?: string | null
-          created_at?: string
-          created_by?: string | null
-          distributor_id?: string
-          due_date?: string | null
-          id?: string
-          notes?: string | null
-          owner_user_id?: string | null
-          qa_run_id?: string | null
-          status?: string
-          task_key?: string
-          task_label?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
-      qa_distributor_payment_config: {
-        Row: {
-          advance_payment_pct: number
-          allow_orders_beyond_limit: boolean
-          allowed_payment_modes: string[]
-          allowed_payment_terms: string[]
-          approval_required_beyond_limit: boolean
-          approval_required_high_risk: boolean
-          created_at: string
-          credit_allowed: boolean
-          credit_limit: number
-          credit_warning_threshold_pct: number
-          default_payment_mode: string
-          default_payment_term: string
-          distributor_id: string
-          id: string
-          max_outstanding_allowed: number | null
-          max_overdue_days: number | null
-          overdue_blocking_enabled: boolean
-          qa_run_id: string | null
-          require_advance_payment: boolean
-          require_payment_proof: boolean
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          advance_payment_pct?: number
-          allow_orders_beyond_limit?: boolean
-          allowed_payment_modes?: string[]
-          allowed_payment_terms?: string[]
-          approval_required_beyond_limit?: boolean
-          approval_required_high_risk?: boolean
-          created_at?: string
-          credit_allowed?: boolean
-          credit_limit?: number
-          credit_warning_threshold_pct?: number
-          default_payment_mode?: string
-          default_payment_term?: string
-          distributor_id: string
-          id?: string
-          max_outstanding_allowed?: number | null
-          max_overdue_days?: number | null
-          overdue_blocking_enabled?: boolean
-          qa_run_id?: string | null
-          require_advance_payment?: boolean
-          require_payment_proof?: boolean
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          advance_payment_pct?: number
-          allow_orders_beyond_limit?: boolean
-          allowed_payment_modes?: string[]
-          allowed_payment_terms?: string[]
-          approval_required_beyond_limit?: boolean
-          approval_required_high_risk?: boolean
-          created_at?: string
-          credit_allowed?: boolean
-          credit_limit?: number
-          credit_warning_threshold_pct?: number
-          default_payment_mode?: string
-          default_payment_term?: string
-          distributor_id?: string
-          id?: string
-          max_outstanding_allowed?: number | null
-          max_overdue_days?: number | null
-          overdue_blocking_enabled?: boolean
-          qa_run_id?: string | null
-          require_advance_payment?: boolean
-          require_payment_proof?: boolean
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
-      qa_distributor_payments: {
-        Row: {
-          amount: number
-          bank_name: string | null
-          cheque_date: string | null
-          cheque_number: string | null
-          collected_by_user_id: string | null
-          created_at: string
-          created_by: string | null
-          distributor_id: string
-          id: string
-          notes: string | null
-          operational_snapshot_user_id: string | null
-          owner_snapshot_user_id: string | null
-          payment_date: string
-          payment_mode: string
-          qa_run_id: string | null
-          receipt_number: string | null
-          reference_number: string | null
-          retailer_id: string
-          sales_credit_user_id: string | null
-          status: string
-          unallocated_amount: number
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          bank_name?: string | null
-          cheque_date?: string | null
-          cheque_number?: string | null
-          collected_by_user_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          distributor_id: string
-          id?: string
-          notes?: string | null
-          operational_snapshot_user_id?: string | null
-          owner_snapshot_user_id?: string | null
-          payment_date?: string
-          payment_mode?: string
-          qa_run_id?: string | null
-          receipt_number?: string | null
-          reference_number?: string | null
-          retailer_id: string
-          sales_credit_user_id?: string | null
-          status?: string
-          unallocated_amount?: number
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          bank_name?: string | null
-          cheque_date?: string | null
-          cheque_number?: string | null
-          collected_by_user_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          distributor_id?: string
-          id?: string
-          notes?: string | null
-          operational_snapshot_user_id?: string | null
-          owner_snapshot_user_id?: string | null
-          payment_date?: string
-          payment_mode?: string
-          qa_run_id?: string | null
-          receipt_number?: string | null
-          reference_number?: string | null
-          retailer_id?: string
-          sales_credit_user_id?: string | null
-          status?: string
-          unallocated_amount?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      qa_distributor_price_books: {
-        Row: {
-          assigned_at: string
-          assigned_by: string | null
-          created_at: string
-          deactivated_at: string | null
-          distributor_id: string
-          id: string
-          is_active: boolean | null
-          price_book_id: string
-          qa_run_id: string | null
-        }
-        Insert: {
-          assigned_at?: string
-          assigned_by?: string | null
-          created_at?: string
-          deactivated_at?: string | null
-          distributor_id: string
-          id?: string
-          is_active?: boolean | null
-          price_book_id: string
-          qa_run_id?: string | null
-        }
-        Update: {
-          assigned_at?: string
-          assigned_by?: string | null
-          created_at?: string
-          deactivated_at?: string | null
-          distributor_id?: string
-          id?: string
-          is_active?: boolean | null
-          price_book_id?: string
-          qa_run_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_distributor_users: {
-        Row: {
-          approved_at: string | null
-          approved_by: string | null
-          auth_user_id: string | null
-          can_deliver: boolean
-          created_at: string
-          designation: string | null
-          distributor_id: string
-          email: string
-          email_sent_at: string | null
-          full_name: string
-          id: string
-          is_active: boolean
-          last_login_at: string | null
-          password_set_at: string | null
-          phone: string | null
-          qa_run_id: string | null
-          requested_at: string | null
-          role: string
-          updated_at: string
-          user_level: string | null
-          user_status: string
-        }
-        Insert: {
-          approved_at?: string | null
-          approved_by?: string | null
-          auth_user_id?: string | null
-          can_deliver?: boolean
-          created_at?: string
-          designation?: string | null
-          distributor_id: string
-          email: string
-          email_sent_at?: string | null
-          full_name: string
-          id?: string
-          is_active?: boolean
-          last_login_at?: string | null
-          password_set_at?: string | null
-          phone?: string | null
-          qa_run_id?: string | null
-          requested_at?: string | null
-          role?: string
-          updated_at?: string
-          user_level?: string | null
-          user_status?: string
-        }
-        Update: {
-          approved_at?: string | null
-          approved_by?: string | null
-          auth_user_id?: string | null
-          can_deliver?: boolean
-          created_at?: string
-          designation?: string | null
-          distributor_id?: string
-          email?: string
-          email_sent_at?: string | null
-          full_name?: string
-          id?: string
-          is_active?: boolean
-          last_login_at?: string | null
-          password_set_at?: string | null
-          phone?: string | null
-          qa_run_id?: string | null
-          requested_at?: string | null
-          role?: string
-          updated_at?: string
-          user_level?: string | null
-          user_status?: string
-        }
-        Relationships: []
-      }
-      qa_distributors: {
-        Row: {
-          about_business: string | null
-          account_holder_name: string | null
-          address: string | null
-          annual_revenue: number | null
-          assets_trucks: number | null
-          assets_vans: number | null
-          bank_account: string | null
-          bank_name: string | null
-          business_hunger: string | null
-          competition_products: string[] | null
-          contact_person: string
-          coverage_area: string | null
-          created_at: string
-          credit_limit: number | null
-          currency: string
-          date_format: string
-          distribution_experience_years: number | null
-          distribution_level: string | null
-          distributor_status: string | null
-          drop_reason: string | null
-          email: string | null
-          established_year: number | null
-          evaluation_checklist: Json | null
-          gst_number: string | null
-          id: string
-          ifsc: string | null
-          logo_url: string | null
-          name: string
-          network_retailers_count: number | null
-          onboarding_date: string | null
-          opportunities: string | null
-          other_products: string[] | null
-          outstanding_amount: number | null
-          owner_id: string | null
-          owner_name: string | null
-          parent_id: string | null
-          parent_type: string | null
-          partnership_status: string | null
-          phone: string
-          products_distributed: string[] | null
-          profitability: string | null
-          qa_run_id: string | null
-          qr_code_url: string | null
-          qr_upi: string | null
-          region_coverage: string | null
-          sales_team_size: number | null
-          state: string | null
-          status: string
-          strength: string | null
-          terms_conditions: string | null
-          territory_id: string | null
-          threats: string | null
-          timezone: string
-          type_id: string | null
-          updated_at: string
-          weakness: string | null
-          years_of_relationship: number | null
-        }
-        Insert: {
-          about_business?: string | null
-          account_holder_name?: string | null
-          address?: string | null
-          annual_revenue?: number | null
-          assets_trucks?: number | null
-          assets_vans?: number | null
-          bank_account?: string | null
-          bank_name?: string | null
-          business_hunger?: string | null
-          competition_products?: string[] | null
-          contact_person: string
-          coverage_area?: string | null
-          created_at?: string
-          credit_limit?: number | null
-          currency?: string
-          date_format?: string
-          distribution_experience_years?: number | null
-          distribution_level?: string | null
-          distributor_status?: string | null
-          drop_reason?: string | null
-          email?: string | null
-          established_year?: number | null
-          evaluation_checklist?: Json | null
-          gst_number?: string | null
-          id?: string
-          ifsc?: string | null
-          logo_url?: string | null
-          name: string
-          network_retailers_count?: number | null
-          onboarding_date?: string | null
-          opportunities?: string | null
-          other_products?: string[] | null
-          outstanding_amount?: number | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_id?: string | null
-          parent_type?: string | null
-          partnership_status?: string | null
-          phone: string
-          products_distributed?: string[] | null
-          profitability?: string | null
-          qa_run_id?: string | null
-          qr_code_url?: string | null
-          qr_upi?: string | null
-          region_coverage?: string | null
-          sales_team_size?: number | null
-          state?: string | null
-          status?: string
-          strength?: string | null
-          terms_conditions?: string | null
-          territory_id?: string | null
-          threats?: string | null
-          timezone?: string
-          type_id?: string | null
-          updated_at?: string
-          weakness?: string | null
-          years_of_relationship?: number | null
-        }
-        Update: {
-          about_business?: string | null
-          account_holder_name?: string | null
-          address?: string | null
-          annual_revenue?: number | null
-          assets_trucks?: number | null
-          assets_vans?: number | null
-          bank_account?: string | null
-          bank_name?: string | null
-          business_hunger?: string | null
-          competition_products?: string[] | null
-          contact_person?: string
-          coverage_area?: string | null
-          created_at?: string
-          credit_limit?: number | null
-          currency?: string
-          date_format?: string
-          distribution_experience_years?: number | null
-          distribution_level?: string | null
-          distributor_status?: string | null
-          drop_reason?: string | null
-          email?: string | null
-          established_year?: number | null
-          evaluation_checklist?: Json | null
-          gst_number?: string | null
-          id?: string
-          ifsc?: string | null
-          logo_url?: string | null
-          name?: string
-          network_retailers_count?: number | null
-          onboarding_date?: string | null
-          opportunities?: string | null
-          other_products?: string[] | null
-          outstanding_amount?: number | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_id?: string | null
-          parent_type?: string | null
-          partnership_status?: string | null
-          phone?: string
-          products_distributed?: string[] | null
-          profitability?: string | null
-          qa_run_id?: string | null
-          qr_code_url?: string | null
-          qr_upi?: string | null
-          region_coverage?: string | null
-          sales_team_size?: number | null
-          state?: string | null
-          status?: string
-          strength?: string | null
-          terms_conditions?: string | null
-          territory_id?: string | null
-          threats?: string | null
-          timezone?: string
-          type_id?: string | null
-          updated_at?: string
-          weakness?: string | null
-          years_of_relationship?: number | null
-        }
-        Relationships: []
-      }
-      qa_education_history: {
-        Row: {
-          activities: string | null
-          created_at: string | null
-          degree: string | null
-          field_of_study: string | null
-          from_date: string | null
-          grade: string | null
-          id: string
-          institution_name: string
-          qa_run_id: string | null
-          to_date: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          activities?: string | null
-          created_at?: string | null
-          degree?: string | null
-          field_of_study?: string | null
-          from_date?: string | null
-          grade?: string | null
-          id?: string
-          institution_name: string
-          qa_run_id?: string | null
-          to_date?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          activities?: string | null
-          created_at?: string | null
-          degree?: string | null
-          field_of_study?: string | null
-          from_date?: string | null
-          grade?: string | null
-          id?: string
-          institution_name?: string
-          qa_run_id?: string | null
-          to_date?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_emergency_contacts: {
-        Row: {
-          address: string | null
-          alternate_phone: string | null
-          contact_name: string
-          created_at: string | null
-          id: string
-          is_primary: boolean | null
-          phone: string | null
-          qa_run_id: string | null
-          relationship: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          address?: string | null
-          alternate_phone?: string | null
-          contact_name: string
-          created_at?: string | null
-          id?: string
-          is_primary?: boolean | null
-          phone?: string | null
-          qa_run_id?: string | null
-          relationship?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          address?: string | null
-          alternate_phone?: string | null
-          contact_name?: string
-          created_at?: string | null
-          id?: string
-          is_primary?: boolean | null
-          phone?: string | null
-          qa_run_id?: string | null
-          relationship?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_employee_connections: {
-        Row: {
-          created_at: string
-          follower_id: string
-          following_id: string
-          id: string
-          qa_run_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          follower_id: string
-          following_id: string
-          id?: string
-          qa_run_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          follower_id?: string
-          following_id?: string
-          id?: string
-          qa_run_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_employee_recommendations: {
-        Row: {
-          created_at: string
-          id: string
-          qa_run_id: string | null
-          recommendation_text: string
-          recommender_id: string
-          relationship: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          qa_run_id?: string | null
-          recommendation_text: string
-          recommender_id: string
-          relationship?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          qa_run_id?: string | null
-          recommendation_text?: string
-          recommender_id?: string
-          relationship?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_gps_tracking: {
-        Row: {
-          accuracy: number | null
-          created_at: string
-          date: string
-          heading: number | null
-          id: string
-          latitude: number
-          longitude: number
-          qa_run_id: string | null
-          speed: number | null
-          timestamp: string
-          user_id: string
-        }
-        Insert: {
-          accuracy?: number | null
-          created_at?: string
-          date?: string
-          heading?: number | null
-          id?: string
-          latitude: number
-          longitude: number
-          qa_run_id?: string | null
-          speed?: number | null
-          timestamp?: string
-          user_id: string
-        }
-        Update: {
-          accuracy?: number | null
-          created_at?: string
-          date?: string
-          heading?: number | null
-          id?: string
-          latitude?: number
-          longitude?: number
-          qa_run_id?: string | null
-          speed?: number | null
-          timestamp?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_gps_tracking_stops: {
-        Row: {
-          created_at: string
-          date: string
-          id: string
-          qa_run_id: string | null
-          reason: string
-          stopped_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          date?: string
-          id?: string
-          qa_run_id?: string | null
-          reason: string
-          stopped_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          date?: string
-          id?: string
-          qa_run_id?: string | null
-          reason?: string
-          stopped_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_inst_leads: {
-        Row: {
-          address: string | null
-          annual_potential_value: number | null
-          assigned_to: string | null
-          city: string | null
-          company_name: string
-          converted_account_id: string | null
-          created_at: string
-          created_by: string
-          email: string | null
-          id: string
-          industry_type: string | null
-          lead_name: string
-          lead_source: string | null
-          lead_status: string | null
-          notes: string | null
-          phone: string | null
-          pincode: string | null
-          qa_run_id: string | null
-          state: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          annual_potential_value?: number | null
-          assigned_to?: string | null
-          city?: string | null
-          company_name: string
-          converted_account_id?: string | null
-          created_at?: string
-          created_by: string
-          email?: string | null
-          id?: string
-          industry_type?: string | null
-          lead_name: string
-          lead_source?: string | null
-          lead_status?: string | null
-          notes?: string | null
-          phone?: string | null
-          pincode?: string | null
-          qa_run_id?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          annual_potential_value?: number | null
-          assigned_to?: string | null
-          city?: string | null
-          company_name?: string
-          converted_account_id?: string | null
-          created_at?: string
-          created_by?: string
-          email?: string | null
-          id?: string
-          industry_type?: string | null
-          lead_name?: string
-          lead_source?: string | null
-          lead_status?: string | null
-          notes?: string | null
-          phone?: string | null
-          pincode?: string | null
-          qa_run_id?: string | null
-          state?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      qa_joint_sales_feedback: {
-        Row: {
-          action_items: string | null
-          additional_notes: string | null
-          beat_plan_id: string | null
-          branding_rating: number | null
-          branding_status: string | null
-          competition_knowledge: string | null
-          competition_presence: string | null
-          competition_rating: number | null
-          consumer_feedback: string | null
-          conversation_highlights: string | null
-          created_at: string | null
-          distributor_feedback_rating: number | null
-          distributor_service: string | null
-          feedback_date: string
-          fse_user_id: string
-          future_growth_rating: number | null
-          growth_potential: string | null
-          id: string
-          joint_sales_impact: string | null
-          manager_id: string
-          monthly_potential_6months: number | null
-          new_products_introduced: string | null
-          order_increase_amount: number | null
-          placement_feedback: string | null
-          pricing_compliance: string | null
-          pricing_feedback: string | null
-          pricing_feedback_rating: number | null
-          product_feedback_rating: number | null
-          product_packaging_feedback: string | null
-          product_quality_feedback: string | null
-          product_sku_range_feedback: string | null
-          product_usp_feedback: string | null
-          promotion_vs_competition: string | null
-          qa_run_id: string | null
-          retailer_id: string
-          retailer_notes: string | null
-          retailing_feedback: string | null
-          retailing_rating: number | null
-          sales_increase_feedback: string | null
-          sales_trend: string | null
-          sales_trends_rating: number | null
-          sampling_rating: number | null
-          sampling_status: string | null
-          scheme_awareness: string | null
-          schemes_feedback: string | null
-          schemes_rating: number | null
-          service_feedback: string | null
-          shelf_visibility: string | null
-          trends_feedback: string | null
-          updated_at: string | null
-          visit_id: string | null
-          willingness_to_grow_range: string | null
-        }
-        Insert: {
-          action_items?: string | null
-          additional_notes?: string | null
-          beat_plan_id?: string | null
-          branding_rating?: number | null
-          branding_status?: string | null
-          competition_knowledge?: string | null
-          competition_presence?: string | null
-          competition_rating?: number | null
-          consumer_feedback?: string | null
-          conversation_highlights?: string | null
-          created_at?: string | null
-          distributor_feedback_rating?: number | null
-          distributor_service?: string | null
-          feedback_date?: string
-          fse_user_id: string
-          future_growth_rating?: number | null
-          growth_potential?: string | null
-          id?: string
-          joint_sales_impact?: string | null
-          manager_id: string
-          monthly_potential_6months?: number | null
-          new_products_introduced?: string | null
-          order_increase_amount?: number | null
-          placement_feedback?: string | null
-          pricing_compliance?: string | null
-          pricing_feedback?: string | null
-          pricing_feedback_rating?: number | null
-          product_feedback_rating?: number | null
-          product_packaging_feedback?: string | null
-          product_quality_feedback?: string | null
-          product_sku_range_feedback?: string | null
-          product_usp_feedback?: string | null
-          promotion_vs_competition?: string | null
-          qa_run_id?: string | null
-          retailer_id: string
-          retailer_notes?: string | null
-          retailing_feedback?: string | null
-          retailing_rating?: number | null
-          sales_increase_feedback?: string | null
-          sales_trend?: string | null
-          sales_trends_rating?: number | null
-          sampling_rating?: number | null
-          sampling_status?: string | null
-          scheme_awareness?: string | null
-          schemes_feedback?: string | null
-          schemes_rating?: number | null
-          service_feedback?: string | null
-          shelf_visibility?: string | null
-          trends_feedback?: string | null
-          updated_at?: string | null
-          visit_id?: string | null
-          willingness_to_grow_range?: string | null
-        }
-        Update: {
-          action_items?: string | null
-          additional_notes?: string | null
-          beat_plan_id?: string | null
-          branding_rating?: number | null
-          branding_status?: string | null
-          competition_knowledge?: string | null
-          competition_presence?: string | null
-          competition_rating?: number | null
-          consumer_feedback?: string | null
-          conversation_highlights?: string | null
-          created_at?: string | null
-          distributor_feedback_rating?: number | null
-          distributor_service?: string | null
-          feedback_date?: string
-          fse_user_id?: string
-          future_growth_rating?: number | null
-          growth_potential?: string | null
-          id?: string
-          joint_sales_impact?: string | null
-          manager_id?: string
-          monthly_potential_6months?: number | null
-          new_products_introduced?: string | null
-          order_increase_amount?: number | null
-          placement_feedback?: string | null
-          pricing_compliance?: string | null
-          pricing_feedback?: string | null
-          pricing_feedback_rating?: number | null
-          product_feedback_rating?: number | null
-          product_packaging_feedback?: string | null
-          product_quality_feedback?: string | null
-          product_sku_range_feedback?: string | null
-          product_usp_feedback?: string | null
-          promotion_vs_competition?: string | null
-          qa_run_id?: string | null
-          retailer_id?: string
-          retailer_notes?: string | null
-          retailing_feedback?: string | null
-          retailing_rating?: number | null
-          sales_increase_feedback?: string | null
-          sales_trend?: string | null
-          sales_trends_rating?: number | null
-          sampling_rating?: number | null
-          sampling_status?: string | null
-          scheme_awareness?: string | null
-          schemes_feedback?: string | null
-          schemes_rating?: number | null
-          service_feedback?: string | null
-          shelf_visibility?: string | null
-          trends_feedback?: string | null
-          updated_at?: string | null
-          visit_id?: string | null
-          willingness_to_grow_range?: string | null
-        }
-        Relationships: []
-      }
-      qa_joint_sales_sessions: {
-        Row: {
-          beat_id: string | null
-          beat_name: string | null
-          beat_plan_id: string | null
-          created_at: string | null
-          fse_user_id: string
-          id: string
-          manager_id: string
-          qa_run_id: string | null
-          session_date: string
-          session_end_time: string | null
-          session_start_time: string | null
-          total_feedback_captured: number | null
-          total_retailers_visited: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          beat_id?: string | null
-          beat_name?: string | null
-          beat_plan_id?: string | null
-          created_at?: string | null
-          fse_user_id: string
-          id?: string
-          manager_id: string
-          qa_run_id?: string | null
-          session_date: string
-          session_end_time?: string | null
-          session_start_time?: string | null
-          total_feedback_captured?: number | null
-          total_retailers_visited?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          beat_id?: string | null
-          beat_name?: string | null
-          beat_plan_id?: string | null
-          created_at?: string | null
-          fse_user_id?: string
-          id?: string
-          manager_id?: string
-          qa_run_id?: string | null
-          session_date?: string
-          session_end_time?: string | null
-          session_start_time?: string | null
-          total_feedback_captured?: number | null
-          total_retailers_visited?: number | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      qa_leave_applications: {
-        Row: {
-          applied_date: string
-          approved_by: string | null
-          approved_date: string | null
-          attendance_marked: boolean | null
-          created_at: string
-          current_approval_level: number | null
-          days_requested: number | null
-          end_date: string
-          final_approved_by: string | null
-          half_day_period: string | null
-          id: string
-          is_half_day: boolean | null
-          is_lop: boolean | null
-          leave_type_id: string
-          lop_days: number | null
-          proof_document_url: string | null
-          qa_run_id: string | null
-          reason: string
-          rejection_reason: string | null
-          sandwich_days_added: number | null
-          start_date: string
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          applied_date?: string
-          approved_by?: string | null
-          approved_date?: string | null
-          attendance_marked?: boolean | null
-          created_at?: string
-          current_approval_level?: number | null
-          days_requested?: number | null
-          end_date: string
-          final_approved_by?: string | null
-          half_day_period?: string | null
-          id?: string
-          is_half_day?: boolean | null
-          is_lop?: boolean | null
-          leave_type_id: string
-          lop_days?: number | null
-          proof_document_url?: string | null
-          qa_run_id?: string | null
-          reason: string
-          rejection_reason?: string | null
-          sandwich_days_added?: number | null
-          start_date: string
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          applied_date?: string
-          approved_by?: string | null
-          approved_date?: string | null
-          attendance_marked?: boolean | null
-          created_at?: string
-          current_approval_level?: number | null
-          days_requested?: number | null
-          end_date?: string
-          final_approved_by?: string | null
-          half_day_period?: string | null
-          id?: string
-          is_half_day?: boolean | null
-          is_lop?: boolean | null
-          leave_type_id?: string
-          lop_days?: number | null
-          proof_document_url?: string | null
-          qa_run_id?: string | null
-          reason?: string
-          rejection_reason?: string | null
-          sandwich_days_added?: number | null
-          start_date?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_leave_balance: {
-        Row: {
-          created_at: string
-          id: string
-          leave_type_id: string
-          opening_balance: number
-          qa_run_id: string | null
-          remaining_balance: number | null
-          updated_at: string
-          used_balance: number
-          user_id: string
-          year: number
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          leave_type_id: string
-          opening_balance?: number
-          qa_run_id?: string | null
-          remaining_balance?: number | null
-          updated_at?: string
-          used_balance?: number
-          user_id: string
-          year?: number
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          leave_type_id?: string
-          opening_balance?: number
-          qa_run_id?: string | null
-          remaining_balance?: number | null
-          updated_at?: string
-          used_balance?: number
-          user_id?: string
-          year?: number
-        }
-        Relationships: []
-      }
-      qa_order_items: {
-        Row: {
-          backorder_qty: number | null
-          category: string
-          cess_amount: number | null
-          cess_rate: number | null
-          cgst_amount: number | null
-          cgst_rate: number | null
-          conversion_to_base: number | null
-          created_at: string
-          discount_amount: number | null
-          hsn_code: string | null
-          id: string
-          igst_amount: number | null
-          igst_rate: number | null
-          order_id: string
-          original_rate: number | null
-          product_id: string | null
-          product_name: string
-          qa_run_id: string | null
-          quantity: number
-          rate: number
-          sgst_amount: number | null
-          sgst_rate: number | null
-          tax_master_id: string | null
-          tax_rate_snapshot: number | null
-          total: number
-          unit: string
-          uom_code: string | null
-          uom_id: string | null
-          variant_id: string | null
-        }
-        Insert: {
-          backorder_qty?: number | null
-          category: string
-          cess_amount?: number | null
-          cess_rate?: number | null
-          cgst_amount?: number | null
-          cgst_rate?: number | null
-          conversion_to_base?: number | null
-          created_at?: string
-          discount_amount?: number | null
-          hsn_code?: string | null
-          id?: string
-          igst_amount?: number | null
-          igst_rate?: number | null
-          order_id: string
-          original_rate?: number | null
-          product_id?: string | null
-          product_name: string
-          qa_run_id?: string | null
-          quantity: number
-          rate: number
-          sgst_amount?: number | null
-          sgst_rate?: number | null
-          tax_master_id?: string | null
-          tax_rate_snapshot?: number | null
-          total: number
-          unit: string
-          uom_code?: string | null
-          uom_id?: string | null
-          variant_id?: string | null
-        }
-        Update: {
-          backorder_qty?: number | null
-          category?: string
-          cess_amount?: number | null
-          cess_rate?: number | null
-          cgst_amount?: number | null
-          cgst_rate?: number | null
-          conversion_to_base?: number | null
-          created_at?: string
-          discount_amount?: number | null
-          hsn_code?: string | null
-          id?: string
-          igst_amount?: number | null
-          igst_rate?: number | null
-          order_id?: string
-          original_rate?: number | null
-          product_id?: string | null
-          product_name?: string
-          qa_run_id?: string | null
-          quantity?: number
-          rate?: number
-          sgst_amount?: number | null
-          sgst_rate?: number | null
-          tax_master_id?: string | null
-          tax_rate_snapshot?: number | null
-          total?: number
-          unit?: string
-          uom_code?: string | null
-          uom_id?: string | null
-          variant_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_orders: {
-        Row: {
-          amount_collected: number | null
-          assigned_agent_id: string | null
-          assigned_van_id: string | null
-          beat_id: string | null
-          beat_name_snapshot: string | null
-          cancellation_reason: string | null
-          cancelled_at: string | null
-          cancelled_by: string | null
-          counter_customer_id: string | null
-          created_at: string
-          credit_paid_amount: number | null
-          credit_pending_amount: number | null
-          delivered_at: string | null
-          delivery_date: string | null
-          delivery_notes: string | null
-          delivery_payment_method: string | null
-          delivery_proof_url: string | null
-          delivery_status: string | null
-          discount_amount: number | null
-          dispatched_at: string | null
-          distributor_id: string | null
-          distributor_name: string | null
-          edit_count: number
-          edited_at: string | null
-          event_id: string | null
-          id: string
-          idempotency_key: string
-          invoice_generated_at: string | null
-          invoice_number: string | null
-          is_backorder: boolean | null
-          is_credit_order: boolean | null
-          is_edited: boolean
-          order_date: string | null
-          order_source: string | null
-          owner_id_snapshot: string | null
-          packing_list_id: string | null
-          parent_order_id: string | null
-          payment_method: string | null
-          payment_proof_url: string | null
-          payment_status: string | null
-          picked_at: string | null
-          previous_pending_cleared: number | null
-          qa_run_id: string | null
-          replaced_by_order_id: string | null
-          replaces_order_id: string | null
-          retailer_id: string | null
-          retailer_name: string
-          sales_channel: string
-          short_items: Json | null
-          status: string
-          subtotal: number
-          territory_id: string | null
-          total_amount: number
-          updated_at: string
-          upi_last_four_code: string | null
-          user_id: string
-          visit_id: string | null
-        }
-        Insert: {
-          amount_collected?: number | null
-          assigned_agent_id?: string | null
-          assigned_van_id?: string | null
-          beat_id?: string | null
-          beat_name_snapshot?: string | null
-          cancellation_reason?: string | null
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          counter_customer_id?: string | null
-          created_at?: string
-          credit_paid_amount?: number | null
-          credit_pending_amount?: number | null
-          delivered_at?: string | null
-          delivery_date?: string | null
-          delivery_notes?: string | null
-          delivery_payment_method?: string | null
-          delivery_proof_url?: string | null
-          delivery_status?: string | null
-          discount_amount?: number | null
-          dispatched_at?: string | null
-          distributor_id?: string | null
-          distributor_name?: string | null
-          edit_count?: number
-          edited_at?: string | null
-          event_id?: string | null
-          id?: string
-          idempotency_key: string
-          invoice_generated_at?: string | null
-          invoice_number?: string | null
-          is_backorder?: boolean | null
-          is_credit_order?: boolean | null
-          is_edited?: boolean
-          order_date?: string | null
-          order_source?: string | null
-          owner_id_snapshot?: string | null
-          packing_list_id?: string | null
-          parent_order_id?: string | null
-          payment_method?: string | null
-          payment_proof_url?: string | null
-          payment_status?: string | null
-          picked_at?: string | null
-          previous_pending_cleared?: number | null
-          qa_run_id?: string | null
-          replaced_by_order_id?: string | null
-          replaces_order_id?: string | null
-          retailer_id?: string | null
-          retailer_name: string
-          sales_channel?: string
-          short_items?: Json | null
-          status?: string
-          subtotal: number
-          territory_id?: string | null
-          total_amount: number
-          updated_at?: string
-          upi_last_four_code?: string | null
-          user_id: string
-          visit_id?: string | null
-        }
-        Update: {
-          amount_collected?: number | null
-          assigned_agent_id?: string | null
-          assigned_van_id?: string | null
-          beat_id?: string | null
-          beat_name_snapshot?: string | null
-          cancellation_reason?: string | null
-          cancelled_at?: string | null
-          cancelled_by?: string | null
-          counter_customer_id?: string | null
-          created_at?: string
-          credit_paid_amount?: number | null
-          credit_pending_amount?: number | null
-          delivered_at?: string | null
-          delivery_date?: string | null
-          delivery_notes?: string | null
-          delivery_payment_method?: string | null
-          delivery_proof_url?: string | null
-          delivery_status?: string | null
-          discount_amount?: number | null
-          dispatched_at?: string | null
-          distributor_id?: string | null
-          distributor_name?: string | null
-          edit_count?: number
-          edited_at?: string | null
-          event_id?: string | null
-          id?: string
-          idempotency_key?: string
-          invoice_generated_at?: string | null
-          invoice_number?: string | null
-          is_backorder?: boolean | null
-          is_credit_order?: boolean | null
-          is_edited?: boolean
-          order_date?: string | null
-          order_source?: string | null
-          owner_id_snapshot?: string | null
-          packing_list_id?: string | null
-          parent_order_id?: string | null
-          payment_method?: string | null
-          payment_proof_url?: string | null
-          payment_status?: string | null
-          picked_at?: string | null
-          previous_pending_cleared?: number | null
-          qa_run_id?: string | null
-          replaced_by_order_id?: string | null
-          replaces_order_id?: string | null
-          retailer_id?: string | null
-          retailer_name?: string
-          sales_channel?: string
-          short_items?: Json | null
-          status?: string
-          subtotal?: number
-          territory_id?: string | null
-          total_amount?: number
-          updated_at?: string
-          upi_last_four_code?: string | null
-          user_id?: string
-          visit_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_petty_cash_transactions: {
-        Row: {
-          amount: number
-          approved_at: string | null
-          approved_by: string | null
-          bill_url: string | null
-          category: string
-          created_at: string
-          description: string | null
-          fund_id: string
-          id: string
-          qa_run_id: string | null
-          rejection_reason: string | null
-          status: string
-          transaction_date: string
-          user_id: string
-        }
-        Insert: {
-          amount?: number
-          approved_at?: string | null
-          approved_by?: string | null
-          bill_url?: string | null
-          category?: string
-          created_at?: string
-          description?: string | null
-          fund_id: string
-          id?: string
-          qa_run_id?: string | null
-          rejection_reason?: string | null
-          status?: string
-          transaction_date?: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          approved_at?: string | null
-          approved_by?: string | null
-          bill_url?: string | null
-          category?: string
-          created_at?: string
-          description?: string | null
-          fund_id?: string
-          id?: string
-          qa_run_id?: string | null
-          rejection_reason?: string | null
-          status?: string
-          transaction_date?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_products: {
-        Row: {
-          barcode: string | null
-          barcode_image_url: string | null
-          base_unit: string | null
-          base_unit_category: string
-          brand: string | null
-          category_id: string | null
-          closing_stock: number | null
-          conversion_factor: number | null
-          cost_currency: string | null
-          country_of_origin: string | null
-          created_at: string
-          created_by: string | null
-          default_purchase_uom_id: string | null
-          default_sales_uom_id: string | null
-          description: string | null
-          discontinuation_reason: string | null
-          discontinued_date: string | null
-          focused_due_date: string | null
-          focused_recurring_config: Json | null
-          focused_target_quantity: number | null
-          focused_territories: string[] | null
-          focused_type: string | null
-          gross_weight_g: number | null
-          gst_percentage: number | null
-          hsn_code: string | null
-          id: string
-          is_active: boolean | null
-          is_discontinued: boolean | null
-          is_focused_product: boolean | null
-          last_cost_update: string | null
-          manufacturer: string | null
-          name: string
-          net_volume_ml: number | null
-          net_weight_g: number | null
-          opening_stock: number | null
-          packaging_weight_g: number | null
-          price_basis_uom_id: string | null
-          primary_supplier_id: string | null
-          product_number: string | null
-          product_type: string | null
-          qa_run_id: string | null
-          qr_code: string | null
-          rate: number
-          reorder_level: number | null
-          reorder_quantity: number | null
-          sku: string
-          sku_image_url: string | null
-          standard_cost: number | null
-          tax_master_id: string | null
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          barcode?: string | null
-          barcode_image_url?: string | null
-          base_unit?: string | null
-          base_unit_category?: string
-          brand?: string | null
-          category_id?: string | null
-          closing_stock?: number | null
-          conversion_factor?: number | null
-          cost_currency?: string | null
-          country_of_origin?: string | null
-          created_at?: string
-          created_by?: string | null
-          default_purchase_uom_id?: string | null
-          default_sales_uom_id?: string | null
-          description?: string | null
-          discontinuation_reason?: string | null
-          discontinued_date?: string | null
-          focused_due_date?: string | null
-          focused_recurring_config?: Json | null
-          focused_target_quantity?: number | null
-          focused_territories?: string[] | null
-          focused_type?: string | null
-          gross_weight_g?: number | null
-          gst_percentage?: number | null
-          hsn_code?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_discontinued?: boolean | null
-          is_focused_product?: boolean | null
-          last_cost_update?: string | null
-          manufacturer?: string | null
-          name: string
-          net_volume_ml?: number | null
-          net_weight_g?: number | null
-          opening_stock?: number | null
-          packaging_weight_g?: number | null
-          price_basis_uom_id?: string | null
-          primary_supplier_id?: string | null
-          product_number?: string | null
-          product_type?: string | null
-          qa_run_id?: string | null
-          qr_code?: string | null
-          rate?: number
-          reorder_level?: number | null
-          reorder_quantity?: number | null
-          sku: string
-          sku_image_url?: string | null
-          standard_cost?: number | null
-          tax_master_id?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          barcode?: string | null
-          barcode_image_url?: string | null
-          base_unit?: string | null
-          base_unit_category?: string
-          brand?: string | null
-          category_id?: string | null
-          closing_stock?: number | null
-          conversion_factor?: number | null
-          cost_currency?: string | null
-          country_of_origin?: string | null
-          created_at?: string
-          created_by?: string | null
-          default_purchase_uom_id?: string | null
-          default_sales_uom_id?: string | null
-          description?: string | null
-          discontinuation_reason?: string | null
-          discontinued_date?: string | null
-          focused_due_date?: string | null
-          focused_recurring_config?: Json | null
-          focused_target_quantity?: number | null
-          focused_territories?: string[] | null
-          focused_type?: string | null
-          gross_weight_g?: number | null
-          gst_percentage?: number | null
-          hsn_code?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_discontinued?: boolean | null
-          is_focused_product?: boolean | null
-          last_cost_update?: string | null
-          manufacturer?: string | null
-          name?: string
-          net_volume_ml?: number | null
-          net_weight_g?: number | null
-          opening_stock?: number | null
-          packaging_weight_g?: number | null
-          price_basis_uom_id?: string | null
-          primary_supplier_id?: string | null
-          product_number?: string | null
-          product_type?: string | null
-          qa_run_id?: string | null
-          qr_code?: string | null
-          rate?: number
-          reorder_level?: number | null
-          reorder_quantity?: number | null
-          sku?: string
-          sku_image_url?: string | null
-          standard_cost?: number | null
-          tax_master_id?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
-      qa_regularization_requests: {
-        Row: {
-          approved_at: string | null
-          approved_by: string | null
-          attendance_date: string
-          created_at: string
-          current_check_in_time: string | null
-          current_check_out_time: string | null
-          id: string
-          qa_run_id: string | null
-          reason: string
-          rejection_reason: string | null
-          requested_check_in_time: string | null
-          requested_check_out_time: string | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          approved_at?: string | null
-          approved_by?: string | null
-          attendance_date: string
-          created_at?: string
-          current_check_in_time?: string | null
-          current_check_out_time?: string | null
-          id?: string
-          qa_run_id?: string | null
-          reason: string
-          rejection_reason?: string | null
-          requested_check_in_time?: string | null
-          requested_check_out_time?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          approved_at?: string | null
-          approved_by?: string | null
-          attendance_date?: string
-          created_at?: string
-          current_check_in_time?: string | null
-          current_check_out_time?: string | null
-          id?: string
-          qa_run_id?: string | null
-          reason?: string
-          rejection_reason?: string | null
-          requested_check_in_time?: string | null
-          requested_check_out_time?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_retailer_beat_assignments: {
-        Row: {
-          assigned_by: string | null
-          assigned_from: string
-          assigned_to: string | null
-          beat_id: string
-          beat_name: string | null
-          created_at: string
-          id: string
-          is_current: boolean
-          removed_by: string | null
-          retailer_id: string
-          transfer_reason: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          assigned_by?: string | null
-          assigned_from?: string
-          assigned_to?: string | null
-          beat_id: string
-          beat_name?: string | null
-          created_at?: string
-          id?: string
-          is_current?: boolean
-          removed_by?: string | null
-          retailer_id: string
-          transfer_reason?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          assigned_by?: string | null
-          assigned_from?: string
-          assigned_to?: string | null
-          beat_id?: string
-          beat_name?: string | null
-          created_at?: string
-          id?: string
-          is_current?: boolean
-          removed_by?: string | null
-          retailer_id?: string
-          transfer_reason?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_retailer_verification_audit: {
-        Row: {
-          action: string
-          created_at: string
-          id: string
-          method: string
-          notes: string | null
-          performed_by: string | null
-          performed_by_name: string | null
-          qa_run_id: string | null
-          retailer_id: string
-          verified_items: Json
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          id?: string
-          method: string
-          notes?: string | null
-          performed_by?: string | null
-          performed_by_name?: string | null
-          qa_run_id?: string | null
-          retailer_id: string
-          verified_items?: Json
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          id?: string
-          method?: string
-          notes?: string | null
-          performed_by?: string | null
-          performed_by_name?: string | null
-          qa_run_id?: string | null
-          retailer_id?: string
-          verified_items?: Json
-        }
-        Relationships: []
-      }
-      qa_retailer_visit_logs: {
-        Row: {
-          action_type: string | null
-          created_at: string
-          distance_meters: number | null
-          end_time: string | null
-          id: string
-          is_phone_order: boolean | null
-          location_feedback_notes: string | null
-          location_feedback_reason: string | null
-          location_status: string | null
-          qa_run_id: string | null
-          retailer_id: string
-          start_latitude: number | null
-          start_longitude: number | null
-          start_time: string
-          time_spent_seconds: number | null
-          updated_at: string
-          user_id: string
-          visit_date: string
-          visit_id: string | null
-        }
-        Insert: {
-          action_type?: string | null
-          created_at?: string
-          distance_meters?: number | null
-          end_time?: string | null
-          id?: string
-          is_phone_order?: boolean | null
-          location_feedback_notes?: string | null
-          location_feedback_reason?: string | null
-          location_status?: string | null
-          qa_run_id?: string | null
-          retailer_id: string
-          start_latitude?: number | null
-          start_longitude?: number | null
-          start_time: string
-          time_spent_seconds?: number | null
-          updated_at?: string
-          user_id: string
-          visit_date: string
-          visit_id?: string | null
-        }
-        Update: {
-          action_type?: string | null
-          created_at?: string
-          distance_meters?: number | null
-          end_time?: string | null
-          id?: string
-          is_phone_order?: boolean | null
-          location_feedback_notes?: string | null
-          location_feedback_reason?: string | null
-          location_status?: string | null
-          qa_run_id?: string | null
-          retailer_id?: string
-          start_latitude?: number | null
-          start_longitude?: number | null
-          start_time?: string
-          time_spent_seconds?: number | null
-          updated_at?: string
-          user_id?: string
-          visit_date?: string
-          visit_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_retailers: {
-        Row: {
-          account_holder_name: string | null
-          address: string
-          alternate_phone: string | null
-          avg_monthly_orders_3m: number | null
-          avg_order_per_visit_3m: number | null
-          bank_account: string | null
-          bank_name: string | null
-          beat_id: string
-          beat_name: string | null
-          category: string | null
-          competitors: string[] | null
-          contact_name: string | null
-          contact_title: string | null
-          created_at: string
-          created_by: string | null
-          distributor_id: string | null
-          duplicate_of: string | null
-          duplicate_risk_score: number
-          entity_type: string
-          first_order_placed: boolean
-          first_visit_completed: boolean
-          gst_number: string | null
-          id: string
-          ifsc: string | null
-          last_order_date: string | null
-          last_order_value: number | null
-          last_visit_date: string | null
-          latitude: number | null
-          location_tag: string | null
-          logo_url: string | null
-          longitude: number | null
-          manual_credit_score: number | null
-          name: string
-          notes: string | null
-          order_value: number | null
-          owner_id: string | null
-          owner_name: string | null
-          parent_name: string | null
-          parent_type: string | null
-          pending_amount: number | null
-          phone: string | null
-          photo_url: string | null
-          portal_enabled: boolean | null
-          portal_pin: string | null
-          potential: string | null
-          priority: string | null
-          productive_visits_3m: number | null
-          qa_run_id: string | null
-          qr_upi: string | null
-          quality_last_calculated_at: string | null
-          retail_type: string | null
-          retailer_confirmed: boolean
-          shop_front_visible: boolean
-          state: string | null
-          status: string | null
-          terms_conditions: string | null
-          territory_id: string | null
-          total_visits_3m: number | null
-          unverified_order_count: number
-          updated_at: string
-          user_id: string
-          verification_address: boolean | null
-          verification_contact: boolean | null
-          verification_method: string | null
-          verification_notes: string | null
-          verification_score: number | null
-          verification_territory: boolean | null
-          verified: boolean
-          verified_at: string | null
-          verified_by: string | null
-          verified_by_name: string | null
-          whatsapp_verified: boolean
-        }
-        Insert: {
-          account_holder_name?: string | null
-          address: string
-          alternate_phone?: string | null
-          avg_monthly_orders_3m?: number | null
-          avg_order_per_visit_3m?: number | null
-          bank_account?: string | null
-          bank_name?: string | null
-          beat_id: string
-          beat_name?: string | null
-          category?: string | null
-          competitors?: string[] | null
-          contact_name?: string | null
-          contact_title?: string | null
-          created_at?: string
-          created_by?: string | null
-          distributor_id?: string | null
-          duplicate_of?: string | null
-          duplicate_risk_score?: number
-          entity_type?: string
-          first_order_placed?: boolean
-          first_visit_completed?: boolean
-          gst_number?: string | null
-          id?: string
-          ifsc?: string | null
-          last_order_date?: string | null
-          last_order_value?: number | null
-          last_visit_date?: string | null
-          latitude?: number | null
-          location_tag?: string | null
-          logo_url?: string | null
-          longitude?: number | null
-          manual_credit_score?: number | null
-          name: string
-          notes?: string | null
-          order_value?: number | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_name?: string | null
-          parent_type?: string | null
-          pending_amount?: number | null
-          phone?: string | null
-          photo_url?: string | null
-          portal_enabled?: boolean | null
-          portal_pin?: string | null
-          potential?: string | null
-          priority?: string | null
-          productive_visits_3m?: number | null
-          qa_run_id?: string | null
-          qr_upi?: string | null
-          quality_last_calculated_at?: string | null
-          retail_type?: string | null
-          retailer_confirmed?: boolean
-          shop_front_visible?: boolean
-          state?: string | null
-          status?: string | null
-          terms_conditions?: string | null
-          territory_id?: string | null
-          total_visits_3m?: number | null
-          unverified_order_count?: number
-          updated_at?: string
-          user_id: string
-          verification_address?: boolean | null
-          verification_contact?: boolean | null
-          verification_method?: string | null
-          verification_notes?: string | null
-          verification_score?: number | null
-          verification_territory?: boolean | null
-          verified?: boolean
-          verified_at?: string | null
-          verified_by?: string | null
-          verified_by_name?: string | null
-          whatsapp_verified?: boolean
-        }
-        Update: {
-          account_holder_name?: string | null
-          address?: string
-          alternate_phone?: string | null
-          avg_monthly_orders_3m?: number | null
-          avg_order_per_visit_3m?: number | null
-          bank_account?: string | null
-          bank_name?: string | null
-          beat_id?: string
-          beat_name?: string | null
-          category?: string | null
-          competitors?: string[] | null
-          contact_name?: string | null
-          contact_title?: string | null
-          created_at?: string
-          created_by?: string | null
-          distributor_id?: string | null
-          duplicate_of?: string | null
-          duplicate_risk_score?: number
-          entity_type?: string
-          first_order_placed?: boolean
-          first_visit_completed?: boolean
-          gst_number?: string | null
-          id?: string
-          ifsc?: string | null
-          last_order_date?: string | null
-          last_order_value?: number | null
-          last_visit_date?: string | null
-          latitude?: number | null
-          location_tag?: string | null
-          logo_url?: string | null
-          longitude?: number | null
-          manual_credit_score?: number | null
-          name?: string
-          notes?: string | null
-          order_value?: number | null
-          owner_id?: string | null
-          owner_name?: string | null
-          parent_name?: string | null
-          parent_type?: string | null
-          pending_amount?: number | null
-          phone?: string | null
-          photo_url?: string | null
-          portal_enabled?: boolean | null
-          portal_pin?: string | null
-          potential?: string | null
-          priority?: string | null
-          productive_visits_3m?: number | null
-          qa_run_id?: string | null
-          qr_upi?: string | null
-          quality_last_calculated_at?: string | null
-          retail_type?: string | null
-          retailer_confirmed?: boolean
-          shop_front_visible?: boolean
-          state?: string | null
-          status?: string | null
-          terms_conditions?: string | null
-          territory_id?: string | null
-          total_visits_3m?: number | null
-          unverified_order_count?: number
-          updated_at?: string
-          user_id?: string
-          verification_address?: boolean | null
-          verification_contact?: boolean | null
-          verification_method?: string | null
-          verification_notes?: string | null
-          verification_score?: number | null
-          verification_territory?: boolean | null
-          verified?: boolean
-          verified_at?: string | null
-          verified_by?: string | null
-          verified_by_name?: string | null
-          whatsapp_verified?: boolean
-        }
-        Relationships: []
-      }
-      qa_social_comments: {
-        Row: {
-          content: string
-          created_at: string | null
-          id: string
-          post_id: string
-          qa_run_id: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string | null
-          id?: string
-          post_id: string
-          qa_run_id?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string | null
-          id?: string
-          post_id?: string
-          qa_run_id?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_social_likes: {
-        Row: {
-          created_at: string | null
-          id: string
-          post_id: string
-          qa_run_id: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          post_id: string
-          qa_run_id?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          post_id?: string
-          qa_run_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_social_post_attachments: {
-        Row: {
-          created_at: string
-          file_name: string | null
-          file_type: string | null
-          file_url: string
-          id: string
-          post_id: string
-          qa_run_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          file_name?: string | null
-          file_type?: string | null
-          file_url: string
-          id?: string
-          post_id: string
-          qa_run_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          file_name?: string | null
-          file_type?: string | null
-          file_url?: string
-          id?: string
-          post_id?: string
-          qa_run_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_social_posts: {
-        Row: {
-          content: string
-          created_at: string | null
-          id: string
-          image_url: string | null
-          is_automated: boolean | null
-          post_metadata: Json | null
-          qa_run_id: string | null
-          scheduled_time: string | null
-          template_id: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          content: string
-          created_at?: string | null
-          id?: string
-          image_url?: string | null
-          is_automated?: boolean | null
-          post_metadata?: Json | null
-          qa_run_id?: string | null
-          scheduled_time?: string | null
-          template_id?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          content?: string
-          created_at?: string | null
-          id?: string
-          image_url?: string | null
-          is_automated?: boolean | null
-          post_metadata?: Json | null
-          qa_run_id?: string | null
-          scheduled_time?: string | null
-          template_id?: string | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_social_reactions: {
-        Row: {
-          created_at: string
-          emoji: string
-          id: string
-          post_id: string
-          qa_run_id: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          emoji: string
-          id?: string
-          post_id: string
-          qa_run_id?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          emoji?: string
-          id?: string
-          post_id?: string
-          qa_run_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_stock: {
-        Row: {
-          created_at: string
-          id: string
-          product_id: string
-          product_name: string
-          qa_run_id: string | null
-          retailer_id: string
-          stock_quantity: number
-          updated_at: string
-          user_id: string
-          visit_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          product_id: string
-          product_name: string
-          qa_run_id?: string | null
-          retailer_id: string
-          stock_quantity?: number
-          updated_at?: string
-          user_id: string
-          visit_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          product_id?: string
-          product_name?: string
-          qa_run_id?: string | null
-          retailer_id?: string
-          stock_quantity?: number
-          updated_at?: string
-          user_id?: string
-          visit_id?: string
-        }
-        Relationships: []
-      }
-      qa_stock_cycle_data: {
-        Row: {
-          created_at: string
-          id: string
-          ordered_quantity: number | null
-          product_id: string
-          product_name: string
-          qa_run_id: string | null
-          retailer_id: string
-          stock_quantity: number | null
-          updated_at: string
-          user_id: string
-          visit_date: string
-          visit_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          ordered_quantity?: number | null
-          product_id: string
-          product_name: string
-          qa_run_id?: string | null
-          retailer_id: string
-          stock_quantity?: number | null
-          updated_at?: string
-          user_id: string
-          visit_date: string
-          visit_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          ordered_quantity?: number | null
-          product_id?: string
-          product_name?: string
-          qa_run_id?: string | null
-          retailer_id?: string
-          stock_quantity?: number | null
-          updated_at?: string
-          user_id?: string
-          visit_date?: string
-          visit_id?: string | null
-        }
-        Relationships: []
-      }
-      qa_support_requests: {
-        Row: {
-          created_at: string
-          created_date: string
-          description: string | null
-          id: string
-          qa_run_id: string | null
-          resolution_notes: string | null
-          resolved_by: string | null
-          resolved_date: string | null
-          status: string
-          subject: string
-          support_category: string
-          target_date: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_date?: string
-          description?: string | null
-          id?: string
-          qa_run_id?: string | null
-          resolution_notes?: string | null
-          resolved_by?: string | null
-          resolved_date?: string | null
-          status?: string
-          subject: string
-          support_category: string
-          target_date?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          created_date?: string
-          description?: string | null
-          id?: string
-          qa_run_id?: string | null
-          resolution_notes?: string | null
-          resolved_by?: string | null
-          resolved_date?: string | null
-          status?: string
-          subject?: string
-          support_category?: string
-          target_date?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_sync_audit_log: {
-        Row: {
-          action: string
-          attempt_count: number | null
-          created_at: string
-          entity_id: string | null
-          entity_type: string
-          error_message: string | null
-          id: string
-          payload: Json | null
-          qa_run_id: string | null
-          status: string
-          synced_at: string | null
-        }
-        Insert: {
-          action: string
-          attempt_count?: number | null
-          created_at?: string
-          entity_id?: string | null
-          entity_type: string
-          error_message?: string | null
-          id?: string
-          payload?: Json | null
-          qa_run_id?: string | null
-          status?: string
-          synced_at?: string | null
-        }
-        Update: {
-          action?: string
-          attempt_count?: number | null
-          created_at?: string
-          entity_id?: string | null
-          entity_type?: string
-          error_message?: string | null
-          id?: string
-          payload?: Json | null
-          qa_run_id?: string | null
-          status?: string
-          synced_at?: string | null
-        }
-        Relationships: []
-      }
-      qa_test_logs: {
-        Row: {
-          assertion_details: Json | null
-          completed_at: string | null
-          error_message: string | null
-          id: string
-          metadata_json: Json | null
-          module_name: string | null
-          records_created: Json | null
-          records_deleted: Json | null
-          started_at: string
-          status: string
-          step_name: string | null
-          test_name: string
-          test_run_id: string
-        }
-        Insert: {
-          assertion_details?: Json | null
-          completed_at?: string | null
-          error_message?: string | null
-          id?: string
-          metadata_json?: Json | null
-          module_name?: string | null
-          records_created?: Json | null
-          records_deleted?: Json | null
-          started_at?: string
-          status?: string
-          step_name?: string | null
-          test_name: string
-          test_run_id: string
-        }
-        Update: {
-          assertion_details?: Json | null
-          completed_at?: string | null
-          error_message?: string | null
-          id?: string
-          metadata_json?: Json | null
-          module_name?: string | null
-          records_created?: Json | null
-          records_deleted?: Json | null
-          started_at?: string
-          status?: string
-          step_name?: string | null
-          test_name?: string
-          test_run_id?: string
-        }
-        Relationships: []
-      }
-      qa_test_runs: {
-        Row: {
-          android_version: string | null
-          apk_version: string | null
-          build_type: string | null
-          completed_at: string | null
-          device_name: string | null
-          failed_tests: number | null
-          id: string
-          notes: string | null
-          overall_status: string | null
-          passed_tests: number | null
-          run_id: string
-          started_at: string
-          tester_email: string | null
-          tester_id: string | null
-          total_tests: number | null
-        }
-        Insert: {
-          android_version?: string | null
-          apk_version?: string | null
-          build_type?: string | null
-          completed_at?: string | null
-          device_name?: string | null
-          failed_tests?: number | null
-          id?: string
-          notes?: string | null
-          overall_status?: string | null
-          passed_tests?: number | null
-          run_id?: string
-          started_at?: string
-          tester_email?: string | null
-          tester_id?: string | null
-          total_tests?: number | null
-        }
-        Update: {
-          android_version?: string | null
-          apk_version?: string | null
-          build_type?: string | null
-          completed_at?: string | null
-          device_name?: string | null
-          failed_tests?: number | null
-          id?: string
-          notes?: string | null
-          overall_status?: string | null
-          passed_tests?: number | null
-          run_id?: string
-          started_at?: string
-          tester_email?: string | null
-          tester_id?: string | null
-          total_tests?: number | null
-        }
-        Relationships: []
-      }
-      qa_user_data_usage: {
-        Row: {
-          bytes_downloaded: number | null
-          bytes_uploaded: number | null
-          id: string
-          qa_run_id: string | null
-          recorded_at: string | null
-          session_id: string | null
-          user_id: string
-        }
-        Insert: {
-          bytes_downloaded?: number | null
-          bytes_uploaded?: number | null
-          id?: string
-          qa_run_id?: string | null
-          recorded_at?: string | null
-          session_id?: string | null
-          user_id: string
-        }
-        Update: {
-          bytes_downloaded?: number | null
-          bytes_uploaded?: number | null
-          id?: string
-          qa_run_id?: string | null
-          recorded_at?: string | null
-          session_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_user_onboarding_progress: {
-        Row: {
-          attachment_url: string | null
-          completed_at: string | null
-          created_at: string | null
-          id: string
-          is_completed: boolean | null
-          notes: string | null
-          qa_run_id: string | null
-          task_id: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          attachment_url?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          notes?: string | null
-          qa_run_id?: string | null
-          task_id: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          attachment_url?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          notes?: string | null
-          qa_run_id?: string | null
-          task_id?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      qa_user_page_views: {
-        Row: {
-          duration_seconds: number | null
-          id: string
-          module_name: string
-          page_path: string
-          qa_run_id: string | null
-          session_id: string | null
-          user_id: string
-          visited_at: string | null
-        }
-        Insert: {
-          duration_seconds?: number | null
-          id?: string
-          module_name: string
-          page_path: string
-          qa_run_id?: string | null
-          session_id?: string | null
-          user_id: string
-          visited_at?: string | null
-        }
-        Update: {
-          duration_seconds?: number | null
-          id?: string
-          module_name?: string
-          page_path?: string
-          qa_run_id?: string | null
-          session_id?: string | null
-          user_id?: string
-          visited_at?: string | null
-        }
-        Relationships: []
-      }
-      qa_visits: {
-        Row: {
-          check_in_address: string | null
-          check_in_location: Json | null
-          check_in_photo_url: string | null
-          check_in_time: string | null
-          check_out_address: string | null
-          check_out_location: Json | null
-          check_out_photo_url: string | null
-          check_out_time: string | null
-          completion_source: string | null
-          created_at: string
-          feedback: Json | null
-          id: string
-          location_match_in: boolean | null
-          location_match_out: boolean | null
-          no_order_reason: string | null
-          planned_date: string
-          qa_run_id: string | null
-          retailer_id: string | null
-          skip_check_in_reason: string | null
-          skip_check_in_time: string | null
-          status: string
-          updated_at: string
-          user_id: string
-          visit_type: string | null
-        }
-        Insert: {
-          check_in_address?: string | null
-          check_in_location?: Json | null
-          check_in_photo_url?: string | null
-          check_in_time?: string | null
-          check_out_address?: string | null
-          check_out_location?: Json | null
-          check_out_photo_url?: string | null
-          check_out_time?: string | null
-          completion_source?: string | null
-          created_at?: string
-          feedback?: Json | null
-          id?: string
-          location_match_in?: boolean | null
-          location_match_out?: boolean | null
-          no_order_reason?: string | null
-          planned_date: string
-          qa_run_id?: string | null
-          retailer_id?: string | null
-          skip_check_in_reason?: string | null
-          skip_check_in_time?: string | null
-          status?: string
-          updated_at?: string
-          user_id: string
-          visit_type?: string | null
-        }
-        Update: {
-          check_in_address?: string | null
-          check_in_location?: Json | null
-          check_in_photo_url?: string | null
-          check_in_time?: string | null
-          check_out_address?: string | null
-          check_out_location?: Json | null
-          check_out_photo_url?: string | null
-          check_out_time?: string | null
-          completion_source?: string | null
-          created_at?: string
-          feedback?: Json | null
-          id?: string
-          location_match_in?: boolean | null
-          location_match_out?: boolean | null
-          no_order_reason?: string | null
-          planned_date?: string
-          qa_run_id?: string | null
-          retailer_id?: string | null
-          skip_check_in_reason?: string | null
-          skip_check_in_time?: string | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-          visit_type?: string | null
-        }
-        Relationships: []
-      }
-      qa_work_experiences: {
-        Row: {
-          company_name: string
-          created_at: string | null
-          description: string | null
-          designation: string | null
-          from_date: string | null
-          id: string
-          is_current: boolean | null
-          location: string | null
-          qa_run_id: string | null
-          to_date: string | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          company_name: string
-          created_at?: string | null
-          description?: string | null
-          designation?: string | null
-          from_date?: string | null
-          id?: string
-          is_current?: boolean | null
-          location?: string | null
-          qa_run_id?: string | null
-          to_date?: string | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          company_name?: string
-          created_at?: string | null
-          description?: string | null
-          designation?: string | null
-          from_date?: string | null
-          id?: string
-          is_current?: boolean | null
-          location?: string | null
-          qa_run_id?: string | null
-          to_date?: string | null
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -20623,6 +15331,144 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      release_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          release_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          release_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          release_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_comments_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      release_likes: {
+        Row: {
+          created_at: string
+          release_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          release_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          release_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_likes_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      release_sections: {
+        Row: {
+          created_at: string
+          features: Json
+          id: string
+          position: number
+          release_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          features?: Json
+          id?: string
+          position?: number
+          release_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          features?: Json
+          id?: string
+          position?: number
+          release_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "release_sections_release_id_fkey"
+            columns: ["release_id"]
+            isOneToOne: false
+            referencedRelation: "releases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      releases: {
+        Row: {
+          body_md: string | null
+          created_at: string
+          created_by: string | null
+          highlights: Json
+          id: string
+          release_date: string
+          slug: string
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          body_md?: string | null
+          created_at?: string
+          created_by?: string | null
+          highlights?: Json
+          id?: string
+          release_date: string
+          slug: string
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          body_md?: string | null
+          created_at?: string
+          created_by?: string | null
+          highlights?: Json
+          id?: string
+          release_date?: string
+          slug?: string
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          version?: string
         }
         Relationships: []
       }
@@ -20928,17 +15774,12 @@ export type Database = {
           category: string | null
           city: string
           company_name: string
-          converted_retailer_id: string | null
           email: string | null
           id: number
-          is_converted: boolean
           latitude: number | null
           longitude: number | null
-          match_breakdown: Json | null
-          match_score: number | null
           mobile: string | null
           pincode: string | null
-          source: string | null
           state: string
           website: string | null
         }
@@ -20947,17 +15788,12 @@ export type Database = {
           category?: string | null
           city: string
           company_name: string
-          converted_retailer_id?: string | null
           email?: string | null
           id?: never
-          is_converted?: boolean
           latitude?: number | null
           longitude?: number | null
-          match_breakdown?: Json | null
-          match_score?: number | null
           mobile?: string | null
           pincode?: string | null
-          source?: string | null
           state: string
           website?: string | null
         }
@@ -20966,17 +15802,12 @@ export type Database = {
           category?: string | null
           city?: string
           company_name?: string
-          converted_retailer_id?: string | null
           email?: string | null
           id?: never
-          is_converted?: boolean
           latitude?: number | null
           longitude?: number | null
-          match_breakdown?: Json | null
-          match_score?: number | null
           mobile?: string | null
           pincode?: string | null
-          source?: string | null
           state?: string
           website?: string | null
         }
@@ -20984,91 +15815,34 @@ export type Database = {
       }
       retailer_external_unsorted: {
         Row: {
-          address: string | null
-          address_confidence: string | null
-          category: string | null
-          city: string | null
           City: string | null
-          company_name: string | null
-          converted_retailer_id: string | null
-          district: string | null
           District: string | null
-          email: string | null
-          id: number | null
-          is_converted: boolean
           Lat: string | null
-          latitude: number | null
           Long: string | null
-          longitude: number | null
-          match_breakdown: Json | null
-          match_score: number | null
-          mobile: string | null
-          pincode: string | null
           "Retailer's Name": string | null
           "Retailer's Number": string
-          state: string | null
           State: string | null
-          village: string | null
           "Village Visited": string | null
-          website: string | null
         }
         Insert: {
-          address?: string | null
-          address_confidence?: string | null
-          category?: string | null
-          city?: string | null
           City?: string | null
-          company_name?: string | null
-          converted_retailer_id?: string | null
-          district?: string | null
           District?: string | null
-          email?: string | null
-          id?: number | null
-          is_converted?: boolean
           Lat?: string | null
-          latitude?: number | null
           Long?: string | null
-          longitude?: number | null
-          match_breakdown?: Json | null
-          match_score?: number | null
-          mobile?: string | null
-          pincode?: string | null
           "Retailer's Name"?: string | null
           "Retailer's Number": string
-          state?: string | null
           State?: string | null
-          village?: string | null
           "Village Visited"?: string | null
-          website?: string | null
         }
         Update: {
-          address?: string | null
-          address_confidence?: string | null
-          category?: string | null
-          city?: string | null
           City?: string | null
-          company_name?: string | null
-          converted_retailer_id?: string | null
-          district?: string | null
           District?: string | null
-          email?: string | null
-          id?: number | null
-          is_converted?: boolean
           Lat?: string | null
-          latitude?: number | null
           Long?: string | null
-          longitude?: number | null
-          match_breakdown?: Json | null
-          match_score?: number | null
-          mobile?: string | null
-          pincode?: string | null
           "Retailer's Name"?: string | null
           "Retailer's Number"?: string
-          state?: string | null
           State?: string | null
-          village?: string | null
           "Village Visited"?: string | null
-          website?: string | null
         }
         Relationships: []
       }
@@ -22412,7 +17186,6 @@ export type Database = {
           verified: boolean
           verified_at: string | null
           verified_by: string | null
-          verified_by_name: string | null
           whatsapp_verified: boolean
         }
         Insert: {
@@ -22486,7 +17259,6 @@ export type Database = {
           verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
-          verified_by_name?: string | null
           whatsapp_verified?: boolean
         }
         Update: {
@@ -22560,7 +17332,6 @@ export type Database = {
           verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
-          verified_by_name?: string | null
           whatsapp_verified?: boolean
         }
         Relationships: [
@@ -22569,13 +17340,6 @@ export type Database = {
             columns: ["distributor_id"]
             isOneToOne: false
             referencedRelation: "distributors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "retailers_duplicate_of_fkey"
-            columns: ["duplicate_of"]
-            isOneToOne: false
-            referencedRelation: "retailers"
             referencedColumns: ["id"]
           },
           {
@@ -23026,7 +17790,6 @@ export type Database = {
           id: string
           is_active: boolean | null
           policy_name: string
-          policy_value: Json | null
           updated_at: string | null
           updated_by: string | null
         }
@@ -23035,7 +17798,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           policy_name: string
-          policy_value?: Json | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -23044,7 +17806,6 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           policy_name?: string
-          policy_value?: Json | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -23055,7 +17816,6 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
-          is_active: boolean
           is_system: boolean | null
           name: string
           updated_at: string | null
@@ -23064,7 +17824,6 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
-          is_active?: boolean
           is_system?: boolean | null
           name: string
           updated_at?: string | null
@@ -23073,7 +17832,6 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
-          is_active?: boolean
           is_system?: boolean | null
           name?: string
           updated_at?: string | null
@@ -23582,6 +18340,106 @@ export type Database = {
           },
         ]
       }
+      support_idea_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          idea_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          idea_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          idea_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_idea_comments_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "support_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_idea_votes: {
+        Row: {
+          created_at: string
+          idea_id: string
+          user_id: string
+          vote: number
+        }
+        Insert: {
+          created_at?: string
+          idea_id: string
+          user_id: string
+          vote?: number
+        }
+        Update: {
+          created_at?: string
+          idea_id?: string
+          user_id?: string
+          vote?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_idea_votes_idea_id_fkey"
+            columns: ["idea_id"]
+            isOneToOne: false
+            referencedRelation: "support_ideas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ideas: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          idea_type: string | null
+          impact: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          idea_type?: string | null
+          impact?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          idea_type?: string | null
+          impact?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_requests: {
         Row: {
           created_at: string
@@ -23627,6 +18485,151 @@ export type Database = {
           target_date?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      support_ticket_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string | null
+          size_bytes: number | null
+          ticket_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          ticket_id: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string | null
+          size_bytes?: number | null
+          ticket_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ticket_comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_internal: boolean
+          status_from: string | null
+          status_to: string | null
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          status_from?: string | null
+          status_to?: string | null
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean
+          status_from?: string | null
+          status_to?: string | null
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          category: string
+          company_name: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          impact: string
+          owner_email: string | null
+          owner_name: string | null
+          owner_phone: string | null
+          status: string
+          subject: string
+          ticket_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category?: string
+          company_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by: string
+          description: string
+          id?: string
+          impact?: string
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          status?: string
+          subject: string
+          ticket_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: string
+          company_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          impact?: string
+          owner_email?: string | null
+          owner_name?: string | null
+          owner_phone?: string | null
+          status?: string
+          subject?: string
+          ticket_number?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -24142,8 +19145,6 @@ export type Database = {
         Row: {
           apply_to_primary_orders: boolean
           apply_to_secondary_orders: boolean
-          cess_rate: number | null
-          cgst_rate: number | null
           cloned_from_id: string | null
           created_at: string
           created_by: string | null
@@ -24151,23 +19152,15 @@ export type Database = {
           effective_from: string | null
           effective_to: string | null
           id: string
-          igst_rate: number | null
           is_active: boolean
-          is_inter_state: boolean | null
           name: string
-          sgst_rate: number | null
-          tax_category: string | null
           tax_type: string
-          total_rate: number | null
           updated_at: string
-          updated_by: string | null
           version: number
         }
         Insert: {
           apply_to_primary_orders?: boolean
           apply_to_secondary_orders?: boolean
-          cess_rate?: number | null
-          cgst_rate?: number | null
           cloned_from_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -24175,23 +19168,15 @@ export type Database = {
           effective_from?: string | null
           effective_to?: string | null
           id?: string
-          igst_rate?: number | null
           is_active?: boolean
-          is_inter_state?: boolean | null
           name: string
-          sgst_rate?: number | null
-          tax_category?: string | null
           tax_type?: string
-          total_rate?: number | null
           updated_at?: string
-          updated_by?: string | null
           version?: number
         }
         Update: {
           apply_to_primary_orders?: boolean
           apply_to_secondary_orders?: boolean
-          cess_rate?: number | null
-          cgst_rate?: number | null
           cloned_from_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -24199,16 +19184,10 @@ export type Database = {
           effective_from?: string | null
           effective_to?: string | null
           id?: string
-          igst_rate?: number | null
           is_active?: boolean
-          is_inter_state?: boolean | null
           name?: string
-          sgst_rate?: number | null
-          tax_category?: string | null
           tax_type?: string
-          total_rate?: number | null
           updated_at?: string
-          updated_by?: string | null
           version?: number
         }
         Relationships: [
@@ -24226,42 +19205,21 @@ export type Database = {
           created_at: string
           id: string
           is_applicable: boolean
-          product_variant_id: string | null
-          tax_master_id: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           is_applicable?: boolean
-          product_variant_id?: string | null
-          tax_master_id?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           is_applicable?: boolean
-          product_variant_id?: string | null
-          tax_master_id?: string | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "tax_product_map_product_variant_id_fkey"
-            columns: ["product_variant_id"]
-            isOneToOne: false
-            referencedRelation: "product_variants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tax_product_map_tax_master_id_fkey"
-            columns: ["tax_master_id"]
-            isOneToOne: false
-            referencedRelation: "tax_masters"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       team_expense_config: {
         Row: {
@@ -24320,7 +19278,6 @@ export type Database = {
           region: string
           retailer_count: number | null
           target_market_size: number | null
-          territory_po_list: string[] | null
           territory_type: string | null
           updated_at: string
           zone: string | null
@@ -24345,7 +19302,6 @@ export type Database = {
           region: string
           retailer_count?: number | null
           target_market_size?: number | null
-          territory_po_list?: string[] | null
           territory_type?: string | null
           updated_at?: string
           zone?: string | null
@@ -24370,7 +19326,6 @@ export type Database = {
           region?: string
           retailer_count?: number | null
           target_market_size?: number | null
-          territory_po_list?: string[] | null
           territory_type?: string | null
           updated_at?: string
           zone?: string | null
@@ -24946,7 +19901,7 @@ export type Database = {
       }
       user_business_plan_territory_beats: {
         Row: {
-          beat_id: string
+          beat_id: string | null
           beat_name: string
           business_plan_id: string
           created_at: string
@@ -24957,7 +19912,7 @@ export type Database = {
           territory_id: string
         }
         Insert: {
-          beat_id: string
+          beat_id?: string | null
           beat_name: string
           business_plan_id: string
           created_at?: string
@@ -24968,7 +19923,7 @@ export type Database = {
           territory_id: string
         }
         Update: {
-          beat_id?: string
+          beat_id?: string | null
           beat_name?: string
           business_plan_id?: string
           created_at?: string
@@ -25005,7 +19960,6 @@ export type Database = {
       user_business_plans: {
         Row: {
           created_at: string
-          has_no_target: boolean
           hierarchy_allocation_id: string | null
           id: string
           manager_own_quantity_target: number | null
@@ -25025,7 +19979,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          has_no_target?: boolean
           hierarchy_allocation_id?: string | null
           id?: string
           manager_own_quantity_target?: number | null
@@ -25045,7 +19998,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          has_no_target?: boolean
           hierarchy_allocation_id?: string | null
           id?: string
           manager_own_quantity_target?: number | null
@@ -25159,9 +20111,8 @@ export type Database = {
           created_at: string | null
           data_used_mb: number | null
           id: string
-          recorded_at: string | null
           session_id: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           bytes_downloaded?: number | null
@@ -25169,9 +20120,8 @@ export type Database = {
           created_at?: string | null
           data_used_mb?: number | null
           id?: string
-          recorded_at?: string | null
           session_id?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           bytes_downloaded?: number | null
@@ -25179,19 +20129,10 @@ export type Database = {
           created_at?: string | null
           data_used_mb?: number | null
           id?: string
-          recorded_at?: string | null
           session_id?: string | null
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_data_usage_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "user_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_delegations: {
         Row: {
@@ -25549,44 +20490,30 @@ export type Database = {
           created_at: string | null
           duration_seconds: number | null
           id: string
-          module_name: string
+          module_name: string | null
           page: string | null
-          page_path: string | null
           session_id: string | null
-          user_id: string
-          visited_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           duration_seconds?: number | null
           id?: string
-          module_name: string
+          module_name?: string | null
           page?: string | null
-          page_path?: string | null
           session_id?: string | null
-          user_id: string
-          visited_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           duration_seconds?: number | null
           id?: string
-          module_name?: string
+          module_name?: string | null
           page?: string | null
-          page_path?: string | null
           session_id?: string | null
-          user_id?: string
-          visited_at?: string | null
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_page_views_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "user_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_performance_scores: {
         Row: {
@@ -25743,15 +20670,7 @@ export type Database = {
           profile_id?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_profiles_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "security_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       user_push_content_subscriptions: {
         Row: {
@@ -25820,46 +20739,29 @@ export type Database = {
           created_at: string | null
           expires_at: string | null
           id: string
-          is_active: boolean | null
-          login_at: string | null
-          logout_at: string | null
           session_token: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
           expires_at?: string | null
           id?: string
-          is_active?: boolean | null
-          login_at?: string | null
-          logout_at?: string | null
           session_token?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
           expires_at?: string | null
           id?: string
-          is_active?: boolean | null
-          login_at?: string | null
-          logout_at?: string | null
           session_token?: string | null
-          user_id?: string
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "user_sessions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       van_beat_assignments: {
         Row: {
           assigned_date: string
-          beat_id: string
+          beat_id: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -25869,7 +20771,7 @@ export type Database = {
         }
         Insert: {
           assigned_date?: string
-          beat_id: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -25879,7 +20781,7 @@ export type Database = {
         }
         Update: {
           assigned_date?: string
-          beat_id?: string
+          beat_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -26351,7 +21253,6 @@ export type Database = {
       van_return_grn_items: {
         Row: {
           created_at: string
-          disposition: string | null
           id: string
           product_id: string
           return_grn_id: string
@@ -26362,7 +21263,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          disposition?: string | null
           id?: string
           product_id: string
           return_grn_id: string
@@ -26373,7 +21273,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          disposition?: string | null
           id?: string
           product_id?: string
           return_grn_id?: string
@@ -27322,64 +22221,18 @@ export type Database = {
       }
     }
     Views: {
-      activity_daily_summary: {
+      analytics_productivity_summary: {
         Row: {
-          activity_points: number | null
-          completed_activities: number | null
-          completed_activity_minutes: number | null
-          date: string | null
-          total_activities: number | null
-          total_activity_minutes: number | null
+          activity_date: string | null
+          pending: number | null
+          planned: number | null
+          productive: number | null
+          ptv_pct: number | null
+          unproductive: number | null
           user_id: string | null
-        }
-        Relationships: []
-      }
-      activity_type_productivity: {
-        Row: {
-          activities: number | null
-          activity_type: string | null
-          completed: number | null
-          date: string | null
-          is_sales_activity: boolean | null
-          minutes: number | null
-          points: number | null
-          user_id: string | null
-          weight: number | null
-        }
-        Relationships: []
-      }
-      field_productivity_daily: {
-        Row: {
-          activity_minutes: number | null
-          activity_points: number | null
-          completed_activities: number | null
-          date: string | null
-          overall_field_productivity: number | null
-          productive_sales_visits: number | null
-          total_activity_visits: number | null
-          total_sales_visits: number | null
-          user_id: string | null
-        }
-        Relationships: []
-      }
-      hypopg_hidden_indexes: {
-        Row: {
-          am_name: unknown
-          index_name: unknown
-          indexrelid: unknown
-          is_hypo: boolean | null
-          schema_name: unknown
-          table_name: unknown
-        }
-        Relationships: []
-      }
-      hypopg_list_indexes: {
-        Row: {
-          am_name: unknown
-          index_name: string | null
-          indexrelid: unknown
-          schema_name: unknown
-          table_name: unknown
+          user_name: string | null
+          username: string | null
+          vto_pct: number | null
         }
         Relationships: []
       }
@@ -27442,45 +22295,10 @@ export type Database = {
       }
     }
     Functions: {
-      _post_credit_note_to_ledger: {
-        Args: {
-          p_actor: string
-          p_amount: number
-          p_cn_id: string
-          p_primary_order: string
-          p_retailer_id: string
-        }
-        Returns: undefined
-      }
       _safe_uuid: { Args: { p: string }; Returns: string }
-      activity_visit_action: {
-        Args: {
-          p_action: string
-          p_activity_event_id: string
-          p_actor: string
-          p_lat?: number
-          p_lng?: number
-          p_outcome?: string
-          p_summary?: string
-          p_visit_id: string
-          p_voice_url?: string
-        }
-        Returns: Json
-      }
       add_carry_forward_to_plan: {
         Args: { p_date: string; p_retailer_ids?: string[]; p_user: string }
         Returns: number
-      }
-      admin_deactivate_all_products: { Args: never; Returns: Json }
-      allocate_inventory_batches: {
-        Args: {
-          p_distributor_id: string
-          p_product_id: string
-          p_required_qty: number
-          p_strategy?: string
-          p_warehouse_id?: string
-        }
-        Returns: Json
       }
       allocate_payment_fifo: {
         Args: { p_payment_id: string }
@@ -27507,17 +22325,6 @@ export type Database = {
         }
         Returns: Json
       }
-      assign_activity: {
-        Args: {
-          p_activity_date: string
-          p_activity_type: string
-          p_expected_duration_minutes?: number
-          p_half_day_type?: string
-          p_note?: string
-          p_subordinate_ids: string[]
-        }
-        Returns: Json
-      }
       assign_beat_cover: {
         Args: {
           p_absent_user: string
@@ -27531,11 +22338,6 @@ export type Database = {
         Args: { p_beat_id: string; p_reason?: string; p_retailer_id: string }
         Returns: Json
       }
-      award_retailer_points: {
-        Args: { p_activity: string; p_points: number; p_retailer_id: string }
-        Returns: undefined
-      }
-      backfill_retailer_payment_allocations: { Args: never; Returns: Json }
       beat_has_history: { Args: { p_beat_id: string }; Returns: boolean }
       calculate_beat_adherence: {
         Args: { p_end: string; p_start: string; p_user_id: string }
@@ -27604,38 +22406,14 @@ export type Database = {
         Args: { p_actor?: string; p_order_id: string }
         Returns: boolean
       }
-      can_place_order_for_retailer: {
-        Args: { p_retailer_id: string }
-        Returns: Json
-      }
       can_view_distributor: {
         Args: { _distributor_id: string }
         Returns: boolean
       }
       can_view_employee: { Args: { _target_user_id: string }; Returns: boolean }
       can_view_profile: { Args: { _target_user_id: string }; Returns: boolean }
-      cancel_order_atomic:
-        | {
-            Args: {
-              p_cancelled_by: string
-              p_order_id: string
-              p_reason: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_cancelled_by: string
-              p_order_id: string
-              p_reason: string
-              p_settlement_amount?: number
-              p_settlement_method?: string
-              p_van_stock_action?: string
-            }
-            Returns: Json
-          }
-      cancel_packing_list_reservations: {
-        Args: { p_packing_list_id: string }
+      cancel_order_atomic: {
+        Args: { p_cancelled_by: string; p_order_id: string; p_reason: string }
         Returns: Json
       }
       check_duplicate_competitor: {
@@ -27648,45 +22426,12 @@ export type Database = {
           product_details: string
         }[]
       }
-      check_opening_stock_exists: {
-        Args: {
-          p_distributor_id: string
-          p_product_id: string
-          p_warehouse_id?: string
-        }
-        Returns: boolean
-      }
       check_rls_drift: { Args: never; Returns: number }
-      claim_push_token: {
-        Args: { p_device_info?: Json; p_platform: string; p_token: string }
-        Returns: undefined
-      }
       cleanup_expired_coverage: { Args: never; Returns: undefined }
       cleanup_expired_insights: { Args: never; Returns: undefined }
       cleanup_expired_recommendations: { Args: never; Returns: undefined }
       cleanup_expired_reset_tokens: { Args: never; Returns: undefined }
       cleanup_old_execution_logs: { Args: never; Returns: undefined }
-      cleanup_qa_run: { Args: { p_run_id: string }; Returns: Json }
-      clear_company_feature_override: {
-        Args: { p_company_id: string; p_feature_key: string }
-        Returns: undefined
-      }
-      confirm_primary_delivery_atomic: {
-        Args: {
-          p_delivered_at: string
-          p_lines?: Json
-          p_packing_list_id: string
-          p_pod_notes: string
-          p_pod_photo_url: string
-          p_pod_signature_url: string
-          p_received_by: string
-        }
-        Returns: Json
-      }
-      confirm_secondary_delivery: {
-        Args: { p_order_id: string; p_payment?: Json; p_pod_url?: string }
-        Returns: Json
-      }
       create_approval_request: {
         Args: {
           p_entity_id: string
@@ -27699,52 +22444,8 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: undefined
       }
-      create_packing_list_atomic: {
-        Args: {
-          p_batch_allocations?: Json
-          p_delivery_date: string
-          p_distributor_id: string
-          p_items: Json
-          p_order_ids: string[]
-          p_order_type?: string
-          p_sources?: Json
-          p_strategy?: string
-          p_total_value?: number
-          p_warehouse_id?: string
-        }
-        Returns: Json
-      }
-      create_product_with_uoms: {
-        Args: { p_price_overrides?: Json; p_product: Json; p_uoms?: Json }
-        Returns: string
-      }
-      create_user_delegation: {
-        Args: {
-          p_beat_ids: string[]
-          p_effective_from: string
-          p_effective_to: string
-          p_notes?: string
-          p_retailer_ids: string[]
-          p_scope: string
-          p_to_user: string
-        }
-        Returns: string
-      }
       deactivate_beat: { Args: { p_beat_id: string }; Returns: Json }
       delete_beat_permanent: { Args: { p_beat_id: string }; Returns: Json }
-      delete_packing_list_atomic: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
-      }
-      deliver_and_invoice_retailer_order: {
-        Args: {
-          p_delivered_items: Json
-          p_order_id: string
-          p_payment: Json
-          p_pod_url: string
-        }
-        Returns: Json
-      }
       detect_retailer_duplicates: {
         Args: {
           p_address: string
@@ -27757,28 +22458,6 @@ export type Database = {
         }
         Returns: number
       }
-      dispatch_batch_stock: {
-        Args: {
-          p_batch_id: string
-          p_distributor_id: string
-          p_packing_list_id: string
-          p_product_id: string
-          p_qty: number
-        }
-        Returns: undefined
-      }
-      dispatch_packing_list_atomic: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
-      }
-      dispatch_primary_packing_list_atomic: {
-        Args: { p_dispatch?: Json; p_packing_list_id: string }
-        Returns: Json
-      }
-      dispatch_secondary_packing_list: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
-      }
       emit_notification_event: {
         Args: {
           p_actor_user_id: string
@@ -27787,58 +22466,10 @@ export type Database = {
           p_record_id: string
           p_source_table: string
         }
-        Returns: undefined
+        Returns: string
       }
       eod_cancel_pending_visits: { Args: never; Returns: number }
-      execute_stock_action: {
-        Args: {
-          p_action: string
-          p_batch_no?: string
-          p_created_by?: string
-          p_distributor_id: string
-          p_expiry_date?: string
-          p_mfg_date?: string
-          p_notes?: string
-          p_product_id: string
-          p_quantity: number
-          p_reference_id?: string
-          p_reference_number?: string
-          p_supplier_batch_code?: string
-          p_warehouse_id?: string
-        }
-        Returns: Json
-      }
-      execute_stock_action_numeric: {
-        Args: {
-          p_action: string
-          p_batch_no?: string
-          p_created_by?: string
-          p_distributor_id: string
-          p_expiry_date?: string
-          p_mfg_date?: string
-          p_notes?: string
-          p_product_id: string
-          p_quantity: number
-          p_reference_id?: string
-          p_reference_number?: string
-          p_supplier_batch_code?: string
-          p_warehouse_id?: string
-        }
-        Returns: Json
-      }
       expire_user_delegations: { Args: never; Returns: undefined }
-      finalize_credit_note: {
-        Args: {
-          p_created_by: string
-          p_lines: Json
-          p_reason: string
-          p_reason_notes: string
-          p_retailer_id: string
-          p_van_id?: string
-          p_visit_id: string
-        }
-        Returns: Json
-      }
       finalize_order_edit: {
         Args: {
           p_edited_by: string
@@ -27848,10 +22479,6 @@ export type Database = {
           p_replacement_order_id: string
           p_target_paid?: number
         }
-        Returns: Json
-      }
-      finalize_primary_invoice_atomic: {
-        Args: { p_invoice_id: string }
         Returns: Json
       }
       find_duplicate_retailers: {
@@ -27873,27 +22500,11 @@ export type Database = {
           phone: string
         }[]
       }
-      generate_delivery_challan: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
-      }
-      generate_delivery_challan_number: {
-        Args: { p_date: string }
-        Returns: string
-      }
       generate_grn_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_primary_invoice_number: { Args: never; Returns: string }
-      generate_primary_invoices_atomic: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
-      }
       generate_return_number: { Args: never; Returns: string }
       generate_shipment_number: { Args: never; Returns: string }
-      generate_system_batch_code: {
-        Args: { p_date?: string; p_product_id: string; p_warehouse_id: string }
-        Returns: string
-      }
       get_activity_logging_summary: { Args: { p_days: number }; Returns: Json }
       get_all_product_units: {
         Args: never
@@ -27919,13 +22530,6 @@ export type Database = {
           subordinate_user_id: string
         }[]
       }
-      get_assignable_users: {
-        Args: never
-        Returns: {
-          user_id: string
-          user_name: string
-        }[]
-      }
       get_auth_user_id_by_email: {
         Args: { lookup_email: string }
         Returns: string
@@ -27948,45 +22552,7 @@ export type Database = {
           retailer_name: string
         }[]
       }
-      get_category_usage: {
-        Args: never
-        Returns: {
-          category_id: string
-          product_count: number
-          scheme_count: number
-          variant_count: number
-        }[]
-      }
-      get_collection_workspace: {
-        Args: { p_filter?: string }
-        Returns: {
-          access_type: string
-          oldest_invoice_date: string
-          open_invoice_count: number
-          outstanding: number
-          retailer_id: string
-          retailer_name: string
-        }[]
-      }
       get_database_metrics: { Args: never; Returns: Json }
-      get_deleted_records: {
-        Args: {
-          p_deleted_by?: string
-          p_limit?: number
-          p_since?: string
-          p_table_name?: string
-        }
-        Returns: {
-          delete_reason: string
-          deleted_at: string
-          deleted_by: string
-          deleted_by_name: string
-          id: string
-          record_data: Json
-          record_id: string
-          table_name: string
-        }[]
-      }
       get_direct_reports: {
         Args: { manager_user_id: string }
         Returns: {
@@ -27996,15 +22562,9 @@ export type Database = {
         }[]
       }
       get_distinct_districts: {
-        Args: { p_state: string }
+        Args: { selected_state: string }
         Returns: {
           district: string
-        }[]
-      }
-      get_distinct_pincodes: {
-        Args: { p_district: string; p_state: string }
-        Returns: {
-          pincode: string
         }[]
       }
       get_distinct_states: {
@@ -28013,35 +22573,7 @@ export type Database = {
           statename: string
         }[]
       }
-      get_distributor_financial_snapshot: {
-        Args: { p_distributor_id: string }
-        Returns: {
-          available_credit: number
-          credit_limit: number
-          credit_utilization_pct: number
-          last_payment_date: string
-          outstanding: number
-          overdue_amount: number
-        }[]
-      }
       get_distributor_id_for_auth_user: { Args: never; Returns: string }
-      get_effective_features: {
-        Args: { p_company_id: string; p_user_id?: string }
-        Returns: {
-          blocked_by: string[]
-          category: string
-          company_override: boolean
-          description: string
-          enabled: boolean
-          feature_id: string
-          feature_key: string
-          feature_name: string
-          global_enabled: boolean
-          role_override: boolean
-          source: string
-          user_override: boolean
-        }[]
-      }
       get_employee_basic_info: {
         Args: { employee_user_id: string }
         Returns: {
@@ -28061,7 +22593,7 @@ export type Database = {
           uom_id: string
         }[]
       }
-      get_estimated_memory_usage: { Args: never; Returns: Json }
+      get_estimated_memory_usage: { Args: never; Returns: number }
       get_invoice_filenames_apr_2026: {
         Args: never
         Returns: {
@@ -28140,15 +22672,6 @@ export type Database = {
           retailer_id: string
           retailer_name: string
           total_amount: number
-        }[]
-      }
-      get_org_beat_names: {
-        Args: { p_distributor_id?: string }
-        Returns: {
-          beat_name: string
-          full_name: string
-          user_id: string
-          username: string
         }[]
       }
       get_password_reset_stats: {
@@ -28237,7 +22760,6 @@ export type Database = {
       get_reporting_chain: {
         Args: { p_user_id: string }
         Returns: {
-          full_name: string
           level: number
           manager_id: string
         }[]
@@ -28261,92 +22783,21 @@ export type Database = {
         }[]
       }
       get_retailer_unsorted_cities: {
-        Args: { p_district: string; p_state: string }
+        Args: { selected_district: string; selected_state: string }
         Returns: {
           city: string
-          count: number
         }[]
       }
       get_retailer_unsorted_districts: {
-        Args: { p_state: string }
+        Args: { selected_state: string }
         Returns: {
-          count: number
           district: string
         }[]
       }
       get_retailer_unsorted_states: {
         Args: never
         Returns: {
-          count: number
           state: string
-        }[]
-      }
-      get_returnable_lines: {
-        Args: {
-          p_product_id: string
-          p_retailer_id: string
-          p_variant_id: string
-        }
-        Returns: {
-          cgst_amount: number
-          invoice_number: string
-          line_taxable: number
-          order_date: string
-          order_id: string
-          rate: number
-          returnable: number
-          sgst_amount: number
-          sold_qty: number
-        }[]
-      }
-      get_sales_quantity_report: {
-        Args: {
-          p_date_from?: string
-          p_date_to?: string
-          p_distributor_id?: string
-          p_product_id?: string
-          p_user_id?: string
-        }
-        Returns: {
-          is_base_unit: boolean
-          line_count: number
-          order_count: number
-          product_id: string
-          product_name: string
-          quantity_in_unit: number
-          uom_category: string
-          uom_code: string
-          uom_name: string
-        }[]
-      }
-      get_sales_quantity_summary: {
-        Args: {
-          p_date_from?: string
-          p_date_to?: string
-          p_distributor_id?: string
-          p_user_id?: string
-        }
-        Returns: {
-          base_unit_category: string
-          base_unit_code: string
-          line_count: number
-          order_count: number
-          product_id: string
-          product_name: string
-          total_base_qty: number
-          total_kg_or_litre: number
-          total_pieces: number
-          total_value: number
-        }[]
-      }
-      get_state_analytics: {
-        Args: never
-        Returns: {
-          converted_retailers: number
-          state_name: string
-          total_districts: number
-          total_pincodes: number
-          total_retailers: number
         }[]
       }
       get_subordinate_users: {
@@ -28366,25 +22817,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_team_activities: {
-        Args: { p_from?: string; p_to?: string }
-        Returns: {
-          activity_date: string
-          activity_event_id: string
-          activity_type: string
-          ae_status: string
-          assigned_by: string
-          completion_summary: string
-          duration_minutes: number
-          expected_duration_minutes: number
-          half_day_type: string
-          outcome: string
-          user_id: string
-          user_name: string
-          visit_id: string
-          visit_status: string
-        }[]
-      }
       get_territory_sales_summary: {
         Args: {
           end_date_param?: string
@@ -28395,38 +22827,6 @@ export type Database = {
           total_orders: number
           total_retailers: number
           total_sales: number
-        }[]
-      }
-      get_today_sales_summary: {
-        Args: { p_date?: string; p_user_id: string }
-        Returns: {
-          base_unit_category: string
-          base_unit_code: string
-          product_name: string
-          qty_in_base: number
-          qty_kg_or_litre: number
-          qty_pieces: number
-          qty_sold: number
-          revenue: number
-          uom_code: string
-        }[]
-      }
-      get_type_supports_primary: { Args: { p_code: string }; Returns: boolean }
-      get_unit_usage_count: {
-        Args: { p_uom_id: string }
-        Returns: {
-          mappings_using: number
-          products_using: number
-        }[]
-      }
-      get_unsorted_state_analytics: {
-        Args: never
-        Returns: {
-          converted_retailers: number
-          state_name: string
-          total_districts: number
-          total_pincodes: number
-          total_retailers: number
         }[]
       }
       get_uom_categories: {
@@ -28446,7 +22846,6 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
-      get_user_type: { Args: { p_user_id: string }; Returns: string }
       get_vendor_contact_info: {
         Args: { vendor_id: string }
         Returns: {
@@ -28487,43 +22886,9 @@ export type Database = {
         Returns: boolean
       }
       hash_hint_answer: { Args: { answer: string }; Returns: string }
-      hypopg: { Args: never; Returns: Record<string, unknown>[] }
-      hypopg_create_index: {
-        Args: { sql_order: string }
-        Returns: Record<string, unknown>[]
-      }
-      hypopg_drop_index: { Args: { indexid: unknown }; Returns: boolean }
-      hypopg_get_indexdef: { Args: { indexid: unknown }; Returns: string }
-      hypopg_hidden_indexes: {
-        Args: never
-        Returns: {
-          indexid: unknown
-        }[]
-      }
-      hypopg_hide_index: { Args: { indexid: unknown }; Returns: boolean }
-      hypopg_relation_size: { Args: { indexid: unknown }; Returns: number }
-      hypopg_reset: { Args: never; Returns: undefined }
-      hypopg_reset_index: { Args: never; Returns: undefined }
-      hypopg_unhide_all_indexes: { Args: never; Returns: undefined }
-      hypopg_unhide_index: { Args: { indexid: unknown }; Returns: boolean }
-      index_advisor: {
-        Args: { query: string }
-        Returns: {
-          errors: string[]
-          index_statements: string[]
-          startup_cost_after: Json
-          startup_cost_before: Json
-          total_cost_after: Json
-          total_cost_before: Json
-        }[]
-      }
       initialize_leave_policy_balances: {
         Args: { p_policy_id: string }
         Returns: undefined
-      }
-      invoice_secondary_packing_list_at_dispatch: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
       }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       is_admin_or_manager: { Args: never; Returns: boolean }
@@ -28531,9 +22896,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: boolean
       }
-      is_approver_for_request:
-        | { Args: { p_request_id: string }; Returns: boolean }
-        | { Args: { request_id: string; user_id: string }; Returns: boolean }
+      is_approver_for_request: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
       is_coordinator: { Args: { p_uid: string }; Returns: boolean }
       is_distributor_owner_of: {
         Args: { _distributor_id: string }
@@ -28608,39 +22974,6 @@ export type Database = {
         Returns: Json
       }
       pm_is_project_member: { Args: { project_uuid: string }; Returns: boolean }
-      portal_can_read_beat: {
-        Args: { p_beat_id: string; p_beat_row_id?: string }
-        Returns: boolean
-      }
-      portal_can_read_order: { Args: { p_order_id: string }; Returns: boolean }
-      portal_can_read_retailer: {
-        Args: { p_retailer_id: string }
-        Returns: boolean
-      }
-      portal_login_by_phone: {
-        Args: { p_phone: string }
-        Returns: {
-          address: string
-          beat_id: string
-          distributor_id: string
-          id: string
-          name: string
-          owner_id: string
-          parent_name: string
-          phone: string
-          territory_id: string
-        }[]
-      }
-      preview_inventory_allocation: {
-        Args: {
-          p_distributor_id: string
-          p_product_id: string
-          p_required_qty: number
-          p_strategy?: string
-          p_warehouse_id?: string
-        }
-        Returns: Json
-      }
       process_approval_step: {
         Args: {
           p_action: string
@@ -28652,10 +22985,6 @@ export type Database = {
       }
       process_monthly_leave_accrual: { Args: never; Returns: undefined }
       process_year_end_carry_forward: { Args: never; Returns: undefined }
-      push_retailer_notification: {
-        Args: { p_actor_user_id: string; p_metadata?: Json; p_rule_id: string }
-        Returns: number
-      }
       quarantine_orphan_orders: {
         Args: { p_grace_minutes?: number }
         Returns: number
@@ -28665,16 +22994,6 @@ export type Database = {
         Args: { p_retailer_id: string }
         Returns: number
       }
-      record_route_execution: {
-        Args: {
-          p_action: string
-          p_beat_id?: string
-          p_remarks?: string
-          p_retailer_id: string
-          p_route_date?: string
-        }
-        Returns: string
-      }
       reflow_allocation_fifo: {
         Args: {
           p_amount: number
@@ -28683,26 +23002,6 @@ export type Database = {
           p_retailer_id: string
         }
         Returns: number
-      }
-      refresh_daily_admin_summary: {
-        Args: { p_date: string }
-        Returns: undefined
-      }
-      refresh_user_monthly_summary: {
-        Args: { p_month: number; p_user_id: string; p_year: number }
-        Returns: undefined
-      }
-      release_all_packing_list_reservations: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
-      }
-      release_batch_reservation: {
-        Args: { p_batch_id: string; p_qty: number }
-        Returns: undefined
-      }
-      release_shortfall_on_packed: {
-        Args: { p_packing_list_id: string }
-        Returns: Json
       }
       request_backdate: {
         Args: { p_date: string; p_reason: string }
@@ -28726,13 +23025,10 @@ export type Database = {
           to_date: string
         }[]
       }
-      reset_all_qa_data: { Args: never; Returns: undefined }
-      resolve_effective_leave_policy:
-        | { Args: { p_leave_type_id: string }; Returns: Json }
-        | {
-            Args: { p_leave_type_id: string; p_user_id: string }
-            Returns: Json
-          }
+      resolve_effective_leave_policy: {
+        Args: { p_leave_type_id: string }
+        Returns: Json
+      }
       resolve_quantity_to_base: {
         Args: {
           p_conversion_snap?: number
@@ -28751,50 +23047,7 @@ export type Database = {
         Args: { p_retailer_id: string }
         Returns: boolean
       }
-      returnable_qty: {
-        Args: { p_order_id: string; p_product_id: string; p_variant_id: string }
-        Returns: number
-      }
-      reverse_retailer_points: {
-        Args: { p_reason: string; p_retailer_id: string }
-        Returns: undefined
-      }
-      revoke_retailer_access: {
-        Args: { p_share_id: string }
-        Returns: undefined
-      }
       run_data_health_checks: { Args: never; Returns: number }
-      run_load_test: { Args: never; Returns: undefined }
-      search_products_for_order: {
-        Args: { p_category?: string; p_limit?: number; p_query: string }
-        Returns: {
-          category_name: string
-          closing_stock: number
-          id: string
-          is_active: boolean
-          is_focused_product: boolean
-          name: string
-          rate: number
-          sku: string
-          unit: string
-          variants: Json
-        }[]
-      }
-      send_broadcast_notification: {
-        Args: {
-          p_actor_user_id: string
-          p_distributor_target_ids?: string[]
-          p_distributor_target_type?: string
-          p_field_sales_target_ids?: string[]
-          p_field_sales_target_type?: string
-          p_message: string
-          p_portals?: string[]
-          p_target_ids?: string[]
-          p_target_type?: string
-          p_title: string
-        }
-        Returns: number
-      }
       send_notification: {
         Args: {
           message_param: string
@@ -28803,48 +23056,6 @@ export type Database = {
           title_param: string
           type_param?: string
           user_id_param: string
-        }
-        Returns: string
-      }
-      set_category_products_active: {
-        Args: { p_active: boolean; p_category_id: string }
-        Returns: Json
-      }
-      set_company_feature: {
-        Args: {
-          p_cascade?: boolean
-          p_company_id: string
-          p_enabled: boolean
-          p_feature_key: string
-        }
-        Returns: {
-          feature_id: string
-          message: string
-          success: boolean
-        }[]
-      }
-      set_products_active: {
-        Args: { p_active: boolean; p_product_ids: string[] }
-        Returns: Json
-      }
-      set_role_feature: {
-        Args: { p_enabled: boolean; p_feature_key: string; p_role_id: string }
-        Returns: undefined
-      }
-      set_user_feature: {
-        Args: { p_enabled: boolean; p_feature_key: string; p_user_id: string }
-        Returns: undefined
-      }
-      share_retailer_access: {
-        Args: {
-          p_can_collect_payment?: boolean
-          p_can_take_orders?: boolean
-          p_can_update_feedback?: boolean
-          p_can_view?: boolean
-          p_effective_from?: string
-          p_effective_to?: string
-          p_retailer_id: string
-          p_to_user: string
         }
         Returns: string
       }
@@ -28861,17 +23072,11 @@ export type Database = {
           score: number
         }[]
       }
-      sync_counts: { Args: never; Returns: Json }
       sync_order_with_items: {
         Args: { p_items: Json; p_order: Json }
         Returns: Json
       }
       sync_order_with_items_v2: { Args: { p_payload: Json }; Returns: Json }
-      sync_primary_packing_list_delivery: {
-        Args: { p_packing_list_id: string }
-        Returns: undefined
-      }
-      sync_pull: { Args: { p_since?: string }; Returns: Json }
       to_base_qty: {
         Args: { p_product_id: string; p_qty: number; p_uom_code: string }
         Returns: number
@@ -28904,19 +23109,6 @@ export type Database = {
         Returns: Json
       }
       unlock_password_reset: { Args: { user_email: string }; Returns: boolean }
-      update_picking_atomic: {
-        Args: { p_batch_row_id: string; p_picked_qty: number }
-        Returns: Json
-      }
-      update_product_with_uoms: {
-        Args: {
-          p_price_overrides?: Json
-          p_product: Json
-          p_product_id: string
-          p_uoms?: Json
-        }
-        Returns: string
-      }
       update_security_info: {
         Args: { new_hint_answer: string; new_hint_question: string }
         Returns: boolean
@@ -29036,7 +23228,6 @@ export type Database = {
         | "in_review"
         | "done"
         | "cancelled"
-        | "overdue"
       pm_task_type: "epic" | "story" | "task" | "bug" | "idea" | "milestone"
       user_status:
         | "pending_completion"
@@ -29208,7 +23399,6 @@ export const Constants = {
         "in_review",
         "done",
         "cancelled",
-        "overdue",
       ],
       pm_task_type: ["epic", "story", "task", "bug", "idea", "milestone"],
       user_status: [
