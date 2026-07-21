@@ -11,29 +11,32 @@ Deno.serve(async (req) => {
     })
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? ''
-    if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'Unauthorized' })
-
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
-
-    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(
-      authHeader.replace('Bearer ', ''),
-    )
-    if (claimsErr || !claimsData?.claims) return json(401, { error: 'Invalid token' })
-    const callerId = claimsData.claims.sub as string
-
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
 
-    // Verify caller is system admin
-    const { data: isAdmin, error: adminErr } = await admin.rpc('is_system_admin', {
-      _user_id: callerId,
-    })
-    if (adminErr || !isAdmin) return json(403, { error: 'Forbidden: system admin only' })
+    // Auth: either a valid system-admin session, OR the one-off RESTORE_ADMIN_SECRET header
+    const secretHeader = req.headers.get('x-restore-secret') ?? ''
+    const restoreSecret = Deno.env.get('RESTORE_ADMIN_SECRET') ?? ''
+    let authorized = restoreSecret !== '' && secretHeader === restoreSecret
+    if (!authorized) {
+      const authHeader = req.headers.get('Authorization') ?? ''
+      if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'Unauthorized' })
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+      })
+      const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(
+        authHeader.replace('Bearer ', ''),
+      )
+      if (claimsErr || !claimsData?.claims) return json(401, { error: 'Invalid token' })
+      const callerId = claimsData.claims.sub as string
+      const { data: isAdmin, error: adminErr } = await admin.rpc('is_system_admin', {
+        _user_id: callerId,
+      })
+      if (adminErr || !isAdmin) return json(403, { error: 'Forbidden: system admin only' })
+      authorized = true
+    }
 
     const body = await req.json().catch(() => ({}))
     const recycle_bin_id: string = body.recycle_bin_id
