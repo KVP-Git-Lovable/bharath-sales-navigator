@@ -19127,6 +19127,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_profiles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       securityaudit_events: {
         Row: {
           backend_pid: number | null
@@ -22019,7 +22049,15 @@ export type Database = {
           profile_id?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "security_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_push_content_subscriptions: {
         Row: {
@@ -23873,7 +23911,14 @@ export type Database = {
       can_view_employee: { Args: { _target_user_id: string }; Returns: boolean }
       can_view_profile: { Args: { _target_user_id: string }; Returns: boolean }
       cancel_order_atomic: {
-        Args: { p_cancelled_by: string; p_order_id: string; p_reason: string }
+        Args: {
+          p_cancelled_by: string
+          p_order_id: string
+          p_reason: string
+          p_settlement_amount?: number
+          p_settlement_method?: string
+          p_van_stock_action?: string
+        }
         Returns: Json
       }
       check_duplicate_competitor: {
