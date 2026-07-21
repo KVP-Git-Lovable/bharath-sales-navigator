@@ -71,7 +71,13 @@ Deno.serve(async (req) => {
     // Check if already exists first
     const { data: existing } = await admin.auth.admin.getUserById(userId)
     if (existing?.user) {
-      report.auth_user = 'already_exists'
+      // Force-reset password on existing row so admin can share it
+      const { error: updErr } = await admin.auth.admin.updateUserById(userId, {
+        password: temp_password,
+        phone: phone ?? undefined,
+        phone_confirm: !!phone,
+      })
+      report.auth_user = updErr ? { error: updErr.message } : 'existed_password_reset'
     } else {
       const createPayload: any = {
         id: userId,
