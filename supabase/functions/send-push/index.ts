@@ -133,21 +133,36 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
     await Promise.all(
       tokens.map(async (t) => {
-        const message = {
-          message: {
-            token: t.token,
-            notification: { title, body: messageBody },
-            data: stringData,
-            android: {
-              priority: 'HIGH',
-              notification: { channel_id: 'default', click_action: 'FLUTTER_NOTIFICATION_CLICK' },
-            },
-            webpush: {
-              notification: { title, body: messageBody, icon: '/icons/app-icon.png' },
-              fcm_options: { link: route },
-            },
-          },
-        };
+        const isWeb = t.platform === 'web';
+        // For web (Android/iOS PWA + desktop): send DATA-ONLY so the service
+        // worker is the single source of truth for display. Including a
+        // `notification` field would cause FCM to auto-display AND the SW's
+        // onBackgroundMessage to display — producing duplicate notifications
+        // (observed on iOS PWA) and inconsistent delivery on Android PWA.
+        // For native (android/ios via Capacitor): keep the notification block
+        // so the OS displays it while the app is backgrounded.
+        const message: Record<string, unknown> = isWeb
+          ? {
+              message: {
+                token: t.token,
+                data: { ...stringData, title, body: messageBody, url: route },
+                webpush: {
+                  headers: { Urgency: 'high' },
+                  fcm_options: { link: route },
+                },
+              },
+            }
+          : {
+              message: {
+                token: t.token,
+                notification: { title, body: messageBody },
+                data: stringData,
+                android: {
+                  priority: 'HIGH',
+                  notification: { channel_id: 'default', click_action: 'FLUTTER_NOTIFICATION_CLICK' },
+                },
+              },
+            };
         const r = await fetch(url, {
           method: 'POST',
           headers: {
