@@ -16014,6 +16014,9 @@ export type Database = {
           created_at: string
           current_address: string | null
           date_of_birth: string | null
+          deactivated_at: string | null
+          deactivated_by: string | null
+          deactivation_reason: string | null
           designation: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
@@ -16035,6 +16038,7 @@ export type Database = {
           phone_number: string | null
           preferred_language: string | null
           profile_picture_url: string | null
+          reactivated_at: string | null
           recovery_email: string | null
           role_id: string | null
           territories_covered: string[] | null
@@ -16050,6 +16054,9 @@ export type Database = {
           created_at?: string
           current_address?: string | null
           date_of_birth?: string | null
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          deactivation_reason?: string | null
           designation?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -16071,6 +16078,7 @@ export type Database = {
           phone_number?: string | null
           preferred_language?: string | null
           profile_picture_url?: string | null
+          reactivated_at?: string | null
           recovery_email?: string | null
           role_id?: string | null
           territories_covered?: string[] | null
@@ -16086,6 +16094,9 @@ export type Database = {
           created_at?: string
           current_address?: string | null
           date_of_birth?: string | null
+          deactivated_at?: string | null
+          deactivated_by?: string | null
+          deactivation_reason?: string | null
           designation?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -16107,6 +16118,7 @@ export type Database = {
           phone_number?: string | null
           preferred_language?: string | null
           profile_picture_url?: string | null
+          reactivated_at?: string | null
           recovery_email?: string | null
           role_id?: string | null
           territories_covered?: string[] | null
@@ -22162,6 +22174,33 @@ export type Database = {
           },
         ]
       }
+      user_status_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          performed_by: string | null
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          performed_by?: string | null
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          performed_by?: string | null
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       van_beat_assignments: {
         Row: {
           assigned_date: string
@@ -23950,6 +23989,10 @@ export type Database = {
         Returns: undefined
       }
       deactivate_beat: { Args: { p_beat_id: string }; Returns: Json }
+      deactivate_user: {
+        Args: { p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
       delete_beat_permanent: { Args: { p_beat_id: string }; Returns: Json }
       detect_retailer_duplicates: {
         Args: {
@@ -24461,9 +24504,51 @@ export type Database = {
         Returns: string
       }
       nextval_text: { Args: { seq_name: string }; Returns: string }
+      notif_fill: {
+        Args: {
+          p_actor_name: string
+          p_meta: Json
+          p_module: string
+          p_tmpl: string
+        }
+        Returns: string
+      }
+      notif_managers_up_chain: {
+        Args: { p_user_id: string }
+        Returns: string[]
+      }
+      notif_pick_users: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          role: string
+        }[]
+      }
+      notif_preview_recipients: {
+        Args: {
+          p_receiver_role?: string
+          p_receiver_type: string
+          p_receiver_user_id?: string
+          p_sample_actor?: string
+        }
+        Returns: {
+          id: string
+          name: string
+          role: string
+        }[]
+      }
       notify_admins: {
         Args: { p_message: string; p_title: string; p_type: string }
         Returns: undefined
+      }
+      notify_send_test: {
+        Args: { p_actor?: string; p_event_code: string; p_source_table: string }
+        Returns: Json
+      }
+      notify_send_test_push: {
+        Args: { p_body?: string; p_title?: string; p_user_id: string }
+        Returns: Json
       }
       owns_completed_invitation: {
         Args: { _email: string; _user_id: string }
@@ -24496,6 +24581,7 @@ export type Database = {
         Returns: number
       }
       reactivate_beat: { Args: { p_beat_id: string }; Returns: Json }
+      reactivate_user: { Args: { p_user_id: string }; Returns: Json }
       recompute_retailer_pending: {
         Args: { p_retailer_id: string }
         Returns: number

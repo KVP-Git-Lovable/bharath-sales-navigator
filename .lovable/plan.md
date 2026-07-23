@@ -1,60 +1,50 @@
-## Goal
-Fully restore the user **Harirama Bantwal** (`43ac16dc-24cb-489f-b77a-08e3fb0af57d`) so he can log in again, while keeping every existing FK reference intact (attendance, visits, orders, expenses, targets, etc. — ~40 tables still reference this UUID).
+# Restore `profile_object_permissions` from the uploaded backup
 
 ## What we have
-The recycle_bin row `4e63e517-1de2-4eb0-8e9f-bfda219ab11f` contains the full archive:
-- `profile` — username "Harirama Bantwal", phone `9606267768`, photo URL, role_id=null, active
-- `user_role` — role: `user`
-- `user_profile` — security profile `f857aa13-adc1-4163-93dd-f82ff1eabf7b`
-- `employee` — manager `427ce7c2-b26e-43c8-9470-fc57a73e8606`, hire/salary fields as-was
+- Uploaded file `profile_object_permissions_rows.sql` — a single `INSERT ... VALUES (...), (...), ...` with **~2,473 rows** and all 12 columns of the original schema. Timestamps range back to 2026-03-18, so this is a full pre-loss snapshot.
+- `security_profiles` (3 system + 1 custom) and `user_profiles` (28 rows) are intact — profile_ids in the backup will resolve.
 
-The **only** thing missing is the `auth.users` row itself (deleted by the cascade). This app uses **phone-based login**, not email, so the auth account will be recreated with phone `9606267768`.
+## Fix (two steps)
 
-## Approach: preserve original UUID via one-shot admin edge function
+### Step 1 — Migration: recreate the table + RLS + trigger
+Idempotent SQL:
+1. `CREATE TABLE IF NOT EXISTS public.profile_object_permissions` with:
+   - `id uuid pk default gen_random_uuid()`
+   - `profile_id uuid REFERENCES security_profiles(id) ON DELETE CASCADE`
+   - `object_name text not null`
+   - `permission_type text not null default 'sub_feature'`
+   - `parent_module text`
+   - six boolean flags default false
+   - `created_at timestamptz default now()`
+   - `UNIQUE (profile_id, object_name, permission_type)` (matches the `ON CONFLICT` used by prior migrations)
+2. `GRANT SELECT, INSERT, UPDATE, DELETE ... TO authenticated; GRANT ALL ... TO service_role;`
+3. `ENABLE ROW LEVEL SECURITY` and re-create the two original policies:
+   - `SELECT`: caller's `user_profiles.profile_id = profile_object_permissions.profile_id`, OR `public.is_system_admin(auth.uid())`.
+   - `ALL` (write): only `public.is_system_admin(auth.uid())`.
+4. Re-create the `backfill_system_profile_permissions` trigger on `security_profiles` (same body as migration `20260714110117…`).
 
-Recreating the auth user with the same UUID is the only way to avoid touching ~40 FK tables. Supabase's `auth.admin.createUser` accepts a specific `id`. If it doesn't in this version, the function falls back to a direct service-role SQL insert into `auth.users` + `auth.identities`, which is the documented recovery path for exactly this scenario.
-
-### Step 1 — Create a one-off admin edge function `restore-deleted-user`
-- Guarded by `is_system_admin(caller)` (Prajwal / any System Administrator).
-- Input: `recycle_bin_id`, `temp_password` (admin supplies it in the request), optional `phone_confirm: true`.
-- Actions in order:
-  1. Read the recycle_bin row; abort if `original_table != 'profiles'` or `_meta.delete_option != 'delete'`.
-  2. Try `supabaseAdmin.auth.admin.createUser({ id, phone, password, phone_confirm: true, user_metadata: { full_name } })`. If the SDK rejects the custom id, fall back to a service-role SQL insert into `auth.users` (id, phone, phone_confirmed_at, encrypted_password via `crypt(password, gen_salt('bf'))`, `aud='authenticated'`, `role='authenticated'`, timestamps) + one row in `auth.identities`.
-  3. `INSERT` the archived `profile` row back into `public.profiles` (skip if already present).
-  4. `INSERT` the archived `user_role` row into `public.user_roles`.
-  5. `INSERT` the archived `user_profile` row into `public.user_profiles` (this restores his security profile so permissions load on login).
-  6. `INSERT` the archived `employee` row into `public.employees`.
-  7. `DELETE` the recycle_bin row (or mark it restored) so it doesn't get re-restored.
-  8. Return `{ success, user_id, phone, temp_password_note }`.
-- Every step wrapped in try/catch with `console.warn`; partial success returns a detailed report so we know what to fix manually.
-
-### Step 2 — Invoke it
-Call the function from the assistant with:
+### Step 2 — Data restore from the uploaded backup
+Using the insert-data tool, run the uploaded `INSERT` verbatim with:
 ```
-recycle_bin_id: 4e63e517-1de2-4eb0-8e9f-bfda219ab11f
-temp_password: <one you provide in chat>
+INSERT INTO public.profile_object_permissions (...) VALUES ...
+ON CONFLICT (profile_id, object_name, permission_type) DO UPDATE SET
+  can_read = EXCLUDED.can_read, can_create = EXCLUDED.can_create,
+  can_edit = EXCLUDED.can_edit, can_delete = EXCLUDED.can_delete,
+  can_view_all = EXCLUDED.can_view_all, can_modify_all = EXCLUDED.can_modify_all,
+  parent_module = EXCLUDED.parent_module;
 ```
-The temp password will be shared back to Harirama out-of-band; he can change it after first login.
+- The `id` PK column is included in the backup — we'll keep it (avoids ID churn for anything that referenced these rows).
+- If the raw `INSERT` payload exceeds one tool call, we'll split into a couple of `VALUES` batches — no schema changes, purely data.
 
-### Step 3 — Verify
-- Query `auth.users` for id `43ac16dc-…` → row exists, phone set, `phone_confirmed_at` set.
-- Query `public.profiles`, `public.user_roles`, `public.user_profiles`, `public.employees` for the same id → all four rows back.
-- Confirm `user_profiles.profile_id = f857aa13-…` (security profile) → permissions will load.
-- Recycle_bin entry `4e63e517-…` is gone.
+### Step 3 — Verify + safety-net
+After the restore, in the same insert call:
+- `SELECT COUNT(*)` per system profile — expect the three system profiles (`System Administrator`, `Sales Manager`, `Field Sales Executive`) to have hundreds of rows each.
+- Re-run the small catalog seed from migration `20260714111408…` (271 flat sub-feature keys) with `ON CONFLICT DO UPDATE ... = true` — cheap belt-and-braces that guarantees `admin_user_list`, `admin_dashboard`, `analytics_*`, etc. exist for every system profile even if the backup was slightly stale.
 
-## What the plan does NOT change
-- No schema changes.
-- No modification of any other user's data.
-- No touching of the ~40 tables that reference Harirama's UUID — they already point to the restored row.
-- The edge function is one-off; it can be deleted after use, or kept as a general "restore from recycle_bin" utility if you want it reusable later.
+## After it runs
+- Ask affected users to hard-refresh once — clears the 30-min `useProfilePermissions` cache and the localStorage snapshot; login and dashboards render immediately.
+- No app code changes needed.
 
-## Risks & mitigations
-- **Direct auth.users insert**: mildly discouraged by Supabase guidelines, but this is exactly the "restore after wrongful delete" case. We try the SDK path first and only fall back to SQL if needed.
-- **Password**: temp password must be shared securely; recommend Harirama changes it on first login (the app already supports `must_change_password`).
-- **If any of the four public inserts collide** (unlikely — rows were purged): the function logs and continues; you'll get a per-table status back.
-
-## Deliverables in build mode
-1. `supabase/functions/restore-deleted-user/index.ts` (with corsHeaders, admin guard, both auth-restore paths).
-2. Deploy the function.
-3. Invoke it with the recycle_bin id and a temp password you provide.
-4. Post-restore verification query results shown in chat.
+## Files touched
+- New: `supabase/migrations/<ts>_restore_profile_object_permissions_table.sql` (schema + RLS + trigger only)
+- No file edits; data restored via the insert-data tool from the uploaded backup.
