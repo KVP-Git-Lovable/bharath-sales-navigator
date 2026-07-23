@@ -11277,6 +11277,7 @@ export type Database = {
           retailer_target_ids: string[] | null
           retailer_target_type: string | null
           source_table: string
+          timezone: string
           title_template: string
           updated_at: string
         }
@@ -11295,6 +11296,7 @@ export type Database = {
           retailer_target_ids?: string[] | null
           retailer_target_type?: string | null
           source_table: string
+          timezone?: string
           title_template?: string
           updated_at?: string
         }
@@ -11313,6 +11315,7 @@ export type Database = {
           retailer_target_ids?: string[] | null
           retailer_target_type?: string | null
           source_table?: string
+          timezone?: string
           title_template?: string
           updated_at?: string
         }
@@ -16719,6 +16722,201 @@ export type Database = {
           title?: string
           updated_at?: string
           version?: string
+        }
+        Relationships: []
+      }
+      report_definitions: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          dataset_key: string
+          id: string
+          layout: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          dataset_key: string
+          id?: string
+          layout: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          dataset_key?: string
+          id?: string
+          layout?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_definitions_dataset_key_fkey"
+            columns: ["dataset_key"]
+            isOneToOne: false
+            referencedRelation: "reportable_datasets"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      report_delivery_log: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          in_app_status: string | null
+          notification_id: string | null
+          period: string
+          push_status: string | null
+          recipient_user_id: string
+          storage_path: string | null
+          subscription_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          in_app_status?: string | null
+          notification_id?: string | null
+          period: string
+          push_status?: string | null
+          recipient_user_id: string
+          storage_path?: string | null
+          subscription_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          in_app_status?: string | null
+          notification_id?: string | null
+          period?: string
+          push_status?: string | null
+          recipient_user_id?: string
+          storage_path?: string | null
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_delivery_log_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "report_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_subscriptions: {
+        Row: {
+          attachment_format: string
+          cadence: string
+          created_at: string
+          created_by: string | null
+          fire_day: string | null
+          fire_time: string
+          id: string
+          last_fired_at: string | null
+          name: string
+          push_to_phone: boolean
+          recipient_mode: string
+          recipient_user_ids: string[]
+          report_definition_id: string
+          scope: string
+          status: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_format?: string
+          cadence: string
+          created_at?: string
+          created_by?: string | null
+          fire_day?: string | null
+          fire_time?: string
+          id?: string
+          last_fired_at?: string | null
+          name: string
+          push_to_phone?: boolean
+          recipient_mode?: string
+          recipient_user_ids?: string[]
+          report_definition_id: string
+          scope?: string
+          status?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_format?: string
+          cadence?: string
+          created_at?: string
+          created_by?: string | null
+          fire_day?: string | null
+          fire_time?: string
+          id?: string
+          last_fired_at?: string | null
+          name?: string
+          push_to_phone?: boolean
+          recipient_mode?: string
+          recipient_user_ids?: string[]
+          report_definition_id?: string
+          scope?: string
+          status?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_subscriptions_report_definition_id_fkey"
+            columns: ["report_definition_id"]
+            isOneToOne: false
+            referencedRelation: "report_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reportable_datasets: {
+        Row: {
+          created_at: string
+          description: string | null
+          dimensions: Json
+          is_active: boolean
+          key: string
+          label: string
+          measures: Json
+          source: string
+          supports_matrix: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          dimensions?: Json
+          is_active?: boolean
+          key: string
+          label: string
+          measures?: Json
+          source: string
+          supports_matrix?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          dimensions?: Json
+          is_active?: boolean
+          key?: string
+          label?: string
+          measures?: Json
+          source?: string
+          supports_matrix?: boolean
+          updated_at?: string
         }
         Relationships: []
       }
@@ -23988,6 +24186,10 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: undefined
       }
+      create_report_subscription: {
+        Args: { p_definition: Json; p_subscription: Json }
+        Returns: string
+      }
       deactivate_beat: { Args: { p_beat_id: string }; Returns: Json }
       deactivate_user: {
         Args: { p_reason?: string; p_user_id: string }
@@ -24077,6 +24279,16 @@ export type Database = {
           level: number
           subordinate_user_id: string
         }[]
+      }
+      get_attendance_report: {
+        Args: {
+          p_columns: string
+          p_filters: Json
+          p_layout: string
+          p_rows: string
+          p_values: string[]
+        }
+        Returns: Json[]
       }
       get_auth_user_id_by_email: {
         Args: { lookup_email: string }
@@ -24222,6 +24434,16 @@ export type Database = {
           total_amount: number
         }[]
       }
+      get_orders_report: {
+        Args: {
+          p_columns: string
+          p_filters: Json
+          p_layout: string
+          p_rows: string
+          p_values: string[]
+        }
+        Returns: Json[]
+      }
       get_password_reset_stats: {
         Args: never
         Returns: {
@@ -24348,6 +24570,36 @@ export type Database = {
           state: string
         }[]
       }
+      get_sales_quantity_report: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_distributor_id?: string
+          p_product_id?: string
+          p_user_id?: string
+        }
+        Returns: {
+          is_base_unit: boolean
+          line_count: number
+          order_count: number
+          product_id: string
+          product_name: string
+          quantity_in_unit: number
+          uom_category: string
+          uom_code: string
+          uom_name: string
+        }[]
+      }
+      get_sales_report: {
+        Args: {
+          p_columns: string
+          p_filters: Json
+          p_layout: string
+          p_rows: string
+          p_values: string[]
+        }
+        Returns: Json[]
+      }
       get_subordinate_users: {
         Args: { user_id_param: string }
         Returns: {
@@ -24426,6 +24678,16 @@ export type Database = {
           skills: string[]
           state: string
         }[]
+      }
+      get_visits_report: {
+        Args: {
+          p_columns: string
+          p_filters: Json
+          p_layout: string
+          p_rows: string
+          p_values: string[]
+        }
+        Returns: Json[]
       }
       has_role: {
         Args: {
@@ -24594,6 +24856,13 @@ export type Database = {
           p_retailer_id: string
         }
         Returns: number
+      }
+      report_all_managers: {
+        Args: never
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
       }
       request_backdate: {
         Args: { p_date: string; p_reason: string }
