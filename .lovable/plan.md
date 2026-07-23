@@ -1,50 +1,87 @@
-# Restore `profile_object_permissions` from the uploaded backup
 
-## What we have
-- Uploaded file `profile_object_permissions_rows.sql` — a single `INSERT ... VALUES (...), (...), ...` with **~2,473 rows** and all 12 columns of the original schema. Timestamps range back to 2026-03-18, so this is a full pre-loss snapshot.
-- `security_profiles` (3 system + 1 custom) and `user_profiles` (28 rows) are intact — profile_ids in the backup will resolve.
+# Notification Rules Redesign + Web Push Fixes + Inbox Polish
 
-## Fix (two steps)
+Four independent scopes bundled into one release. All DB functions (`notif_pick_users`, `notif_preview_recipients`, `notify_send_test`) already exist — no migrations.
 
-### Step 1 — Migration: recreate the table + RLS + trigger
-Idempotent SQL:
-1. `CREATE TABLE IF NOT EXISTS public.profile_object_permissions` with:
-   - `id uuid pk default gen_random_uuid()`
-   - `profile_id uuid REFERENCES security_profiles(id) ON DELETE CASCADE`
-   - `object_name text not null`
-   - `permission_type text not null default 'sub_feature'`
-   - `parent_module text`
-   - six boolean flags default false
-   - `created_at timestamptz default now()`
-   - `UNIQUE (profile_id, object_name, permission_type)` (matches the `ON CONFLICT` used by prior migrations)
-2. `GRANT SELECT, INSERT, UPDATE, DELETE ... TO authenticated; GRANT ALL ... TO service_role;`
-3. `ENABLE ROW LEVEL SECURITY` and re-create the two original policies:
-   - `SELECT`: caller's `user_profiles.profile_id = profile_object_permissions.profile_id`, OR `public.is_system_admin(auth.uid())`.
-   - `ALL` (write): only `public.is_system_admin(auth.uid())`.
-4. Re-create the `backfill_system_profile_permissions` trigger on `security_profiles` (same body as migration `20260714110117…`).
+---
 
-### Step 2 — Data restore from the uploaded backup
-Using the insert-data tool, run the uploaded `INSERT` verbatim with:
-```
-INSERT INTO public.profile_object_permissions (...) VALUES ...
-ON CONFLICT (profile_id, object_name, permission_type) DO UPDATE SET
-  can_read = EXCLUDED.can_read, can_create = EXCLUDED.can_create,
-  can_edit = EXCLUDED.can_edit, can_delete = EXCLUDED.can_delete,
-  can_view_all = EXCLUDED.can_view_all, can_modify_all = EXCLUDED.can_modify_all,
-  parent_module = EXCLUDED.parent_module;
-```
-- The `id` PK column is included in the backup — we'll keep it (avoids ID churn for anything that referenced these rows).
-- If the raw `INSERT` payload exceeds one tool call, we'll split into a couple of `VALUES` batches — no schema changes, purely data.
+## 1. Plain-language rule builder (admin)
 
-### Step 3 — Verify + safety-net
-After the restore, in the same insert call:
-- `SELECT COUNT(*)` per system profile — expect the three system profiles (`System Administrator`, `Sales Manager`, `Field Sales Executive`) to have hundreds of rows each.
-- Re-run the small catalog seed from migration `20260714111408…` (271 flat sub-feature keys) with `ON CONFLICT DO UPDATE ... = true` — cheap belt-and-braces that guarantees `admin_user_list`, `admin_dashboard`, `analytics_*`, etc. exist for every system profile even if the backup was slightly stale.
+**File:** `src/pages/admin/NotificationRulesAdmin.tsx` (or whichever component currently renders the rules form — I'll locate it in build mode; likely `src/components/admin/NotificationRuleForm.tsx`).
 
-## After it runs
-- Ask affected users to hard-refresh once — clears the 30-min `useProfilePermissions` cache and the localStorage snapshot; login and dashboards render immediately.
-- No app code changes needed.
+Replace the current form with a **sentence-style builder**:
 
-## Files touched
-- New: `supabase/migrations/<ts>_restore_profile_object_permissions_table.sql` (schema + RLS + trigger only)
-- No file edits; data restored via the insert-data tool from the uploaded backup.
+> When **[event ▾]** happens on **[module ▾]**, notify **[whom ▾]**, via **[channel ▾]**.
+
+- **whom ▾** dropdown maps to `receiver_type` with a muted sub-label under each option:
+  - The person themselves → `employee`
+  - Their manager → `manager`
+  - Whole hierarchy up → `hierarchy`
+  - A role → `role` (reveals role picker)
+  - Specific people → `specific_user` (reveals user picker below)
+  - All admins → `admin`
+
+- **Message field** with clickable token chips inserted at caret: `{user_name}` `{date}` `{time}` `{beat}` `{record_name}`.
+
+- **User picker** (only when whom = Specific people): options from `supabase.rpc('notif_pick_users')` → `{id, name, role}`. Selected `id` → `receiver_user_id`. Debounced search over name.
+
+- **"Who will receive this" live preview card**:
+  - Fires on any change (debounced 300 ms).
+  - Calls `supabase.rpc('notif_preview_recipients', { p_receiver_type, p_receiver_role, p_receiver_user_id, p_sample_actor })`.
+  - Renders returned names as chips + total count ("Will notify 4 people").
+  - For actor-relative types (`employee`, `manager`, `hierarchy`), show a small **"Preview as [rep ▾]"** picker sourced from `notif_pick_users`, defaulting to the current user; its selection is passed as `p_sample_actor`.
+
+- **"Send test to me" button**: calls `supabase.rpc('notify_send_test', { p_event_code, p_source_table })` using the current form's event/module. Toast the returned recipient names on success.
+
+- **No DB changes.** Existing save/update handlers keep writing the same columns.
+
+## 2. Web push fixes — SW scope + foreground display
+
+**Files:** `src/lib/firebaseMessaging.ts`, `public/firebase-messaging-sw.js`.
+
+- Register `firebase-messaging-sw.js` at **root scope** (`/`) instead of the query-param URL path currently used. That path currently causes `getToken` to hang on some browsers because the scope defaults to `/firebase-messaging-sw.js?...` rather than `/`.
+  - Register as: `navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })`.
+  - Move Firebase config out of URL params: read `VITE_FIREBASE_*` env in `public/firebase-messaging-sw.js` via a build-time replacement or import them inside a small `public/firebase-messaging-sw-config.js` — simplest: hardcode `self.firebaseConfig` at the top of the SW using values sourced from env at build via a tiny generated file, or read from `self.location` if project keeps that pattern. **I'll use the standard pattern: bake the config into a generated `public/firebase-messaging-sw.js` via Vite's `define` or a build script.** Confirm approach in build.
+- Replace the empty `onMessage(messaging, () => {})` with a real handler:
+  - Show `toast(payload.notification.title, { description: payload.notification.body })` via `sonner`.
+  - Still call the optional `onNotification?.()` callback so the bell refetch fires.
+- All `VITE_FIREBASE_*` + `VITE_FIREBASE_VAPID_KEY` read from `import.meta.env` (already there — just verify none are missing).
+- **`push_device_tokens` upsert stays untouched.**
+
+## 3. Reliable push enable on Profile
+
+**File:** `src/components/PushNotificationSettings.tsx`.
+
+- Add a `useEffect` that runs on mount (and when `enabled` becomes `true`):
+  - If `Notification.permission === 'granted'` **and** `enabled === true` **and** not native, call `initWebPush(user.id)` to (re)register the FCM token.
+  - Guarded by a ref so it only fires once per session.
+- Keep the existing OFF→ON toggle behaviour (that path still works for first-time permission grant).
+- Toggle stays as the opt-out control — nothing removed.
+
+## 4. Notification center polish
+
+**Files:** `src/components/NotificationBell.tsx`, and inbox list rendering (already uses `useNotifications`).
+
+- **Unread dot** already exists per item; add a distinct blue dot vs read state (currently every item shows a dot because the query only fetches unread). Since fetch is unread-only, keep dot but visually differentiate the newest unread from older with the existing bg tint — no behaviour change needed; add clearer styling.
+- **"Mark all read"** action — already present in the header of the popover. Verify it's visible and wire tightens if broken.
+- **Relative timestamps** — already used via `formatDistanceToNow`. Keep.
+- **"Test" tag** — add a small pill (`<Badge variant="secondary">Test</Badge>`) when `notification.metadata?.is_test === true`. Requires reading `metadata` field (already in the `Notification` type on `useNotifications`, need to ensure the `select('id, title, message, ...')` on `NotificationBell` fetches it — it uses `useNotifications` which does `select('*')`, so it's included).
+
+The core need in #4 is really the **Test badge** — the other items are already implemented but I'll audit them in build mode and tighten any gaps.
+
+---
+
+## Out of scope (explicit)
+
+- No DB migrations. No RLS changes. No edits to `notif_pick_users` / `notif_preview_recipients` / `notify_send_test`.
+- No changes to native push (`pushRegistration.ts`) beyond leaving it alone.
+- No changes to `push_device_tokens` schema or upsert payload.
+
+## Verification plan
+
+- **Rule builder**: open the admin page, build a rule with each `whom` option, confirm preview count updates and matches expected names; click "Send test to me" and confirm a toast + a row lands in `notifications` for the current user.
+- **Web push**: on a published build (not the preview iframe — SW registration is disabled there per skill/pwa), enable push on Profile, confirm FCM token upserts to `push_device_tokens`, send a test push and confirm a foreground toast appears when the tab is open.
+- **Profile re-register**: revoke and re-grant browser permission, reload the app — token should re-register without needing to toggle off/on.
+- **Inbox**: force a row with `metadata: { is_test: true }` and confirm the "Test" pill renders.
+
+Approve and I'll build all four in one pass.
