@@ -11269,7 +11269,7 @@ export type Database = {
           id: string
           is_active: boolean
           message_template: string
-          name: string
+          name: string | null
           notification_channel: string
           receiver_role: string | null
           receiver_type: string
@@ -11288,7 +11288,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           message_template?: string
-          name: string
+          name?: string | null
           notification_channel?: string
           receiver_role?: string | null
           receiver_type?: string
@@ -11307,7 +11307,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           message_template?: string
-          name?: string
+          name?: string | null
           notification_channel?: string
           receiver_role?: string | null
           receiver_type?: string
@@ -11319,15 +11319,7 @@ export type Database = {
           title_template?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "notification_rules_event_code_fkey"
-            columns: ["event_code"]
-            isOneToOne: false
-            referencedRelation: "notification_event_types"
-            referencedColumns: ["event_code"]
-          },
-        ]
+        Relationships: []
       }
       notifications: {
         Row: {
