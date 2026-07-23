@@ -26,8 +26,19 @@ export function PushNotificationSettings() {
         .eq('user_id', user.id)
         .eq('template_type', 'push_master')
         .maybeSingle();
-      setEnabled(data?.is_enabled ?? true);
+      const isOn = data?.is_enabled ?? true;
+      setEnabled(isOn);
       setLoading(false);
+
+      // Reliable registration: if the toggle is ON and the browser already granted
+      // permission, register the push token now — don't wait for an OFF→ON flip.
+      try {
+        if (isOn && !Capacitor.isNativePlatform() && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          await initWebPush(user.id);
+        }
+      } catch {
+        // best-effort; the toggle remains the recovery path
+      }
     })();
   }, [user?.id]);
 

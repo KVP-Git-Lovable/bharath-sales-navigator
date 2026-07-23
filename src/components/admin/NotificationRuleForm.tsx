@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye } from 'lucide-react';
+import { X, Eye, Send, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface NotificationRuleFormProps {
@@ -35,21 +35,23 @@ const SOURCE_TABLES = [
   'retailers', 'attendance', 'branding_requests',
 ];
 
-const RECEIVER_TYPES = [
-  { value: 'employee', label: 'Employee (Actor)' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'admin', label: 'All Admins' },
-  { value: 'role', label: 'Specific Role' },
-  { value: 'specific_user', label: 'Specific User' },
+// Plain-language "whom" options — sub-label maps to the stored receiver_type.
+const WHOM_OPTIONS: Array<{ value: string; label: string; sub: string }> = [
+  { value: 'employee',      label: 'The person themselves', sub: 'employee — the actor who triggered the event' },
+  { value: 'manager',       label: 'Their manager',         sub: 'manager — direct reporting manager of the actor' },
+  { value: 'hierarchy',     label: 'Whole hierarchy up',    sub: 'hierarchy — every manager above the actor' },
+  { value: 'role',          label: 'A role',                sub: 'role — everyone assigned to a specific role' },
+  { value: 'specific_user', label: 'Specific people',       sub: 'specific_user — one chosen person' },
+  { value: 'admin',         label: 'All admins',            sub: 'admin — every system administrator' },
 ];
 
 const CHANNELS = [
   { value: 'in_app', label: 'In-App' },
-  { value: 'email', label: 'Email' },
-  { value: 'push', label: 'Push (Future)' },
+  { value: 'email',  label: 'Email' },
+  { value: 'push',   label: 'Push' },
 ];
 
-const PLACEHOLDERS = ['{user_name}', '{module_name}', '{record_name}', '{date}', '{points}'];
+const PLACEHOLDERS = ['{user_name}', '{date}', '{time}', '{beat}', '{record_name}'];
 
 export function NotificationRuleForm({ rule, userId, onClose, onSaved }: NotificationRuleFormProps) {
   const [name, setName] = useState(rule?.name || '');
@@ -57,11 +59,14 @@ export function NotificationRuleForm({ rule, userId, onClose, onSaved }: Notific
   const [sourceTable, setSourceTable] = useState(rule?.source_table || '');
   const [receiverType, setReceiverType] = useState(rule?.receiver_type || 'employee');
   const [receiverRole, setReceiverRole] = useState(rule?.receiver_role || '');
+  const [receiverUserId, setReceiverUserId] = useState<string>(rule?.receiver_user_id || '');
   const [notification_channel, setChannel] = useState(rule?.notification_channel || 'in_app');
-  const [titleTemplate, setTitleTemplate] = useState(rule?.title_template || '{user_name} - {module_name}');
-  const [messageTemplate, setMessageTemplate] = useState(rule?.message_template || '{user_name} performed an action on {module_name}');
+  const [titleTemplate, setTitleTemplate] = useState(rule?.title_template || '{user_name} - {record_name}');
+  const [messageTemplate, setMessageTemplate] = useState(rule?.message_template || '{user_name} performed an action');
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [sampleActor, setSampleActor] = useState<string>(userId);
+  const [sendingTest, setSendingTest] = useState(false);
 
   const { data: eventTypes = [] } = useQuery({
     queryKey: ['notification-event-types'],
@@ -76,23 +81,57 @@ export function NotificationRuleForm({ rule, userId, onClose, onSaved }: Notific
     },
   });
 
-  const insertPlaceholder = (placeholder: string, target: 'title' | 'message') => {
-    if (target === 'title') setTitleTemplate(prev => prev + placeholder);
-    else setMessageTemplate(prev => prev + placeholder);
+  // User picker used by "Specific people" and by the "preview as [rep]" control.
+  const { data: pickUsers = [] } = useQuery({
+    queryKey: ['notif-pick-users'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('notif_pick_users');
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string; role?: string | null }>;
+    },
+  });
+
+  // Live "who will receive this" preview.
+  const { data: preview, isFetching: previewLoading } = useQuery({
+    queryKey: ['notif-preview', receiverType, receiverRole, receiverUserId, sampleActor],
+    enabled: !!receiverType,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc('notif_preview_recipients', {
+        p_receiver_type: receiverType,
+        p_receiver_role: receiverType === 'role' ? (receiverRole || null) : null,
+        p_receiver_user_id: receiverType === 'specific_user' ? (receiverUserId || null) : null,
+        p_sample_actor: sampleActor || null,
+      });
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; name: string }>;
+    },
+  });
+
+  const insertPlaceholder = (placeholder: string) => {
+    setMessageTemplate((prev) => prev + placeholder);
   };
 
   const renderPreview = (template: string) => {
+    const now = new Date();
     return template
       .replace('{user_name}', 'John Doe')
-      .replace('{module_name}', sourceTable ? sourceTable.replace(/_/g, ' ') : 'Module')
       .replace('{record_name}', 'Sample Record')
-      .replace('{date}', new Date().toLocaleDateString())
-      .replace('{points}', '100');
+      .replace('{date}', now.toLocaleDateString())
+      .replace('{time}', now.toLocaleTimeString())
+      .replace('{beat}', 'Beat 12');
   };
 
   const handleSave = async () => {
     if (!name || !eventCode || !sourceTable) {
-      toast.error('Please fill in all required fields');
+      toast.error('Give the rule a name, and pick an event and module.');
+      return;
+    }
+    if (receiverType === 'role' && !receiverRole) {
+      toast.error('Pick which role should receive this.');
+      return;
+    }
+    if (receiverType === 'specific_user' && !receiverUserId) {
+      toast.error('Pick which person should receive this.');
       return;
     }
     setSaving(true);
@@ -103,6 +142,7 @@ export function NotificationRuleForm({ rule, userId, onClose, onSaved }: Notific
         source_table: sourceTable,
         receiver_type: receiverType,
         receiver_role: receiverType === 'role' ? receiverRole : null,
+        receiver_user_id: receiverType === 'specific_user' ? receiverUserId : null,
         notification_channel,
         title_template: titleTemplate,
         message_template: messageTemplate,
@@ -127,79 +167,180 @@ export function NotificationRuleForm({ rule, userId, onClose, onSaved }: Notific
     }
   };
 
+  const handleSendTest = async () => {
+    if (!eventCode || !sourceTable) {
+      toast.error('Pick an event and a module before testing.');
+      return;
+    }
+    setSendingTest(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('notify_send_test', {
+        p_event_code: eventCode,
+        p_source_table: sourceTable,
+      });
+      if (error) throw error;
+      const names = ((data as any[]) || []).map((r) => r.name).filter(Boolean);
+      toast.success(
+        names.length ? `Test sent to: ${names.join(', ')}` : 'Test sent — no matching recipients.',
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send test');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const chip = 'inline-flex items-center rounded-md border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[13px] font-medium text-primary';
+  const showActorPreview = receiverType === 'employee' || receiverType === 'manager' || receiverType === 'hierarchy';
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-lg">{rule ? 'Edit Rule' : 'Create Notification Rule'}</CardTitle>
         <Button variant="ghost" size="sm" onClick={onClose}><X size={16} /></Button>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Rule Name *</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Notify manager on new order" />
-          </div>
-          <div className="space-y-2">
-            <Label>Event Type *</Label>
+      <CardContent className="space-y-5">
+        <div className="space-y-2">
+          <Label>Rule name *</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Notify manager on new order" />
+        </div>
+
+        {/* Sentence-style builder */}
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Rule</p>
+          <div className="flex flex-wrap items-center gap-2 text-[14px] leading-8">
+            <span>When</span>
             <Select value={eventCode} onValueChange={setEventCode}>
-              <SelectTrigger><SelectValue placeholder="Select event" /></SelectTrigger>
+              <SelectTrigger className={`${chip} h-8 w-auto min-w-[140px]`}>
+                <SelectValue placeholder="event" />
+              </SelectTrigger>
               <SelectContent>
-                {eventTypes.map((et: any) => (
+                {(eventTypes as any[]).map((et) => (
                   <SelectItem key={et.event_code} value={et.event_code}>{et.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Source Table *</Label>
+            <span>happens on</span>
             <Select value={sourceTable} onValueChange={setSourceTable}>
-              <SelectTrigger><SelectValue placeholder="Select table" /></SelectTrigger>
+              <SelectTrigger className={`${chip} h-8 w-auto min-w-[140px]`}>
+                <SelectValue placeholder="module" />
+              </SelectTrigger>
               <SelectContent>
-                {SOURCE_TABLES.map(t => (
+                {SOURCE_TABLES.map((t) => (
                   <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Receiver</Label>
+            <span>, notify</span>
             <Select value={receiverType} onValueChange={setReceiverType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RECEIVER_TYPES.map(r => (
-                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+              <SelectTrigger className={`${chip} h-8 w-auto min-w-[180px]`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-w-[320px]">
+                {WHOM_OPTIONS.map((w) => (
+                  <SelectItem key={w.value} value={w.value}>
+                    <div className="flex flex-col">
+                      <span>{w.label}</span>
+                      <span className="text-[11px] text-muted-foreground">{w.sub}</span>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          {receiverType === 'role' && (
-            <div className="space-y-2">
-              <Label>Role Name</Label>
-              <Input value={receiverRole} onChange={e => setReceiverRole(e.target.value)} placeholder="e.g. admin, moderator" />
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label>Channel</Label>
+            <span>, via</span>
             <Select value={notification_channel} onValueChange={setChannel}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className={`${chip} h-8 w-auto min-w-[110px]`}>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {CHANNELS.map(c => (
+                {CHANNELS.map((c) => (
                   <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <span>.</span>
           </div>
+
+          {receiverType === 'role' && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <Label className="text-xs text-muted-foreground">Role name</Label>
+              <Input
+                value={receiverRole}
+                onChange={(e) => setReceiverRole(e.target.value)}
+                placeholder="e.g. admin, sales_manager"
+                className="h-8 max-w-xs"
+              />
+            </div>
+          )}
+          {receiverType === 'specific_user' && (
+            <div className="mt-3 flex items-center gap-2 text-sm">
+              <Label className="text-xs text-muted-foreground">Person</Label>
+              <Select value={receiverUserId} onValueChange={setReceiverUserId}>
+                <SelectTrigger className="h-8 max-w-xs">
+                  <SelectValue placeholder="Pick a person" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pickUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name}{u.role ? ` — ${u.role}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* Live recipients preview */}
+        <div className="rounded-lg border p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Users className="h-4 w-4" />
+              Who will receive this
+              {previewLoading && <span className="text-xs text-muted-foreground">(refreshing…)</span>}
+            </div>
+            {showActorPreview && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>preview as</span>
+                <Select value={sampleActor} onValueChange={setSampleActor}>
+                  <SelectTrigger className="h-7 text-xs min-w-[160px]">
+                    <SelectValue placeholder="pick a rep" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pickUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          {preview && preview.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {preview.map((r) => (
+                <Badge key={r.id} variant="secondary" className="text-xs">{r.name}</Badge>
+              ))}
+              <span className="text-xs text-muted-foreground ml-1">
+                ({preview.length} {preview.length === 1 ? 'person' : 'people'})
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              No recipients match yet — adjust the sentence above.
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
-          <Label>Placeholders</Label>
+          <Label>Message tokens</Label>
+          <p className="text-xs text-muted-foreground">Click to insert into the message.</p>
           <div className="flex flex-wrap gap-1.5">
-            {PLACEHOLDERS.map(p => (
+            {PLACEHOLDERS.map((p) => (
               <Badge
                 key={p}
                 variant="outline"
                 className="cursor-pointer hover:bg-primary/10 text-xs"
-                onClick={() => insertPlaceholder(p, 'message')}
+                onClick={() => insertPlaceholder(p)}
               >
                 {p}
               </Badge>
@@ -209,12 +350,12 @@ export function NotificationRuleForm({ rule, userId, onClose, onSaved }: Notific
 
         <div className="space-y-2">
           <Label>Title Template</Label>
-          <Input value={titleTemplate} onChange={e => setTitleTemplate(e.target.value)} />
+          <Input value={titleTemplate} onChange={(e) => setTitleTemplate(e.target.value)} />
         </div>
 
         <div className="space-y-2">
-          <Label>Message Template</Label>
-          <Textarea value={messageTemplate} onChange={e => setMessageTemplate(e.target.value)} rows={3} />
+          <Label>Message</Label>
+          <Textarea value={messageTemplate} onChange={(e) => setMessageTemplate(e.target.value)} rows={3} />
         </div>
 
         {showPreview && (
@@ -225,12 +366,15 @@ export function NotificationRuleForm({ rule, userId, onClose, onSaved }: Notific
           </div>
         )}
 
-        <div className="flex items-center gap-2 pt-2">
+        <div className="flex flex-wrap items-center gap-2 pt-2">
           <Button onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : rule ? 'Update Rule' : 'Create Rule'}
           </Button>
           <Button variant="outline" onClick={() => setShowPreview(!showPreview)} className="gap-1.5">
             <Eye size={14} /> {showPreview ? 'Hide' : 'Show'} Preview
+          </Button>
+          <Button variant="outline" onClick={handleSendTest} disabled={sendingTest} className="gap-1.5">
+            <Send size={14} /> {sendingTest ? 'Sending…' : 'Send test to me'}
           </Button>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
         </div>

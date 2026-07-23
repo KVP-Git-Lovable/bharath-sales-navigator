@@ -50,13 +50,16 @@ export async function initWebPush(userId: string, onNotification?: () => void): 
     }
 
     if (!getApps().length) initializeApp(config);
-    // Pass Firebase web config to the SW via URL params so the SW file stays generic
+    // Pass Firebase web config to the SW via URL params so the SW file stays generic.
+    // Register at ROOT scope explicitly — some browsers stall getToken() when the
+    // SW's default scope reflects the query string.
     const swUrl =
       `/firebase-messaging-sw.js?apiKey=${encodeURIComponent(config.apiKey!)}` +
       `&projectId=${encodeURIComponent(config.projectId!)}` +
       `&appId=${encodeURIComponent(config.appId!)}` +
       `&senderId=${encodeURIComponent(config.messagingSenderId!)}`;
-    const reg = await navigator.serviceWorker.register(swUrl);
+    const reg = await navigator.serviceWorker.register(swUrl, { scope: '/' });
+    await navigator.serviceWorker.ready;
     const messaging = getMessaging();
     const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     if (!token) return null;
@@ -73,7 +76,17 @@ export async function initWebPush(userId: string, onNotification?: () => void): 
     );
     currentToken = token;
 
-    onMessage(messaging, () => {
+    onMessage(messaging, (payload) => {
+      try {
+        const title = payload?.notification?.title || (payload?.data as any)?.title || 'Notification';
+        const body = payload?.notification?.body || (payload?.data as any)?.body || '';
+        // Lazy-import to avoid pulling sonner into non-UI callers
+        import('sonner').then(({ toast }) => {
+          toast(title, body ? { description: body } : undefined);
+        }).catch(() => {});
+      } catch (err) {
+        devError('[Push] foreground display failed', err);
+      }
       onNotification?.();
     });
 
