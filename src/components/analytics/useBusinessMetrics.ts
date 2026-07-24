@@ -53,10 +53,13 @@ interface PendingPaymentDetail {
   user_name?: string;
 }
 
-const getKgQuantity = (quantity: unknown, _unit?: unknown) => {
-  // Single unit (Piece) — sum quantity as-is regardless of legacy unit label.
+const getKgQuantity = (quantity: unknown, unit?: unknown) => {
   const qty = Number(quantity || 0);
-  return Number.isFinite(qty) ? qty : 0;
+  if (!Number.isFinite(qty)) return 0;
+  const u = String(unit || '').toLowerCase().trim();
+  // Convert grams to KG so the KPI reflects true weight, not raw piece counts.
+  if (u === 'grams' || u === 'gram' || u === 'g') return qty / 1000;
+  return qty;
 };
 
 const getDisplayQuantity = (quantity: unknown, _unit?: unknown) => {
