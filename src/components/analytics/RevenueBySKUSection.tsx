@@ -108,19 +108,30 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
 
         const orderIds = orders.map((o: any) => o.id);
 
-        // Fetch order items for these orders
-        const { data: orderItems, error: itemsError } = await supabase
-          .from('order_items')
-          .select('product_name, quantity, unit, total')
-          .in('order_id', orderIds);
+        // Fetch order items in batches to avoid URL length limits (Bad Request on large .in() lists)
+        const BATCH_SIZE = 200;
+        const orderItems: any[] = [];
+        let itemsError: any = null;
+        for (let i = 0; i < orderIds.length; i += BATCH_SIZE) {
+          const batch = orderIds.slice(i, i + BATCH_SIZE);
+          const { data: batchItems, error: batchError } = await supabase
+            .from('order_items')
+            .select('product_name, quantity, unit, total')
+            .in('order_id', batch);
+          if (batchError) {
+            itemsError = batchError;
+            break;
+          }
+          if (batchItems) orderItems.push(...batchItems);
+        }
 
         console.log('[RevenueBySKU] order_items query', {
           orderIds: orderIds.length,
-          itemsReturned: orderItems?.length ?? 0,
+          itemsReturned: orderItems.length,
           itemsError,
         });
 
-        if (itemsError || !orderItems) {
+        if (itemsError) {
           console.error('Order items error:', itemsError);
           setSkuData([]);
           setLoading(false);
