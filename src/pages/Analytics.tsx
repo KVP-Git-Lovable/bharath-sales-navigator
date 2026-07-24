@@ -737,7 +737,14 @@ const Analytics = () => {
       orders?.forEach(order => {
         totalRevenue += Number(order.total_amount || 0);
         order.order_items?.forEach((item: any) => {
-          totalQuantity += Number(item.quantity || 0);
+          const qty = Number(item.quantity || 0);
+          const unit = (item.unit || '').toLowerCase();
+          // Convert grams to KG - same logic as Products by Quantity
+          if (unit === 'grams' || unit === 'gram' || unit === 'g') {
+            totalQuantity += qty / 1000;
+          } else {
+            totalQuantity += qty;
+          }
         });
       });
 
