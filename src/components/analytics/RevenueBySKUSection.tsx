@@ -45,6 +45,13 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
       const fromDate = format(dateRange.from, 'yyyy-MM-dd');
       const toDate = format(dateRange.to, 'yyyy-MM-dd');
 
+      console.log('[RevenueBySKU] fetch start', {
+        selectedUsers,
+        selectedUsersCount: selectedUsers.length,
+        fromDate,
+        toDate,
+      });
+
       // If no users selected or multiple users, aggregate across selected users
       if (selectedUsers.length === 0 || selectedUsers.length > 1) {
         // First get the user IDs for the selected user names
@@ -56,6 +63,12 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
             .select('id, full_name')
             .in('full_name', selectedUsers);
           
+          console.log('[RevenueBySKU] profiles lookup', {
+            requestedNames: selectedUsers.length,
+            matchedProfiles: profiles?.length ?? 0,
+            profilesError,
+          });
+
           if (profilesError || !profiles) {
             console.error('Error fetching profiles:', profilesError);
             setSkuData([]);
@@ -80,6 +93,12 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
 
         const { data: orders, error: ordersError } = await ordersQuery;
 
+        console.log('[RevenueBySKU] orders query', {
+          userIdsUsed: userIds.length,
+          ordersReturned: orders?.length ?? 0,
+          ordersError,
+        });
+
         if (ordersError || !orders || orders.length === 0) {
           console.error('Orders error or no orders:', ordersError);
           setSkuData([]);
@@ -94,6 +113,12 @@ export const RevenueBySKUSection = ({ selectedUsers, dateRange, filteredUserName
           .from('order_items')
           .select('product_name, quantity, unit, total')
           .in('order_id', orderIds);
+
+        console.log('[RevenueBySKU] order_items query', {
+          orderIds: orderIds.length,
+          itemsReturned: orderItems?.length ?? 0,
+          itemsError,
+        });
 
         if (itemsError || !orderItems) {
           console.error('Order items error:', itemsError);
