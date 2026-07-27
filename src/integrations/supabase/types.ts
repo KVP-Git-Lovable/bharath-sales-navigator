@@ -15779,12 +15779,12 @@ export type Database = {
           net_weight_g: number | null
           opening_stock: number | null
           packaging_weight_g: number | null
+          price: number | null
           price_basis_uom_id: string | null
           primary_supplier_id: string | null
           product_number: string | null
           product_type: string | null
           qr_code: string | null
-          rate: number
           reorder_level: number | null
           reorder_quantity: number | null
           sku: string
@@ -15832,12 +15832,12 @@ export type Database = {
           net_weight_g?: number | null
           opening_stock?: number | null
           packaging_weight_g?: number | null
+          price?: number | null
           price_basis_uom_id?: string | null
           primary_supplier_id?: string | null
           product_number?: string | null
           product_type?: string | null
           qr_code?: string | null
-          rate?: number
           reorder_level?: number | null
           reorder_quantity?: number | null
           sku: string
@@ -15885,12 +15885,12 @@ export type Database = {
           net_weight_g?: number | null
           opening_stock?: number | null
           packaging_weight_g?: number | null
+          price?: number | null
           price_basis_uom_id?: string | null
           primary_supplier_id?: string | null
           product_number?: string | null
           product_type?: string | null
           qr_code?: string | null
-          rate?: number
           reorder_level?: number | null
           reorder_quantity?: number | null
           sku?: string
