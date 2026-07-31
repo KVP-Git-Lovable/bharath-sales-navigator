@@ -15745,7 +15745,6 @@ export type Database = {
         Row: {
           barcode: string | null
           barcode_image_url: string | null
-          base_unit: string | null
           base_unit_category: string
           brand: string | null
           category_id: string | null
@@ -15779,12 +15778,12 @@ export type Database = {
           net_weight_g: number | null
           opening_stock: number | null
           packaging_weight_g: number | null
-          price: number | null
           price_basis_uom_id: string | null
           primary_supplier_id: string | null
           product_number: string | null
           product_type: string | null
           qr_code: string | null
+          rate: number | null
           reorder_level: number | null
           reorder_quantity: number | null
           sku: string
@@ -15798,7 +15797,6 @@ export type Database = {
         Insert: {
           barcode?: string | null
           barcode_image_url?: string | null
-          base_unit?: string | null
           base_unit_category?: string
           brand?: string | null
           category_id?: string | null
@@ -15832,12 +15830,12 @@ export type Database = {
           net_weight_g?: number | null
           opening_stock?: number | null
           packaging_weight_g?: number | null
-          price?: number | null
           price_basis_uom_id?: string | null
           primary_supplier_id?: string | null
           product_number?: string | null
           product_type?: string | null
           qr_code?: string | null
+          rate?: number | null
           reorder_level?: number | null
           reorder_quantity?: number | null
           sku: string
@@ -15851,7 +15849,6 @@ export type Database = {
         Update: {
           barcode?: string | null
           barcode_image_url?: string | null
-          base_unit?: string | null
           base_unit_category?: string
           brand?: string | null
           category_id?: string | null
@@ -15885,12 +15882,12 @@ export type Database = {
           net_weight_g?: number | null
           opening_stock?: number | null
           packaging_weight_g?: number | null
-          price?: number | null
           price_basis_uom_id?: string | null
           primary_supplier_id?: string | null
           product_number?: string | null
           product_type?: string | null
           qr_code?: string | null
+          rate?: number | null
           reorder_level?: number | null
           reorder_quantity?: number | null
           sku?: string
