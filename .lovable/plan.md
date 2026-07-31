@@ -1,87 +1,45 @@
+## Confirmed: `products.base_unit` really is gone
 
-# Notification Rules Redesign + Web Push Fixes + Inbox Polish
+Verified against the live database — `public.products` currently has `unit`, `base_unit_category`, `conversion_factor`, `rate`, but **no `base_unit` column**. That is exactly why PostgREST returns `column products.base_unit does not exist` (42703), and why the product list in Order Entry comes back empty.
 
-Four independent scopes bundled into one release. All DB functions (`notif_pick_users`, `notif_preview_recipients`, `notify_send_test`) already exist — no migrations.
+**How it was dropped:** statement history shows
 
----
+```text
+ALTER TABLE public.products DROP COLUMN base_unit CASCADE
+```
 
-## 1. Plain-language rule builder (admin)
+It carries no Management-API source comment (unlike the earlier `DROP COLUMN rate`, which was tagged `pat:3894160`), and its `CASCADE`/`RESTRICT` phrasing matches the Supabase **Dashboard Table Editor** "delete column" action. Two sibling drops from the same tool — `product_variants.product_id RESTRICT` and `retailers.beat_name RESTRICT` — were already re-added; only `products.base_unit` is still missing. `CASCADE` also means anything that depended on the column (views, generated columns) was dropped with it.
 
-**File:** `src/pages/admin/NotificationRulesAdmin.tsx` (or whichever component currently renders the rules form — I'll locate it in build mode; likely `src/components/admin/NotificationRuleForm.tsx`).
+**Why order placement breaks:** the product fetches select the whole row or an explicit picker column list that includes `base_unit`:
+- `src/hooks/useMasterDataCache.ts` (`PRODUCT_PICKER_COLUMNS`) — feeds the Order Entry / Cart product picker
+- `src/hooks/useOfflineOrderEntry.ts` — offline product cache (`ProductRow.base_unit`)
+- `src/utils/exportProductsMaster.ts` — explicit `..., rate, base_unit, ...` select
+- plus display/UOM consumers: `OrderEntry.tsx`, `Cart.tsx`, `TableOrderForm.tsx`, `resolveProduct.ts`, `uomEngine.ts`, invoice generators, `ProductManagement.tsx`, product import.
 
-Replace the current form with a **sentence-style builder**:
+A single failing column in the picker query makes the whole request 400, so no products render and no order can be placed.
 
-> When **[event ▾]** happens on **[module ▾]**, notify **[whom ▾]**, via **[channel ▾]**.
+## Plan
 
-- **whom ▾** dropdown maps to `receiver_type` with a muted sub-label under each option:
-  - The person themselves → `employee`
-  - Their manager → `manager`
-  - Whole hierarchy up → `hierarchy`
-  - A role → `role` (reveals role picker)
-  - Specific people → `specific_user` (reveals user picker below)
-  - All admins → `admin`
+### 1. Restore the column (migration)
+```sql
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS base_unit text;
+```
+Idempotent, nullable — matches how `product_variants.base_unit` is defined and how the code reads it (optional string).
 
-- **Message field** with clickable token chips inserted at caret: `{user_name}` `{date}` `{time}` `{beat}` `{record_name}`.
+### 2. Backfill sensible values
+No data survived the drop, so repopulate deterministically:
+- Set `base_unit` from the product's **base UOM in `product_uom_mapping`** (`is_base = true` → `uom_master.code`) where a mapping exists — this is the authoritative source.
+- Otherwise fall back to `products.unit`, and to `'Piece'` when both are empty.
+- Only fill rows where `base_unit IS NULL`; no blanket overwrite.
 
-- **User picker** (only when whom = Specific people): options from `supabase.rpc('notif_pick_users')` → `{id, name, role}`. Selected `id` → `receiver_user_id`. Debounced search over name.
+### 3. Verify end to end
+- Confirm the column exists and every product has a non-null `base_unit`.
+- Reload Order Entry and check the product picker populates and a line item can be added; confirm no `42703` in the Postgres logs.
+- `schemaHealthCheck.ts` already probes `products.rate` / `products.unit` — add `products.base_unit` to that probe list so a future drop shows the banner instead of an empty picker.
 
-- **"Who will receive this" live preview card**:
-  - Fires on any change (debounced 300 ms).
-  - Calls `supabase.rpc('notif_preview_recipients', { p_receiver_type, p_receiver_role, p_receiver_user_id, p_sample_actor })`.
-  - Renders returned names as chips + total count ("Will notify 4 people").
-  - For actor-relative types (`employee`, `manager`, `hierarchy`), show a small **"Preview as [rep ▾]"** picker sourced from `notif_pick_users`, defaulting to the current user; its selection is passed as `p_sample_actor`.
+### 4. Prevent recurrence
+Add a Postgres **event trigger** that blocks `ALTER TABLE ... DROP COLUMN` on `products`, `product_variants`, `orders`, `order_items`, and `retailers`. This is the third columns-dropped incident on these tables (rate, product_id, beat_name, base_unit) and the drops are coming from the Dashboard Table Editor / a Management-API token, both of which bypass migrations and review. The trigger raises a clear error telling the operator to go through a migration instead.
 
-- **"Send test to me" button**: calls `supabase.rpc('notify_send_test', { p_event_code, p_source_table })` using the current form's event/module. Toast the returned recipient names on success.
-
-- **No DB changes.** Existing save/update handlers keep writing the same columns.
-
-## 2. Web push fixes — SW scope + foreground display
-
-**Files:** `src/lib/firebaseMessaging.ts`, `public/firebase-messaging-sw.js`.
-
-- Register `firebase-messaging-sw.js` at **root scope** (`/`) instead of the query-param URL path currently used. That path currently causes `getToken` to hang on some browsers because the scope defaults to `/firebase-messaging-sw.js?...` rather than `/`.
-  - Register as: `navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })`.
-  - Move Firebase config out of URL params: read `VITE_FIREBASE_*` env in `public/firebase-messaging-sw.js` via a build-time replacement or import them inside a small `public/firebase-messaging-sw-config.js` — simplest: hardcode `self.firebaseConfig` at the top of the SW using values sourced from env at build via a tiny generated file, or read from `self.location` if project keeps that pattern. **I'll use the standard pattern: bake the config into a generated `public/firebase-messaging-sw.js` via Vite's `define` or a build script.** Confirm approach in build.
-- Replace the empty `onMessage(messaging, () => {})` with a real handler:
-  - Show `toast(payload.notification.title, { description: payload.notification.body })` via `sonner`.
-  - Still call the optional `onNotification?.()` callback so the bell refetch fires.
-- All `VITE_FIREBASE_*` + `VITE_FIREBASE_VAPID_KEY` read from `import.meta.env` (already there — just verify none are missing).
-- **`push_device_tokens` upsert stays untouched.**
-
-## 3. Reliable push enable on Profile
-
-**File:** `src/components/PushNotificationSettings.tsx`.
-
-- Add a `useEffect` that runs on mount (and when `enabled` becomes `true`):
-  - If `Notification.permission === 'granted'` **and** `enabled === true` **and** not native, call `initWebPush(user.id)` to (re)register the FCM token.
-  - Guarded by a ref so it only fires once per session.
-- Keep the existing OFF→ON toggle behaviour (that path still works for first-time permission grant).
-- Toggle stays as the opt-out control — nothing removed.
-
-## 4. Notification center polish
-
-**Files:** `src/components/NotificationBell.tsx`, and inbox list rendering (already uses `useNotifications`).
-
-- **Unread dot** already exists per item; add a distinct blue dot vs read state (currently every item shows a dot because the query only fetches unread). Since fetch is unread-only, keep dot but visually differentiate the newest unread from older with the existing bg tint — no behaviour change needed; add clearer styling.
-- **"Mark all read"** action — already present in the header of the popover. Verify it's visible and wire tightens if broken.
-- **Relative timestamps** — already used via `formatDistanceToNow`. Keep.
-- **"Test" tag** — add a small pill (`<Badge variant="secondary">Test</Badge>`) when `notification.metadata?.is_test === true`. Requires reading `metadata` field (already in the `Notification` type on `useNotifications`, need to ensure the `select('id, title, message, ...')` on `NotificationBell` fetches it — it uses `useNotifications` which does `select('*')`, so it's included).
-
-The core need in #4 is really the **Test badge** — the other items are already implemented but I'll audit them in build mode and tighten any gaps.
-
----
-
-## Out of scope (explicit)
-
-- No DB migrations. No RLS changes. No edits to `notif_pick_users` / `notif_preview_recipients` / `notify_send_test`.
-- No changes to native push (`pushRegistration.ts`) beyond leaving it alone.
-- No changes to `push_device_tokens` schema or upsert payload.
-
-## Verification plan
-
-- **Rule builder**: open the admin page, build a rule with each `whom` option, confirm preview count updates and matches expected names; click "Send test to me" and confirm a toast + a row lands in `notifications` for the current user.
-- **Web push**: on a published build (not the preview iframe — SW registration is disabled there per skill/pwa), enable push on Profile, confirm FCM token upserts to `push_device_tokens`, send a test push and confirm a foreground toast appears when the tab is open.
-- **Profile re-register**: revoke and re-grant browser permission, reload the app — token should re-register without needing to toggle off/on.
-- **Inbox**: force a row with `metadata: { is_test: true }` and confirm the "Test" pill renders.
-
-Approve and I'll build all four in one pass.
+## Technical notes
+- Evidence: `information_schema.columns` for the current shape, `extensions.pg_stat_statements` for the DDL text (DDL isn't in `postgres_logs` because statement logging is off).
+- No application code needs changing for the fix itself — the code already expects `base_unit`; step 3's health-check addition is the only source edit.
