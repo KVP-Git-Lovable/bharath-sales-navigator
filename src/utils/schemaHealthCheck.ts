@@ -17,6 +17,7 @@ export type CriticalColumn =
   | 'product_variants.price'
   | 'products.rate'
   | 'products.unit'
+  | 'products.base_unit'
   | 'product_variants.variant_name';
 
 // Columns that must exist before we allow an order to be queued/synced.
@@ -91,6 +92,7 @@ export async function runSchemaHealthCheck(
     { key: 'product_variants.price',     table: 'product_variants', column: 'price' },
     { key: 'products.rate',              table: 'products',         column: 'rate' },
     { key: 'products.unit',              table: 'products',         column: 'unit' },
+    { key: 'products.base_unit',         table: 'products',         column: 'base_unit' },
     { key: 'product_variants.variant_name', table: 'product_variants', column: 'variant_name' },
   ];
 
