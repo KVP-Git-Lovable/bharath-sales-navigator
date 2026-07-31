@@ -15745,6 +15745,7 @@ export type Database = {
         Row: {
           barcode: string | null
           barcode_image_url: string | null
+          base_unit: string | null
           base_unit_category: string
           brand: string | null
           category_id: string | null
@@ -15797,6 +15798,7 @@ export type Database = {
         Insert: {
           barcode?: string | null
           barcode_image_url?: string | null
+          base_unit?: string | null
           base_unit_category?: string
           brand?: string | null
           category_id?: string | null
@@ -15849,6 +15851,7 @@ export type Database = {
         Update: {
           barcode?: string | null
           barcode_image_url?: string | null
+          base_unit?: string | null
           base_unit_category?: string
           brand?: string | null
           category_id?: string | null
