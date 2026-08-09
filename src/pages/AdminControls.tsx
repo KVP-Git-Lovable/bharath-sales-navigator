@@ -68,6 +68,7 @@ const AdminControls = () => {
     { title: "Activity Coordinator", description: "View team activities and assign new ones", icon: Activity, color: "teal", path: "/admin/activity-coordinator" },
     { title: "Retailer External Database", description: "Browse external grocery retailer data by state and city", icon: Database, color: "orange", path: "/admin/retailer-external-db" },
     { title: "Sync Health", description: "Monitor sync failures, data integrity checks, and RLS security events", icon: Activity, color: "red", path: "/admin/sync-health" },
+    { title: "DB Health", description: "Track tables, columns, RLS policies and cron jobs over time; detect drops", icon: Database, color: "violet", path: "/admin/db-health" },
   ], []);
 
   const ALWAYS_VISIBLE_FOR_ADMIN = new Set(['/admin/uom-master', '/admin/beat-coordinator', '/admin/sync-health']);
