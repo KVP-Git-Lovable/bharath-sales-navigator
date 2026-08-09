@@ -65,6 +65,25 @@ interface Retailer {
   owner_name?: string;
 }
 
+/**
+ * The list renders 26 of the retailers table's 72 columns, but the fetch used
+ * select('*'). On production that is ~5,351 retailers for a manager viewing all
+ * subordinates, and PostgREST repeats each column NAME on every row — so the
+ * unused 46 columns cost both bytes and keys on a field connection.
+ * Measured on production: 492 -> ~321 bytes per row before JSON key overhead.
+ *
+ * Keep in sync with the Retailer interface above. beat_name and owner_name are
+ * derived after fetch, not columns, so they are deliberately absent.
+ */
+const RETAILER_LIST_COLUMNS = [
+  'id', 'name', 'address', 'phone', 'category', 'priority', 'status',
+  'beat_id', 'territory_id', 'created_at', 'last_visit_date',
+  'latitude', 'longitude', 'order_value', 'notes',
+  'parent_type', 'parent_name', 'location_tag', 'retail_type', 'potential',
+  'competitors', 'entity_type', 'gst_number', 'photo_url', 'verified',
+  'user_id',
+].join(',');
+
 export const MyRetailers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -216,7 +235,7 @@ export const MyRetailers = () => {
             
             const { data, error } = await supabase
               .from("retailers")
-              .select("*")
+              .select(RETAILER_LIST_COLUMNS)
               .in("user_id", userIds)
               .order("name")
               .range(from, to);
