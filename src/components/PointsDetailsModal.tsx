@@ -127,6 +127,7 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
         points,
         reference_type,
         reference_id,
+        retailer_id,
         metadata,
         gamification_games(name),
         gamification_actions(action_name, action_type, gamification_games(name))
@@ -171,19 +172,24 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
       setSuggestedTimeFilter(null);
     }
 
-    // Collect all retailer IDs from multiple sources
+    // Resolve the retailer id for a points row from every place it can live
+    const resolveRetailerId = (item: any): string | null => {
+      const metadata = (item.metadata || {}) as Record<string, any>;
+      const ctx = (metadata.context || {}) as Record<string, any>;
+      return (
+        item.retailer_id ||
+        ctx.retailer_id ||
+        metadata.retailer_id ||
+        (item.reference_type === "retailer" ? item.reference_id : null) ||
+        null
+      );
+    };
+
+    // Collect all retailer IDs
     const retailerIds = new Set<string>();
-    
-    (data || []).forEach(item => {
-      // Check metadata for retailer_id (most reliable source)
-      const metadata = item.metadata as Record<string, any> | null;
-      if (metadata?.retailer_id) {
-        retailerIds.add(metadata.retailer_id);
-      }
-      // reference_id might be retailer_id directly
-      if (item.reference_id) {
-        retailerIds.add(item.reference_id);
-      }
+    (data || []).forEach((item: any) => {
+      const rid = resolveRetailerId(item);
+      if (rid) retailerIds.add(rid);
     });
 
     // Fetch retailer names for all collected IDs
@@ -203,10 +209,9 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
     }
 
     const formattedData: PointDetail[] = (data || []).map((item: any) => {
-      // Get retailer ID from metadata first (most reliable), then reference_id
-      const metadata = item.metadata as Record<string, any> | null;
-      const retailerId = metadata?.retailer_id || item.reference_id || null;
+      const retailerId = resolveRetailerId(item);
       const retailerName = retailerId ? retailerMap.get(retailerId) || null : null;
+
 
       return {
         id: item.id,
@@ -247,6 +252,8 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
       const exportData = filteredPoints.map(point => ({
         "Date & Time": format(new Date(point.earned_at), "dd MMM yyyy, HH:mm"),
         "Game Name": point.game_name,
+        "Activity": point.action_name || "-",
+
         "Retailer Name": point.retailer_name || "-",
         "Reference": point.reference_id || "-",
         "Points": point.points
@@ -450,6 +457,12 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
                           <div className="font-medium text-xs truncate">
                             {point.game_name}
                           </div>
+                          {point.action_name && (
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {point.action_name}
+                            </div>
+                          )}
+
                           {point.retailer_name && (
                             <div className="text-[10px] text-primary truncate">
                               {point.retailer_name}
@@ -474,6 +487,7 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
                         <TableRow>
                           <TableHead className="text-xs">Date & Time</TableHead>
                           <TableHead className="text-xs">Game Name</TableHead>
+                          <TableHead className="text-xs">Activity</TableHead>
                           <TableHead className="text-xs">Retailer Name</TableHead>
                           <TableHead className="text-xs">Reference</TableHead>
                           <TableHead className="text-right text-xs">Points</TableHead>
@@ -482,7 +496,7 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
                       <TableBody>
                         {filteredPoints.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                               No points earned in this period
                             </TableCell>
                           </TableRow>
@@ -493,6 +507,8 @@ export function PointsDetailsModal({ open, onOpenChange, userId, timeFilter: ini
                                 {format(new Date(point.earned_at), "dd MMM yyyy, HH:mm")}
                               </TableCell>
                               <TableCell className="text-xs">{point.game_name}</TableCell>
+                              <TableCell className="text-xs">{point.action_name || "-"}</TableCell>
+
                               <TableCell className="text-xs">
                                 {point.retailer_name && point.retailer_id ? (
                                   <a

@@ -9,10 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Trophy, Award, Gift, Info, Loader2, Medal, TrendingUp, Target, Star, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Trophy, Award, Gift, Info, Loader2, Medal, TrendingUp, Target, Star, FileSpreadsheet, Sparkles } from "lucide-react";
 import { ModuleHelpButton } from "@/components/help/ModuleHelpButton";
 import { BadgesDisplay } from "@/components/BadgesDisplay";
 import { PointsDetailsModal } from "@/components/PointsDetailsModal";
+import { TrophyMark } from "@/components/gamification/TrophyMark";
+import { TrophyStage } from "@/components/gamification/TrophyStage";
+import { CelebrationOverlay } from "@/components/gamification/CelebrationOverlay";
+
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,6 +73,7 @@ export default function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState<UserPoints[]>([]);
   const [myPoints, setMyPoints] = useState<MyPoints>({ today: 0, week: 0, month: 0, quarter: 0, year: 0, total: 0 });
   const [availableToRedeem, setAvailableToRedeem] = useState(0);
+  const [totalRedeemed, setTotalRedeemed] = useState(0);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
   const [games, setGames] = useState<GameWithPoints[]>([]);
   const [pointsBreakdown, setPointsBreakdown] = useState<PointsBreakdown[]>([]);
@@ -80,6 +85,8 @@ export default function Leaderboard() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [redeemPoints, setRedeemPoints] = useState("");
   const [conversionRate, setConversionRate] = useState(1);
+  const [celebration, setCelebration] = useState<{ title: string; subtitle?: string } | null>(null);
+
 
   useEffect(() => {
     fetchLeaderboardData();
@@ -127,12 +134,17 @@ export default function Leaderboard() {
 
     const { data: profilesData } = await supabase
       .from("profiles")
-      .select("id, full_name, profile_picture_url")
+      .select("id, full_name, profile_picture_url, is_active, user_status")
       .in("id", userIds);
 
-    // Drop users whose profile didn't come back (avoids "Unknown User" ghost rows
-    // when a profile was deleted or RLS hides it from the current viewer).
-    const profilesById = new Map((profilesData || []).map(p => [p.id, p] as const));
+    const profilesById = new Map(
+      (profilesData || [])
+        .filter((p: any) => p.is_active !== false && (p.user_status ?? "active") !== "inactive")
+        .map(p => [p.id, p] as const)
+    );
+
+    // Drop users whose profile didn't come back or who are inactive.
+
     const missingProfiles = userIds.filter(id => !profilesById.has(id));
     if (missingProfiles.length > 0) {
       console.warn('[Leaderboard] Skipping points rows with no matching profile:', missingProfiles);
@@ -249,6 +261,7 @@ export default function Leaderboard() {
 
     // Calculate total redeemed points (approved + pending)
     const totalRedeemedPoints = redemptionsData?.reduce((sum, r) => sum + (r.points_redeemed || 0), 0) || 0;
+    setTotalRedeemed(totalRedeemedPoints);
 
     if (data) {
       const points: MyPoints = { today: 0, week: 0, month: 0, quarter: 0, year: 0, total: 0 };
@@ -409,9 +422,14 @@ export default function Leaderboard() {
       toast.success("Redemption request submitted successfully");
       setShowRedeemDialog(false);
       setRedeemPoints("");
+      setCelebration({
+        title: "REWARD UNLOCKED",
+        subtitle: `${points.toLocaleString()} pts on their way — ₹${(points * conversionRate).toLocaleString()} voucher requested.`,
+      });
       fetchRedemptions();
       fetchMyPoints();
     }
+
   };
 
   const getDisplayPoints = () => {
@@ -455,132 +473,210 @@ export default function Leaderboard() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5">
-        {/* Header Section */}
-        <div className="relative overflow-hidden bg-gradient-primary text-primary-foreground">
-          <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent"></div>
-          <div className="relative p-4 sm:p-6">
-            <div className="flex items-center gap-4 mb-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => navigate(-1)}
-                className="text-primary-foreground hover:bg-primary-foreground/20 p-2"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="flex-1 flex items-center gap-2">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold">Leaderboard</h1>
-                  <p className="text-primary-foreground/80 text-sm sm:text-base mt-1">Track performance, earn points, and compete</p>
-                </div>
+      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-3 sm:p-5 space-y-4">
+        {/* ===== HERO BAND (matches Gamification admin hero) ===== */}
+        <div
+          className="relative overflow-hidden rounded-[20px] px-5 sm:px-7 py-4 sm:py-5"
+          style={{ background: "linear-gradient(120deg,#2B1E72 0%,#4526AE 55%,#5A2DD8 100%)" }}
+        >
+          <div
+            className="pointer-events-none absolute -top-[90px] -left-[60px] w-[240px] h-[240px] rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 70%)" }}
+          />
+          <div
+            className="pointer-events-none absolute -bottom-[120px] right-[26%] w-[300px] h-[300px] rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(124,58,237,.55) 0%, rgba(124,58,237,0) 70%)" }}
+          />
+          <Sparkles className="pointer-events-none absolute h-3.5 w-3.5 text-white/40 animate-pulse" style={{ left: "48%", top: "16%" }} />
+          <Star className="pointer-events-none absolute h-3 w-3 text-amber-300/70 animate-pulse" style={{ left: "60%", top: "72%" }} />
+
+          <div className="relative flex flex-row items-start sm:items-center gap-3 sm:gap-6">
+            <div className="flex-1 min-w-0">
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(-1)}
+                  className="h-7 w-7 text-white hover:bg-white/20 shrink-0"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-[9px] font-semibold uppercase tracking-[0.22em] text-white/70">My rewards</div>
                 <ModuleHelpButton categoryId="gamification" variant="onDark" />
               </div>
+
+              <h1
+                className="font-pixel text-[17px] sm:text-[21px] xl:text-[24px] leading-none mt-1.5 text-white"
+                style={{ textShadow: "2px 2px 0 rgba(124,58,237,.75), 0 0 16px rgba(167,139,250,.5)" }}
+              >
+                LEADERBOARD
+              </h1>
+              <p className="text-[11.5px] xl:text-[12.5px] mt-2 max-w-[560px] leading-snug text-white/75">
+                Track your performance, earn points and redeem rewards.
+              </p>
+
+              {/* glass stat chips — full-width stacked rows on phones */}
+              <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                {[
+                  {
+                    icon: TrendingUp,
+                    bg: "#14b8a6",
+                    value: `#${(leaderboard.findIndex(l => l.user_id === userProfile?.id) + 1) || "-"}`,
+                    label: `of ${leaderboard.length} participants`,
+                  },
+                  { icon: Target, bg: "#3b82f6", value: games.length, label: "Active games" },
+                  { icon: Star, bg: "#f59e0b", value: getDisplayPoints(), label: `Points (${timeFilter})` },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    className="flex items-center gap-2.5 rounded-[12px] px-3 py-2 bg-white/10 backdrop-blur-md min-w-0 w-full sm:w-auto"
+                    style={{ border: "1px solid rgba(255,255,255,.16)" }}
+                  >
+
+                    <div className="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center text-white shrink-0" style={{ background: s.bg }}>
+                      <s.icon className="h-[13px] w-[13px]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-extrabold leading-none text-white">{s.value}</div>
+                      <div className="text-[9px] mt-1 text-white/65 truncate">{s.label}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
             </div>
-            
-            {/* Quick Action Buttons - Mobile Friendly */}
-            <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={() => navigate("/activities-info")}
-                className="bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground border-primary-foreground/30 text-xs sm:text-sm"
-              >
-                <Trophy className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Game Config</span>
-                <span className="sm:hidden">Config</span>
-              </Button>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={() => navigate("/badges-info")}
-                className="bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground border-primary-foreground/30 text-xs sm:text-sm"
-              >
-                <Award className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Badges
-              </Button>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={() => navigate("/game-policy")}
-                className="bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground border-primary-foreground/30 text-xs sm:text-sm"
-              >
-                <Info className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Policy
-              </Button>
-            </div>
+
+            {/* trophy: large illustration on the right, on phones too */}
+            <TrophyStage className="shrink-0 w-[120px] xs:w-[140px] sm:w-[170px] xl:w-[210px] self-center" />
           </div>
+
+          <div className="relative mt-3 -mx-1 px-1 flex gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap">
+            {[
+              { icon: Trophy, label: "Game Config", to: "/activities-info" },
+              { icon: Award, label: "Badges", to: "/badges-info" },
+              { icon: Info, label: "Policy", to: "/game-policy" },
+            ].map((b) => (
+              <button
+                key={b.label}
+                onClick={() => navigate(b.to)}
+                className="shrink-0 text-[11px] font-semibold text-white rounded-[10px] px-3 py-1.5 inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 transition-colors"
+                style={{ border: "1px solid rgba(255,255,255,.16)" }}
+              >
+                <b.icon className="h-3.5 w-3.5" /> {b.label}
+              </button>
+            ))}
+          </div>
+
         </div>
 
-        {/* My Points Summary Cards - Overlapping Header */}
-        <div className="p-4 -mt-6 relative z-10">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <Card className="bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border-yellow-200 shadow-lg">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600" />
-                  <LeaderboardTimeFilters 
-                    timeFilter={timeFilter} 
-                    onFilterChange={(v: any) => setTimeFilter(v)}
-                    customStartDate={customStartDate}
-                    customEndDate={customEndDate}
-                    onCustomStartDateChange={setCustomStartDate}
-                    onCustomEndDateChange={setCustomEndDate}
+        {/* ===== POINTS WALLET — the main highlight ===== */}
+        <Card className="overflow-hidden shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)] border-0">
+          <div className="flex flex-col lg:flex-row">
+            {/* Available — hero segment */}
+            <div
+              className="relative flex-1 p-5 sm:p-6 text-white"
+              style={{ background: "linear-gradient(135deg,#1c2440 0%,#3b2a86 60%,#5A2DD8 100%)" }}
+            >
+              <div className="flex items-center gap-2">
+                <Gift className="h-4 w-4 text-amber-300" />
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">Available points</span>
+              </div>
+              <div className="mt-2 flex items-end gap-2">
+                <span className="text-4xl sm:text-5xl font-extrabold leading-none tabular-nums">
+                  {availableToRedeem.toLocaleString()}
+                </span>
+                <span className="text-[11px] pb-1 text-white/60">pts</span>
+              </div>
+              <p className="text-[11px] mt-2 text-white/70">
+                ≈ ₹{(availableToRedeem * conversionRate).toLocaleString()} redeemable value
+              </p>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <Button
+                  size="sm"
+                  className="bg-amber-400 text-[#1c2440] hover:bg-amber-300 font-bold text-xs"
+                  onClick={() => setShowRedeemDialog(true)}
+                >
+                  <Gift className="h-3.5 w-3.5 mr-1.5" /> Redeem Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-white hover:bg-white/15 text-xs"
+                  onClick={() => setShowDetailsModal(true)}
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" /> View Details
+                </Button>
+              </div>
+            </div>
+
+            {/* Earned / Redeemed breakdown */}
+            <div className="flex-1 grid grid-cols-2 divide-x bg-card">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Earned till date
+                  </span>
+                </div>
+                <p className="text-3xl sm:text-4xl font-extrabold mt-2 tabular-nums text-foreground">
+                  {myPoints.total.toLocaleString()}
+                </p>
+                <p className="text-[11px] mt-2 text-muted-foreground">Lifetime points earned</p>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500"
+                    style={{ width: `${myPoints.total ? Math.min(100, (availableToRedeem / myPoints.total) * 100) : 0}%` }}
                   />
                 </div>
-                <p className="text-xs sm:text-sm text-muted-foreground">My Points</p>
-                <p className="text-2xl sm:text-4xl font-bold text-yellow-700">{getDisplayPoints()}</p>
-                <div className="flex flex-col gap-2 mt-3">
-                  <p className="text-xs text-muted-foreground">Total: {myPoints.total}</p>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="w-full font-semibold text-xs sm:text-sm"
-                    onClick={() => setShowDetailsModal(true)}
-                  >
-                    <FileSpreadsheet className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    View Details
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-r from-green-500/10 to-green-600/10 border-green-200 shadow-lg">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-                  <p className="text-xs sm:text-sm text-muted-foreground">My Rank</p>
-                </div>
-                <p className="text-2xl sm:text-4xl font-bold text-green-700">
-                  #{leaderboard.findIndex(l => l.user_id === userProfile?.id) + 1 || "N/A"}
+                <p className="text-[10px] mt-1.5 text-muted-foreground">
+                  {myPoints.total ? Math.round((availableToRedeem / myPoints.total) * 100) : 0}% still available
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">of {leaderboard.length} participants</p>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card className="bg-gradient-to-r from-blue-500/10 to-blue-600/10 border-blue-200 shadow-lg">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Target className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                  <p className="text-xs sm:text-sm text-muted-foreground">Active Games</p>
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center gap-2">
+                  <Medal className="h-4 w-4 text-violet-500" />
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Redeemed points
+                  </span>
                 </div>
-                <p className="text-2xl sm:text-4xl font-bold text-blue-700">{games.length}</p>
-                <p className="text-xs text-muted-foreground mt-1">Currently participating</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 border-purple-200 shadow-lg">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
-                  <p className="text-xs sm:text-sm text-muted-foreground">Available to Redeem</p>
+                <p className="text-3xl sm:text-4xl font-extrabold mt-2 tabular-nums text-foreground">
+                  {totalRedeemed.toLocaleString()}
+                </p>
+                <p className="text-[11px] mt-2 text-muted-foreground">Approved + pending requests</p>
+                <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-violet-500"
+                    style={{ width: `${myPoints.total ? Math.min(100, (totalRedeemed / myPoints.total) * 100) : 0}%` }}
+                  />
                 </div>
-                <p className="text-2xl sm:text-4xl font-bold text-purple-700">{availableToRedeem}</p>
-                <Button className="w-full mt-3 text-xs sm:text-sm" size="sm" onClick={() => setShowRedeemDialog(true)}>
-                  Redeem Now
-                </Button>
-              </CardContent>
-            </Card>
+                <p className="text-[10px] mt-1.5 text-muted-foreground">
+                  {redemptions.length} redemption{redemptions.length === 1 ? "" : "s"} so far
+                </p>
+              </div>
+            </div>
           </div>
+        </Card>
+
+        {/* Period selector for the period-scoped sections below */}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-[12px] text-muted-foreground">
+            Showing period performance:{" "}
+            <span className="font-semibold text-foreground capitalize">{timeFilter}</span>
+          </div>
+          <LeaderboardTimeFilters
+            timeFilter={timeFilter}
+            onFilterChange={(v: any) => setTimeFilter(v)}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            onCustomStartDateChange={setCustomStartDate}
+            onCustomEndDateChange={setCustomEndDate}
+          />
+        </div>
+
+        <div className="relative z-10">
+
 
           {/* Activity Performance */}
           {pointsBreakdown.length > 0 && (
@@ -612,189 +708,281 @@ export default function Leaderboard() {
           )}
 
           <Tabs defaultValue="games" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-              <TabsTrigger value="games" className="text-xs sm:text-sm">
-                <Award className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">My Games</span>
-                <span className="sm:hidden">Games</span>
-              </TabsTrigger>
-              <TabsTrigger value="badges" className="text-xs sm:text-sm">
-                <Medal className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                Badges
-              </TabsTrigger>
-              <TabsTrigger value="leaderboard" className="text-xs sm:text-sm">
-                <Trophy className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Rankings</span>
-                <span className="sm:hidden">Rank</span>
-              </TabsTrigger>
-              <TabsTrigger value="redemptions" className="text-xs sm:text-sm">
-                <Gift className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Redemptions</span>
-                <span className="sm:hidden">Redeem</span>
-              </TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto p-1.5 rounded-[16px] bg-white shadow-[0_14px_34px_-26px_rgba(28,36,64,.55)] border">
+              {[
+                { value: "games", icon: Award, long: "My Games", short: "Games" },
+                { value: "badges", icon: Medal, long: "Badges", short: "Badges" },
+                { value: "leaderboard", icon: Trophy, long: "Rankings", short: "Rank" },
+                { value: "redemptions", icon: Gift, long: "Redemptions", short: "Redeem" },
+              ].map((t) => (
+                <TabsTrigger
+                  key={t.value}
+                  value={t.value}
+                  className="rounded-[12px] py-2 text-[11.5px] sm:text-[12.5px] font-semibold data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:bg-[linear-gradient(135deg,#2B1E72_0%,#5A2DD8_100%)]"
+                >
+                  <t.icon className="mr-1.5 h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{t.long}</span>
+                  <span className="sm:hidden">{t.short}</span>
+                </TabsTrigger>
+              ))}
             </TabsList>
 
+            {/* ================= RANKINGS ================= */}
             <TabsContent value="leaderboard" className="space-y-4">
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">Top Performers</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Rankings for {timeFilter}</CardDescription>
-                </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {leaderboard.slice(0, 3).map((item, index) => (
-                    <div key={item.user_id} className={`flex items-center gap-4 p-4 rounded-lg ${
-                      item.user_id === userProfile?.id 
-                        ? "bg-gradient-to-r from-blue-100 to-purple-100 dark:from-blue-950/20 dark:to-purple-950/20 border-2 border-blue-500" 
-                        : "bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/10 dark:to-orange-950/10"
-                    }`}>
-                      <div className="text-3xl">{getRankIcon(index + 1)}</div>
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback>{item.profiles.full_name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-semibold">{item.profiles.full_name}</p>
-                        <p className="text-sm text-muted-foreground">{item.total_points} points</p>
-                      </div>
-                      {item.user_id === userProfile?.id && (
-                        <Badge variant="default">You</Badge>
-                      )}
-                    </div>
-                  ))}
+              <Card className="border-0 overflow-hidden shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)]">
+                <div
+                  className="px-5 py-4 text-white"
+                  style={{ background: "linear-gradient(120deg,#2B1E72 0%,#4526AE 60%,#5A2DD8 100%)" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-amber-300" />
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/75">Top performers</span>
+                  </div>
+                  <p className="text-[12px] mt-1 text-white/70 capitalize">Rankings for {timeFilter}</p>
                 </div>
+                <CardContent className="p-4 sm:p-5">
+                  {/* podium */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {leaderboard.slice(0, 3).map((item, index) => {
+                      const isMe = item.user_id === userProfile?.id;
+                      const accent = ["#f59e0b", "#94a3b8", "#b45309"][index];
+                      return (
+                        <div
+                          key={item.user_id}
+                          className="relative rounded-[16px] p-4 overflow-hidden bg-card transition-transform hover:-translate-y-0.5"
+                          style={{ border: `1.5px solid ${isMe ? "#5A2DD8" : accent + "55"}` }}
+                        >
+                          <div
+                            className="pointer-events-none absolute -top-10 -right-10 w-28 h-28 rounded-full"
+                            style={{ background: `radial-gradient(circle, ${accent}33 0%, transparent 70%)` }}
+                          />
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{getRankIcon(index + 1)}</span>
+                            <Avatar className="h-11 w-11 ring-2 ring-offset-2" style={{ ["--tw-ring-color" as any]: accent }}>
+                              <AvatarFallback className="font-bold">{item.profiles.full_name[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-sm truncate">{item.profiles.full_name}</p>
+                              <p className="text-[11px] text-muted-foreground">Rank #{index + 1}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex items-end justify-between">
+                            <div>
+                              <p className="text-2xl font-extrabold tabular-nums leading-none">{item.total_points.toLocaleString()}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">points</p>
+                            </div>
+                            {isMe && <Badge className="bg-[#5A2DD8] hover:bg-[#5A2DD8] text-[10px]">You</Badge>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                <div className="mt-6 space-y-2">
-                  <p className="text-sm font-medium">All Participants</p>
-                  {leaderboard.slice(3).map((item, index) => (
-                    <div key={item.user_id} className={`flex items-center gap-3 p-3 rounded-md ${
-                      item.user_id === userProfile?.id 
-                        ? "bg-blue-100 dark:bg-blue-950/20 border border-blue-500" 
-                        : "bg-muted/50"
-                    }`}>
-                      <span className="text-sm font-medium w-8">#{index + 4}</span>
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs">{item.profiles.full_name[0]}</AvatarFallback>
-                      </Avatar>
-                      <p className="flex-1 text-sm">{item.profiles.full_name}</p>
-                      <Badge variant="outline">{item.total_points} pts</Badge>
-                      {item.user_id === userProfile?.id && (
-                        <Badge variant="default" className="text-xs">You</Badge>
-                      )}
+                  <div className="mt-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-2">
+                      All participants
+                    </p>
+                    <div className="space-y-1.5">
+                      {leaderboard.slice(3).map((item, index) => {
+                        const isMe = item.user_id === userProfile?.id;
+                        return (
+                          <div
+                            key={item.user_id}
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-[12px] transition-colors ${
+                              isMe ? "bg-[#5A2DD8]/10 border border-[#5A2DD8]/40" : "bg-muted/50 hover:bg-muted"
+                            }`}
+                          >
+                            <span className="text-[12px] font-bold w-8 text-muted-foreground tabular-nums">#{index + 4}</span>
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-[11px]">{item.profiles.full_name[0]}</AvatarFallback>
+                            </Avatar>
+                            <p className="flex-1 text-[13px] font-medium truncate">{item.profiles.full_name}</p>
+                            {isMe && <Badge className="bg-[#5A2DD8] hover:bg-[#5A2DD8] text-[10px]">You</Badge>}
+                            <span className="text-[12px] font-bold tabular-nums">{item.total_points.toLocaleString()}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
 
+            {/* ================= MY GAMES ================= */}
             <TabsContent value="games" className="space-y-4">
               {games.length === 0 ? (
-                <Card className="shadow-lg">
-                  <CardContent className="p-8 sm:p-12 text-center">
-                  <Award className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No active games at the moment</p>
-                </CardContent>
-              </Card>
-            ) : (
-              games.map((game) => (
-                <Card key={game.id} className="shadow-lg">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>{game.activity_name}</CardTitle>
-                        <CardDescription>{game.description || "No description"}</CardDescription>
-                      </div>
-                      <Badge variant={game.is_active ? "default" : "secondary"}>
-                        {game.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Your Progress</span>
-                      <span className="font-semibold">{game.earned_points} / {game.total_possible_points} points</span>
-                    </div>
-                    <Progress 
-                      value={(game.earned_points / game.total_possible_points) * 100} 
-                      className="h-3"
-                    />
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                      <div className="text-center p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{game.earned_points}</p>
-                        <p className="text-xs text-muted-foreground">Points Earned</p>
-                      </div>
-                      <div className="text-center p-3 bg-muted/50 rounded-lg">
-                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                          {Math.round((game.earned_points / game.total_possible_points) * 100)}%
-                        </p>
-                        <p className="text-xs text-muted-foreground">Completion</p>
-                      </div>
-                    </div>
+                <Card className="border-0 shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)]">
+                  <CardContent className="p-10 text-center">
+                    <TrophyMark float className="w-[92px] h-auto mx-auto opacity-80" />
+                    <p className="mt-3 font-semibold">No active games right now</p>
+                    <p className="text-[12px] text-muted-foreground mt-1">
+                      New reward programs will show up here as soon as they go live.
+                    </p>
                   </CardContent>
                 </Card>
-              ))
-            )}
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {games.map((game) => {
+                    const pct = game.total_possible_points
+                      ? Math.min(100, Math.round((game.earned_points / game.total_possible_points) * 100))
+                      : 0;
+                    return (
+                      <Card
+                        key={game.id}
+                        className="border-0 overflow-hidden shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)] transition-transform hover:-translate-y-0.5"
+                      >
+                        <div
+                          className="relative px-5 py-4 text-white"
+                          style={{ background: "linear-gradient(135deg,#1c2440 0%,#3b2a86 60%,#5A2DD8 100%)" }}
+                        >
+                          <div
+                            className="pointer-events-none absolute -top-12 -right-8 w-32 h-32 rounded-full"
+                            style={{ background: "radial-gradient(circle, rgba(255,255,255,.14) 0%, transparent 70%)" }}
+                          />
+                          <div className="relative flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65">Game</p>
+                              <p className="font-bold text-[14px] mt-1 truncate">{game.activity_name}</p>
+                              <p className="text-[11px] text-white/70 mt-1 line-clamp-2">
+                                {game.description || "No description"}
+                              </p>
+                            </div>
+                            <Badge
+                              className={`shrink-0 text-[10px] ${
+                                game.is_active
+                                  ? "bg-emerald-400 text-[#1c2440] hover:bg-emerald-400"
+                                  : "bg-white/20 hover:bg-white/20"
+                              }`}
+                            >
+                              {game.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                        </div>
+                        <CardContent className="p-5 space-y-3">
+                          <div className="flex items-center justify-between text-[12px]">
+                            <span className="text-muted-foreground">Your progress</span>
+                            <span className="font-bold tabular-nums">
+                              {game.earned_points} / {game.total_possible_points} pts
+                            </span>
+                          </div>
+                          <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${pct}%`, background: "linear-gradient(90deg,#f59e0b,#5A2DD8)" }}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 pt-1">
+                            <div className="rounded-[12px] p-3 text-center bg-amber-500/10">
+                              <p className="text-xl font-extrabold text-amber-600 tabular-nums">{game.earned_points}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Points earned</p>
+                            </div>
+                            <div className="rounded-[12px] p-3 text-center bg-[#5A2DD8]/10">
+                              <p className="text-xl font-extrabold text-[#5A2DD8] tabular-nums">{pct}%</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Completion</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </TabsContent>
 
+            {/* ================= BADGES ================= */}
             <TabsContent value="badges">
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">My Badges</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">Achievements and milestones</CardDescription>
-                </CardHeader>
-              <CardContent>
-                <BadgesDisplay />
-              </CardContent>
-            </Card>
-            </TabsContent>
-
-            <TabsContent value="redemptions" className="space-y-4">
-              {redemptions.length === 0 ? (
-                <Card className="shadow-lg">
-                  <CardContent className="p-8 sm:p-12 text-center">
-                  <Gift className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No redemption requests yet</p>
-                  <Button className="mt-4" onClick={() => setShowRedeemDialog(true)}>
-                    Redeem Points Now
-                  </Button>
+              <Card className="border-0 overflow-hidden shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)]">
+                <div
+                  className="px-5 py-4 text-white flex items-center justify-between gap-4"
+                  style={{ background: "linear-gradient(120deg,#2B1E72 0%,#4526AE 60%,#5A2DD8 100%)" }}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Medal className="h-4 w-4 text-amber-300" />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/75">My badges</span>
+                    </div>
+                    <p className="text-[12px] mt-1 text-white/70">Achievements and milestones you have unlocked</p>
+                  </div>
+                  <TrophyMark float className="w-[58px] h-auto hidden sm:block" />
+                </div>
+                <CardContent className="p-4 sm:p-5">
+                  <BadgesDisplay />
                 </CardContent>
               </Card>
-            ) : (
-              redemptions.map((redemption) => (
-                <Card key={redemption.id} className="shadow-lg">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{redemption.points_redeemed} Points</p>
-                          <Badge variant="outline">₹{redemption.voucher_amount}</Badge>
+            </TabsContent>
+
+            {/* ================= REDEMPTIONS ================= */}
+            <TabsContent value="redemptions" className="space-y-4">
+              {redemptions.length === 0 ? (
+                <Card className="border-0 shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)]">
+                  <CardContent className="p-10 text-center">
+                    <div className="w-14 h-14 rounded-[16px] mx-auto flex items-center justify-center bg-[#5A2DD8]/10">
+                      <Gift className="h-7 w-7 text-[#5A2DD8]" />
+                    </div>
+                    <p className="mt-3 font-semibold">No redemption requests yet</p>
+                    <p className="text-[12px] text-muted-foreground mt-1">
+                      Turn your points into vouchers whenever you are ready.
+                    </p>
+                    <Button
+                      className="mt-4 bg-amber-400 text-[#1c2440] hover:bg-amber-300 font-bold"
+                      onClick={() => setShowRedeemDialog(true)}
+                    >
+                      <Gift className="h-4 w-4 mr-1.5" /> Redeem points now
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {redemptions.map((redemption) => (
+                    <Card
+                      key={redemption.id}
+                      className="border-0 overflow-hidden shadow-[0_18px_40px_-28px_rgba(28,36,64,.5)]"
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-[12px] shrink-0 flex items-center justify-center bg-[#5A2DD8]/10">
+                              <Gift className="h-5 w-5 text-[#5A2DD8]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-[15px] tabular-nums">
+                                {redemption.points_redeemed.toLocaleString()} pts
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                ₹{redemption.voucher_amount.toLocaleString()} ·{" "}
+                                {new Date(redemption.requested_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          {getStatusBadge(redemption.status)}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Requested: {new Date(redemption.requested_at).toLocaleDateString()}
-                        </p>
+
                         {redemption.status === "approved" && redemption.voucher_code && (
-                          <div className="bg-green-50 dark:bg-green-950/20 p-3 rounded-md border border-green-200 dark:border-green-800">
-                            <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Voucher Code</p>
-                            <p className="text-lg font-mono font-bold text-green-600 dark:text-green-400">
+                          <div className="mt-4 rounded-[12px] p-3 bg-emerald-500/10 border border-emerald-500/25">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                              Voucher code
+                            </p>
+                            <p className="text-lg font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                               {redemption.voucher_code}
                             </p>
                           </div>
                         )}
                         {redemption.status === "rejected" && redemption.rejection_reason && (
-                          <div className="bg-red-50 dark:bg-red-950/20 p-3 rounded-md border border-red-200 dark:border-red-800">
-                            <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Rejection Reason</p>
-                            <p className="text-sm text-red-600 dark:text-red-400">{redemption.rejection_reason}</p>
+                          <div className="mt-4 rounded-[12px] p-3 bg-destructive/10 border border-destructive/25">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-destructive">
+                              Rejection reason
+                            </p>
+                            <p className="text-[12.5px] text-destructive mt-1">{redemption.rejection_reason}</p>
                           </div>
                         )}
-                      </div>
-                      {getStatusBadge(redemption.status)}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </TabsContent>
-        </Tabs>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
         </div>
       </div>
 
@@ -855,6 +1043,15 @@ export default function Leaderboard() {
           timeFilter={timeFilter}
         />
       )}
+
+      {/* Victory celebration */}
+      <CelebrationOverlay
+        open={!!celebration}
+        title={celebration?.title ?? ""}
+        subtitle={celebration?.subtitle}
+        onDone={() => setCelebration(null)}
+      />
     </Layout>
+
   );
 }

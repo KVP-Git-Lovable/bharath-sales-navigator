@@ -119,11 +119,70 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'confetti-fall': {
+					'0%': { transform: 'translateY(-10vh) rotate(0deg)', opacity: '0' },
+					'8%': { opacity: '1' },
+					'100%': { transform: 'translateY(112vh) rotate(720deg)', opacity: '0' }
+				},
+				'emoji-rise': {
+					'0%': { transform: 'translateY(0) scale(.7)', opacity: '0' },
+					'15%': { opacity: '1' },
+					'100%': { transform: 'translateY(-72vh) scale(1.15)', opacity: '0' }
+				},
+				'trophy-float': {
+					'0%, 100%': { transform: 'translateY(0)' },
+					'50%': { transform: 'translateY(-8px)' }
+				},
+				'trophy-pop': {
+					'0%': { transform: 'scale(.4) rotate(-12deg)', opacity: '0' },
+					'60%': { transform: 'scale(1.12) rotate(4deg)', opacity: '1' },
+					'100%': { transform: 'scale(1) rotate(0deg)', opacity: '1' }
+				},
+				'ray-spin': {
+					'0%': { transform: 'rotate(0deg)' },
+					'100%': { transform: 'rotate(360deg)' }
+				},
+				'glow-pulse': {
+					'0%, 100%': { opacity: '.75', transform: 'scale(1)' },
+					'50%': { opacity: '1', transform: 'scale(1.06)' }
+				},
+				'sparkle-twinkle': {
+					'0%, 100%': { opacity: '0', transform: 'scale(.5) rotate(0deg)' },
+					'50%': { opacity: '1', transform: 'scale(1.15) rotate(25deg)' }
+				},
+				'confetti-drift': {
+					'0%': { opacity: '0', transform: 'translateY(-6px) rotate(0deg)' },
+					'20%': { opacity: '1' },
+					'100%': { opacity: '0', transform: 'translateY(26px) rotate(220deg)' }
+				},
+				'ring-pulse': {
+					'0%, 100%': { opacity: '.55', transform: 'translateX(-50%) scale(.94)' },
+					'50%': { opacity: '1', transform: 'translateX(-50%) scale(1.04)' }
+				},
+				'fade-in': {
+					'0%': { opacity: '0' },
+					'100%': { opacity: '1' }
+				},
+				'scale-in': {
+					'0%': { transform: 'scale(.94)', opacity: '0' },
+					'100%': { transform: 'scale(1)', opacity: '1' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'confetti-fall': 'confetti-fall 3s linear forwards',
+				'emoji-rise': 'emoji-rise 3.4s ease-out forwards',
+				'trophy-float': 'trophy-float 3.2s ease-in-out infinite',
+				'ray-spin': 'ray-spin 14s linear infinite',
+				'glow-pulse': 'glow-pulse 3.4s ease-in-out infinite',
+				'sparkle-twinkle': 'sparkle-twinkle 2.4s ease-in-out infinite',
+				'confetti-drift': 'confetti-drift 3.2s ease-in-out infinite',
+				'ring-pulse': 'ring-pulse 2.8s ease-in-out infinite',
+				'trophy-pop': 'trophy-pop .7s cubic-bezier(.34,1.56,.64,1) both',
+				'fade-in': 'fade-in .3s ease-out',
+				'scale-in': 'scale-in .35s ease-out both'
 			}
 		}
 	},

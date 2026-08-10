@@ -26,19 +26,27 @@ export function PushNotificationSettings() {
         .eq('user_id', user.id)
         .eq('template_type', 'push_master')
         .maybeSingle();
-      const isOn = data?.is_enabled ?? true;
-      setEnabled(isOn);
-      setLoading(false);
+      const preferenceEnabled = data?.is_enabled ?? true;
 
-      // Reliable registration: if the toggle is ON and the browser already granted
-      // permission, register the push token now — don't wait for an OFF→ON flip.
-      try {
-        if (isOn && !Capacitor.isNativePlatform() && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          await initWebPush(user.id);
+      if (!Capacitor.isNativePlatform() && preferenceEnabled) {
+        const browserPermission = 'Notification' in window ? Notification.permission : 'denied';
+        if (browserPermission === 'granted') {
+          try {
+            const token = await initWebPush(user.id);
+            setEnabled(Boolean(token));
+          } catch (error) {
+            console.error('Push registration failed:', error);
+            setEnabled(false);
+          }
+        } else {
+          // A saved preference is not the same as an active browser subscription.
+          // Keep the switch off so the next user click can request permission.
+          setEnabled(false);
         }
-      } catch {
-        // best-effort; the toggle remains the recovery path
+      } else {
+        setEnabled(preferenceEnabled);
       }
+      setLoading(false);
     })();
   }, [user?.id]);
 
@@ -46,27 +54,35 @@ export function PushNotificationSettings() {
     if (!user?.id) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('notification_preferences').upsert(
-        { user_id: user.id, template_type: 'push_master', is_enabled: next },
-        { onConflict: 'user_id,template_type' },
-      );
-      if (error) throw error;
-      setEnabled(next);
-
       if (next) {
         if (Capacitor.isNativePlatform()) {
           await registerNativePush(user.id, (r) => navigate(r));
         } else {
           const token = await initWebPush(user.id);
-          if (!token) toast.warning('Enable notifications in your browser to receive push alerts.');
+          if (!token) {
+            const permission = 'Notification' in window ? Notification.permission : 'unsupported';
+            throw new Error(
+              permission === 'denied'
+                ? 'Notifications are blocked. Allow them in your browser site settings, then try again.'
+                : 'This browser could not register for push notifications.',
+            );
+          }
         }
-        toast.success('Push notifications enabled');
       } else {
         if (Capacitor.isNativePlatform()) await unregisterNativePush();
         else await disableWebPush();
-        toast.success('Push notifications disabled');
       }
+
+      const { error } = await supabase.from('notification_preferences').upsert(
+        { user_id: user.id, template_type: 'push_master', is_enabled: next },
+        { onConflict: 'user_id,template_type' },
+      );
+      if (error) throw error;
+
+      setEnabled(next);
+      toast.success(next ? 'Push notifications enabled on this device' : 'Push notifications disabled');
     } catch (e: any) {
+      setEnabled(false);
       toast.error(e.message || 'Failed to update preference');
     } finally {
       setSaving(false);
@@ -74,23 +90,28 @@ export function PushNotificationSettings() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          {enabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-          Push Notifications
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground pr-4">
-          Get real-time alerts on your device for orders, approvals, and mentions.
+    <Card className="rounded-2xl border-border/60 shadow-sm overflow-hidden">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center shadow-sm ${enabled ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-amber-500/30' : 'bg-muted text-muted-foreground'}`}>
+            {enabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold text-sm text-foreground">Push Notifications</p>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Switch checked={enabled} disabled={saving} onCheckedChange={onToggle} />
+              )}
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Get real-time alerts on your device for orders, approvals, and mentions.
+            </p>
+          </div>
         </div>
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Switch checked={enabled} disabled={saving} onCheckedChange={onToggle} />
-        )}
       </CardContent>
     </Card>
+
   );
 }

@@ -18,6 +18,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { FeatureProvider } from "@/context/FeatureContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import NotificationDetail from "./pages/NotificationDetail";
+import NotificationHistory from "./pages/NotificationHistory";
 import { RoleBasedAuthPage } from "@/components/auth/RoleBasedAuthPage";
 import { useMasterDataCache } from "@/hooks/useMasterDataCache";
 import { cacheWarmingStore } from "@/components/CacheWarmingProgress";
@@ -515,6 +516,7 @@ const AppContent = () => {
         
         <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
+        <Route path="/notifications/history" element={<ProtectedRoute><NotificationHistory /></ProtectedRoute>} />
         <Route path="/notifications/:id" element={<ProtectedRoute><NotificationDetail /></ProtectedRoute>} />
         <Route path="/admin-controls" element={<ProtectedRoute><AdminControls /></ProtectedRoute>} />
         <Route path="/feature-management" element={<ProtectedRoute><FeatureManagement /></ProtectedRoute>} />

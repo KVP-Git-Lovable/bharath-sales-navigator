@@ -1,4 +1,4 @@
-import trophyAsset from "@/assets/gamification-trophy.png.asset.json";
+import trophyAsset from "@/assets/gamification-trophy-3d.png";
 import { cn } from "@/lib/utils";
 
 interface TrophyMarkProps {
@@ -15,7 +15,7 @@ interface TrophyMarkProps {
 export function TrophyMark({ className, float = false, alt = "Champion trophy" }: TrophyMarkProps) {
   return (
     <img
-      src={trophyAsset.url}
+      src={trophyAsset}
       alt={alt}
       width={480}
       height={480}
