@@ -93,6 +93,79 @@ interface OrderData {
   invoice_id: string | null;
 }
 
+/** One order line rendered for a spreadsheet cell, e.g. "Thums Up 250ml x 24 pcs @ 21.50 = 516.00". */
+const describeItem = (it: any): string => {
+  const name = it.product_name ?? 'Item';
+  const qty = it.quantity ?? 0;
+  const unit = it.unit ? ` ${it.unit}` : '';
+  const rate = Number(it.rate ?? 0).toFixed(2);
+  const total = Number(it.total ?? 0).toFixed(2);
+  return `${name} x ${qty}${unit} @ ${rate} = ${total}`;
+};
+
+/**
+ * Columns for the Orders export.
+ *
+ * Invoice number needs care: only a small fraction of orders have a row in the
+ * invoices table, but the PDF prints a fallback derived from the order id
+ * (invoiceGenerator.ts) whenever invoice_number is missing. Exporting a blank
+ * cell therefore contradicts the document the user is holding, so the same
+ * fallback is used here and a second column says which of the two it is.
+ */
+const provisionalInvoiceNumber = (orderId: string) => `INV-${orderId.substring(0, 8).toUpperCase()}`;
+
+const ORDER_EXPORT_COLUMNS: { key: string; label: string }[] = [
+  { key: 'order_ref', label: 'Order Ref' },
+  { key: 'invoice_number_display', label: 'Invoice Number' },
+  { key: 'invoice_state', label: 'Invoice Status' },
+  { key: 'order_date', label: 'Order Date' },
+  { key: 'last_updated', label: 'Last Updated' },
+  { key: 'user_name', label: 'Salesperson' },
+  { key: 'retailer_name', label: 'Retailer' },
+  { key: 'retailer_phone', label: 'Retailer Phone' },
+  { key: 'status', label: 'Order Status' },
+  { key: 'is_edited_label', label: 'Edited' },
+  { key: 'item_count', label: 'Item Count' },
+  { key: 'total_quantity', label: 'Total Quantity' },
+  { key: 'items', label: 'Items' },
+  { key: 'subtotal', label: 'Subtotal' },
+  { key: 'discount_amount', label: 'Discount' },
+  { key: 'tax_amount', label: 'Tax (SGST+CGST)' },
+  { key: 'total_amount', label: 'Total Amount' },
+  { key: 'order_type', label: 'Order Type' },
+  { key: 'payment_method', label: 'Payment Method' },
+  { key: 'payment_status', label: 'Payment Status' },
+  { key: 'credit_paid_amount', label: 'Amount Paid' },
+  { key: 'credit_pending_amount', label: 'Amount Pending' },
+  { key: 'id', label: 'Order ID' },
+  { key: 'retailer_id', label: 'Retailer ID' },
+];
+
+/** Flattens an OrderData row into the shape ORDER_EXPORT_COLUMNS expects. */
+const toOrderExportRow = (o: OrderData) => {
+  const items = Array.isArray(o.items) ? o.items : [];
+  const money = (n: unknown) => Number(n ?? 0).toFixed(2);
+  return {
+    ...o,
+    order_ref: o.id.substring(0, 8).toUpperCase(),
+    invoice_number_display: o.invoice_number || provisionalInvoiceNumber(o.id),
+    invoice_state: o.invoice_number ? 'Saved' : 'Provisional (not yet generated)',
+    order_date: o.created_at ? format(new Date(o.created_at), 'dd/MM/yyyy HH:mm') : '',
+    last_updated: o.updated_at ? format(new Date(o.updated_at), 'dd/MM/yyyy HH:mm') : '',
+    is_edited_label: o.is_edited ? 'Yes' : 'No',
+    item_count: items.length,
+    total_quantity: items.reduce((s: number, it: any) => s + Number(it?.quantity ?? 0), 0),
+    tax_amount: money(items.reduce(
+      (s: number, it: any) => s + Number(it?.sgst_amount ?? 0) + Number(it?.cgst_amount ?? 0), 0)),
+    subtotal: money(o.subtotal),
+    discount_amount: money(o.discount_amount),
+    total_amount: money(o.total_amount),
+    credit_paid_amount: money(o.credit_paid_amount),
+    credit_pending_amount: money(o.credit_pending_amount),
+    order_type: o.is_credit_order ? 'Credit' : 'Cash',
+  };
+};
+
 interface StockData {
   id: string;
   user_name: string;
@@ -1116,19 +1189,46 @@ const Operations = () => {
   };
 
   // Export to CSV
-  const exportToCSV = async (data: any[], filename: string) => {
+  //
+  // A CSV cell may itself contain a comma, a newline or a quote, so every value
+  // is quoted and inner quotes are doubled. Without that a retailer name like
+  // 'Kamath "provision" store' silently shifts every later column on that row.
+  const csvCell = (val: unknown): string => {
+    if (val === null || val === undefined) return '""';
+    let text: string;
+    if (val instanceof Date) {
+      text = format(val, 'dd/MM/yyyy HH:mm');
+    } else if (Array.isArray(val)) {
+      // Order items arrive as objects; Object.values() on them used to render
+      // the literal string "[object Object]" for every order.
+      text = val.map(v => (v && typeof v === 'object' ? describeItem(v) : String(v))).join(' | ');
+    } else if (typeof val === 'object') {
+      text = JSON.stringify(val);
+    } else {
+      text = String(val);
+    }
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+
+  const exportToCSV = async (
+    data: any[],
+    filename: string,
+    columns?: { key: string; label: string }[],
+  ) => {
     if (data.length === 0) {
       toast.error('No data to export');
       return;
     }
 
-    const headers = Object.keys(data[0]).join(',');
+    const cols = columns ?? Object.keys(data[0]).map(key => ({ key, label: key }));
     const csvContent = [
-      headers,
-      ...data.map(row => Object.values(row).map(val => `"${val}"`).join(','))
+      cols.map(c => csvCell(c.label)).join(','),
+      ...data.map(row => cols.map(c => csvCell(row[c.key])).join(',')),
     ].join('\n');
 
-    await downloadCSV(csvContent, `${filename}-${format(new Date(), 'yyyy-MM-dd')}`);
+    // Excel assumes the system codepage unless the file starts with a BOM, which
+    // mangles the rupee sign and any Kannada/Hindi retailer name.
+    await downloadCSV('﻿' + csvContent, `${filename}-${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
   // Initial users fetch (once)
@@ -1559,7 +1659,7 @@ const Operations = () => {
                   variant="outline"
                   onClick={() => {
                     if (activeTab === 'checkins') exportToCSV(filteredCheckInData, 'checkin-data');
-                    if (activeTab === 'orders') exportToCSV(filteredOrderData, 'order-data');
+                    if (activeTab === 'orders') exportToCSV(filteredOrderData.map(toOrderExportRow), 'order-data', ORDER_EXPORT_COLUMNS);
                     if (activeTab === 'stock') exportToCSV(filteredStockData, 'stock-data');
                   }}
                 >
