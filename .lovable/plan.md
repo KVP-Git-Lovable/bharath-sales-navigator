@@ -1,45 +1,37 @@
-## Confirmed: `products.base_unit` really is gone
+# WhatsApp Webhook for +91 7411679191
 
-Verified against the live database — `public.products` currently has `unit`, `base_unit_category`, `conversion_factor`, `rate`, but **no `base_unit` column**. That is exactly why PostgREST returns `column products.base_unit does not exist` (42703), and why the product list in Order Entry comes back empty.
+Create a single public webhook endpoint in this QuickApp project that Twilio can call for the WhatsApp number +91 7411679191. It runs on this project's Supabase (etabpbfokzhhfuybeieu), independent of the Staging project.
 
-**How it was dropped:** statement history shows
+## What gets built
+
+1. **New backend function `whatsapp-webhook`** (public, no login token required, since Twilio cannot send one).
+   - Accepts Twilio's form-encoded POST (From, To, Body, MessageSid, NumMedia, MessageStatus, etc.).
+   - Verifies the message belongs to the WhatsApp sender +917411679191; ignores others.
+   - Records every inbound message and every delivery-status callback into a new log table.
+   - Returns an empty TwiML response so Twilio does not error or auto-reply.
+   - Message-handling logic (the invoice behaviour you'll describe later) is stubbed as one clearly marked handler function, so it can be filled in without touching the plumbing.
+
+2. **New table `whatsapp_inbound_messages`** on this project's Supabase
+   - Fields: direction, message SID, from number, to number, body, media URLs, Twilio status, error code, raw payload, processed flag, timestamp.
+   - Only signed-in users can read it; the webhook writes with the service role.
+
+3. **Outbound sender switched to the new number**
+   - Replace the hardcoded `whatsapp:+917411681616` sender with `whatsapp:+917411679191` in the existing invoice/verification WhatsApp senders so replies land on this webhook.
+
+4. **Config entry** marking `whatsapp-webhook` as public in `supabase/config.toml`.
+
+## Webhook URL to paste in Twilio
 
 ```text
-ALTER TABLE public.products DROP COLUMN base_unit CASCADE
+https://etabpbfokzhhfuybeieu.supabase.co/functions/v1/whatsapp-webhook
 ```
 
-It carries no Management-API source comment (unlike the earlier `DROP COLUMN rate`, which was tagged `pat:3894160`), and its `CASCADE`/`RESTRICT` phrasing matches the Supabase **Dashboard Table Editor** "delete column" action. Two sibling drops from the same tool — `product_variants.product_id RESTRICT` and `retailers.beat_name RESTRICT` — were already re-added; only `products.base_unit` is still missing. `CASCADE` also means anything that depended on the column (views, generated columns) was dropped with it.
+Set it in Twilio Console under the WhatsApp sender +917411679191:
+- "When a message comes in" -> the URL above, method POST
+- "Status callback URL" -> the same URL, method POST
 
-**Why order placement breaks:** the product fetches select the whole row or an explicit picker column list that includes `base_unit`:
-- `src/hooks/useMasterDataCache.ts` (`PRODUCT_PICKER_COLUMNS`) — feeds the Order Entry / Cart product picker
-- `src/hooks/useOfflineOrderEntry.ts` — offline product cache (`ProductRow.base_unit`)
-- `src/utils/exportProductsMaster.ts` — explicit `..., rate, base_unit, ...` select
-- plus display/UOM consumers: `OrderEntry.tsx`, `Cart.tsx`, `TableOrderForm.tsx`, `resolveProduct.ts`, `uomEngine.ts`, invoice generators, `ProductManagement.tsx`, product import.
+## Notes
 
-A single failing column in the picker query makes the whole request 400, so no products render and no order can be placed.
-
-## Plan
-
-### 1. Restore the column (migration)
-```sql
-ALTER TABLE public.products ADD COLUMN IF NOT EXISTS base_unit text;
-```
-Idempotent, nullable — matches how `product_variants.base_unit` is defined and how the code reads it (optional string).
-
-### 2. Backfill sensible values
-No data survived the drop, so repopulate deterministically:
-- Set `base_unit` from the product's **base UOM in `product_uom_mapping`** (`is_base = true` → `uom_master.code`) where a mapping exists — this is the authoritative source.
-- Otherwise fall back to `products.unit`, and to `'Piece'` when both are empty.
-- Only fill rows where `base_unit IS NULL`; no blanket overwrite.
-
-### 3. Verify end to end
-- Confirm the column exists and every product has a non-null `base_unit`.
-- Reload Order Entry and check the product picker populates and a line item can be added; confirm no `42703` in the Postgres logs.
-- `schemaHealthCheck.ts` already probes `products.rate` / `products.unit` — add `products.base_unit` to that probe list so a future drop shows the banner instead of an empty picker.
-
-### 4. Prevent recurrence
-Add a Postgres **event trigger** that blocks `ALTER TABLE ... DROP COLUMN` on `products`, `product_variants`, `orders`, `order_items`, and `retailers`. This is the third columns-dropped incident on these tables (rate, product_id, beat_name, base_unit) and the drops are coming from the Dashboard Table Editor / a Management-API token, both of which bypass migrations and review. The trigger raises a clear error telling the operator to go through a migration instead.
-
-## Technical notes
-- Evidence: `information_schema.columns` for the current shape, `extensions.pg_stat_statements` for the DDL text (DDL isn't in `postgres_logs` because statement logging is off).
-- No application code needs changing for the fix itself — the code already expects `base_unit`; step 3's health-check addition is the only source edit.
+- No other app screens, routes, or data are touched.
+- Twilio credentials already stored for this project are reused; nothing new needs to be pasted for auth.
+- Once you share the exact invoice behaviour, it plugs into the stubbed handler without changing the URL.
