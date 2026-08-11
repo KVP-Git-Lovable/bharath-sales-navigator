@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.restore-permissions]
 verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.whatsapp-retailer-verify-inbound]
+verify_jwt = false

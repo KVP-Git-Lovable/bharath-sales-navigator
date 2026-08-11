@@ -48,7 +48,7 @@ serve(async (req) => {
       recipients.map(async (to) => {
         const formBody = new URLSearchParams({
           To: to,
-          From: 'whatsapp:+917411681616',
+          From: 'whatsapp:+917411679191',
           ContentSid: 'HX2b27e4c3a2353117297ef3d48c04e292',
           ContentVariables: contentVariables,
         });

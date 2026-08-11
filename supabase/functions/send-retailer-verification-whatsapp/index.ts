@@ -16,7 +16,7 @@ const corsHeaders = {
 };
 
 const TEMPLATE_CONTENT_SID = "HXa4311ea6f7d67093fe5426e224645038";
-const WHATSAPP_FROM = "whatsapp:+917411681616";
+const WHATSAPP_FROM = "whatsapp:+917411679191";
 
 function normalisePhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
