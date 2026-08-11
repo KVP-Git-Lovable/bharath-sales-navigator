@@ -409,6 +409,44 @@ export type Database = {
           },
         ]
       }
+      activity_tiers: {
+        Row: {
+          action_id: string
+          created_at: string
+          id: string
+          points: number
+          sort: number
+          threshold_pct: number
+          updated_at: string
+        }
+        Insert: {
+          action_id: string
+          created_at?: string
+          id?: string
+          points?: number
+          sort?: number
+          threshold_pct: number
+          updated_at?: string
+        }
+        Update: {
+          action_id?: string
+          created_at?: string
+          id?: string
+          points?: number
+          sort?: number
+          threshold_pct?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_tiers_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "gamification_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_types: {
         Row: {
           code: string
@@ -4025,6 +4063,122 @@ export type Database = {
           details?: Json | null
           id?: string
           sample_ids?: string[] | null
+        }
+        Relationships: []
+      }
+      db_health_objects: {
+        Row: {
+          detail: Json | null
+          id: number
+          object_name: string
+          object_schema: string
+          object_type: string
+          parent_name: string | null
+          snapshot_id: string
+        }
+        Insert: {
+          detail?: Json | null
+          id?: number
+          object_name: string
+          object_schema?: string
+          object_type: string
+          parent_name?: string | null
+          snapshot_id: string
+        }
+        Update: {
+          detail?: Json | null
+          id?: number
+          object_name?: string
+          object_schema?: string
+          object_type?: string
+          parent_name?: string | null
+          snapshot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "db_health_objects_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "db_health_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      db_health_snapshots: {
+        Row: {
+          captured_at: string
+          captured_by: string | null
+          column_count: number | null
+          cron_job_active_count: number | null
+          cron_job_count: number | null
+          db_size_bytes: number | null
+          edge_function_hint: number | null
+          enum_count: number | null
+          extension_count: number | null
+          foreign_key_count: number | null
+          function_count: number | null
+          id: string
+          index_count: number | null
+          notes: string | null
+          rls_disabled_table_count: number | null
+          rls_enabled_table_count: number | null
+          rls_policy_count: number | null
+          sequence_count: number | null
+          source: string
+          table_count: number | null
+          total_row_estimate: number | null
+          trigger_count: number | null
+          view_count: number | null
+        }
+        Insert: {
+          captured_at?: string
+          captured_by?: string | null
+          column_count?: number | null
+          cron_job_active_count?: number | null
+          cron_job_count?: number | null
+          db_size_bytes?: number | null
+          edge_function_hint?: number | null
+          enum_count?: number | null
+          extension_count?: number | null
+          foreign_key_count?: number | null
+          function_count?: number | null
+          id?: string
+          index_count?: number | null
+          notes?: string | null
+          rls_disabled_table_count?: number | null
+          rls_enabled_table_count?: number | null
+          rls_policy_count?: number | null
+          sequence_count?: number | null
+          source?: string
+          table_count?: number | null
+          total_row_estimate?: number | null
+          trigger_count?: number | null
+          view_count?: number | null
+        }
+        Update: {
+          captured_at?: string
+          captured_by?: string | null
+          column_count?: number | null
+          cron_job_active_count?: number | null
+          cron_job_count?: number | null
+          db_size_bytes?: number | null
+          edge_function_hint?: number | null
+          enum_count?: number | null
+          extension_count?: number | null
+          foreign_key_count?: number | null
+          function_count?: number | null
+          id?: string
+          index_count?: number | null
+          notes?: string | null
+          rls_disabled_table_count?: number | null
+          rls_enabled_table_count?: number | null
+          rls_policy_count?: number | null
+          sequence_count?: number | null
+          source?: string
+          table_count?: number | null
+          total_row_estimate?: number | null
+          trigger_count?: number | null
+          view_count?: number | null
         }
         Relationships: []
       }
@@ -8230,56 +8384,113 @@ export type Database = {
         Row: {
           action_name: string
           action_type: string
+          award_mode: string
           base_daily_target: number | null
+          cap_scope: string
+          cap_value: number | null
+          conditions_json: Json
           consecutive_orders_required: number | null
           created_at: string
+          description: string | null
+          eligibility_ids: string[]
+          eligibility_mode: string
+          expiry_days: number | null
+          expiry_type: string
           focused_products: string[] | null
           game_id: string
           id: string
           is_enabled: boolean | null
+          is_system: boolean
+          is_tiered: boolean
+          kpi_id: string | null
+          leaderboard: boolean
           max_awardable_activities: number | null
           max_daily_awards: number | null
           metadata: Json | null
           min_growth_percentage: number | null
           points: number
+          redemption_min: number | null
+          target_period: string | null
           target_type: string | null
+          tier_mode: string
+          trigger_type: string | null
           updated_at: string
+          validity_from: string | null
+          validity_to: string | null
         }
         Insert: {
           action_name: string
           action_type: string
+          award_mode?: string
           base_daily_target?: number | null
+          cap_scope?: string
+          cap_value?: number | null
+          conditions_json?: Json
           consecutive_orders_required?: number | null
           created_at?: string
+          description?: string | null
+          eligibility_ids?: string[]
+          eligibility_mode?: string
+          expiry_days?: number | null
+          expiry_type?: string
           focused_products?: string[] | null
           game_id: string
           id?: string
           is_enabled?: boolean | null
+          is_system?: boolean
+          is_tiered?: boolean
+          kpi_id?: string | null
+          leaderboard?: boolean
           max_awardable_activities?: number | null
           max_daily_awards?: number | null
           metadata?: Json | null
           min_growth_percentage?: number | null
           points?: number
+          redemption_min?: number | null
+          target_period?: string | null
           target_type?: string | null
+          tier_mode?: string
+          trigger_type?: string | null
           updated_at?: string
+          validity_from?: string | null
+          validity_to?: string | null
         }
         Update: {
           action_name?: string
           action_type?: string
+          award_mode?: string
           base_daily_target?: number | null
+          cap_scope?: string
+          cap_value?: number | null
+          conditions_json?: Json
           consecutive_orders_required?: number | null
           created_at?: string
+          description?: string | null
+          eligibility_ids?: string[]
+          eligibility_mode?: string
+          expiry_days?: number | null
+          expiry_type?: string
           focused_products?: string[] | null
           game_id?: string
           id?: string
           is_enabled?: boolean | null
+          is_system?: boolean
+          is_tiered?: boolean
+          kpi_id?: string | null
+          leaderboard?: boolean
           max_awardable_activities?: number | null
           max_daily_awards?: number | null
           metadata?: Json | null
           min_growth_percentage?: number | null
           points?: number
+          redemption_min?: number | null
+          target_period?: string | null
           target_type?: string | null
+          tier_mode?: string
+          trigger_type?: string | null
           updated_at?: string
+          validity_from?: string | null
+          validity_to?: string | null
         }
         Relationships: [
           {
@@ -8297,6 +8508,8 @@ export type Database = {
           count: number | null
           created_at: string | null
           id: string
+          period_key: string | null
+          retailer_id: string | null
           tracking_date: string
           updated_at: string | null
           user_id: string
@@ -8306,6 +8519,8 @@ export type Database = {
           count?: number | null
           created_at?: string | null
           id?: string
+          period_key?: string | null
+          retailer_id?: string | null
           tracking_date: string
           updated_at?: string | null
           user_id: string
@@ -8315,6 +8530,8 @@ export type Database = {
           count?: number | null
           created_at?: string | null
           id?: string
+          period_key?: string | null
+          retailer_id?: string | null
           tracking_date?: string
           updated_at?: string | null
           user_id?: string
@@ -8332,10 +8549,13 @@ export type Database = {
       gamification_games: {
         Row: {
           baseline_target: number | null
+          category: string
+          color: string | null
           created_at: string
           created_by: string | null
           description: string | null
           end_date: string
+          icon: string | null
           id: string
           is_active: boolean | null
           is_all_territories: boolean | null
@@ -8347,10 +8567,13 @@ export type Database = {
         }
         Insert: {
           baseline_target?: number | null
+          category?: string
+          color?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           end_date: string
+          icon?: string | null
           id?: string
           is_active?: boolean | null
           is_all_territories?: boolean | null
@@ -8362,10 +8585,13 @@ export type Database = {
         }
         Update: {
           baseline_target?: number | null
+          category?: string
+          color?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
           end_date?: string
+          icon?: string | null
           id?: string
           is_active?: boolean | null
           is_all_territories?: boolean | null
@@ -8381,34 +8607,46 @@ export type Database = {
         Row: {
           action_id: string | null
           earned_at: string
+          expires_at: string | null
           game_id: string | null
           id: string
           metadata: Json | null
+          period_key: string | null
           points: number | null
           reference_id: string | null
           reference_type: string | null
+          retailer_id: string | null
+          status: string
           user_id: string
         }
         Insert: {
           action_id?: string | null
           earned_at?: string
+          expires_at?: string | null
           game_id?: string | null
           id?: string
           metadata?: Json | null
+          period_key?: string | null
           points?: number | null
           reference_id?: string | null
           reference_type?: string | null
+          retailer_id?: string | null
+          status?: string
           user_id: string
         }
         Update: {
           action_id?: string | null
           earned_at?: string
+          expires_at?: string | null
           game_id?: string | null
           id?: string
           metadata?: Json | null
+          period_key?: string | null
           points?: number | null
           reference_id?: string | null
           reference_type?: string | null
+          retailer_id?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: [
@@ -8511,6 +8749,51 @@ export type Database = {
           retailer_id?: string
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      gamification_settings: {
+        Row: {
+          approval_fallback: string
+          created_at: string
+          currency_name: string
+          default_award_mode: string
+          engine_enabled: boolean
+          id: string
+          leaderboard_enabled: boolean
+          notifications_enabled: boolean
+          point_conversion: number
+          singleton: boolean
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          approval_fallback?: string
+          created_at?: string
+          currency_name?: string
+          default_award_mode?: string
+          engine_enabled?: boolean
+          id?: string
+          leaderboard_enabled?: boolean
+          notifications_enabled?: boolean
+          point_conversion?: number
+          singleton?: boolean
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          approval_fallback?: string
+          created_at?: string
+          currency_name?: string
+          default_award_mode?: string
+          engine_enabled?: boolean
+          id?: string
+          leaderboard_enabled?: boolean
+          notifications_enabled?: boolean
+          point_conversion?: number
+          singleton?: boolean
+          timezone?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -11324,10 +11607,14 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string
+          deleted_at: string | null
+          delivery_status: string
           id: string
+          is_dismissed: boolean
           is_read: boolean | null
           message: string
           metadata: Json | null
+          read_at: string | null
           related_id: string | null
           related_table: string | null
           retailer_id: string | null
@@ -11338,10 +11625,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
+          delivery_status?: string
           id?: string
+          is_dismissed?: boolean
           is_read?: boolean | null
           message: string
           metadata?: Json | null
+          read_at?: string | null
           related_id?: string | null
           related_table?: string | null
           retailer_id?: string | null
@@ -11352,10 +11643,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
+          delivery_status?: string
           id?: string
+          is_dismissed?: boolean
           is_read?: boolean | null
           message?: string
           metadata?: Json | null
+          read_at?: string | null
           related_id?: string | null
           related_table?: string | null
           retailer_id?: string | null
@@ -23971,6 +24266,10 @@ export type Database = {
       }
     }
     Functions: {
+      _capture_db_health_snapshot_impl: {
+        Args: { p_source?: string }
+        Returns: string
+      }
       _post_credit_note_to_ledger: {
         Args: {
           p_actor: string
@@ -24139,6 +24438,10 @@ export type Database = {
       }
       can_view_employee: { Args: { _target_user_id: string }; Returns: boolean }
       can_view_profile: { Args: { _target_user_id: string }; Returns: boolean }
+      can_view_retailer_ledger: {
+        Args: { p_retailer_id: string }
+        Returns: boolean
+      }
       cancel_order_atomic: {
         Args: {
           p_cancelled_by: string
@@ -24149,6 +24452,10 @@ export type Database = {
           p_van_stock_action?: string
         }
         Returns: Json
+      }
+      capture_db_health_snapshot: {
+        Args: { p_source?: string }
+        Returns: string
       }
       check_duplicate_competitor: {
         Args: { competitor_name_param: string }
@@ -24242,6 +24549,64 @@ export type Database = {
           phone: string
         }[]
       }
+      gam_award_event: {
+        Args: {
+          p_context?: Json
+          p_dry_run?: boolean
+          p_reference_id?: string
+          p_reference_type?: string
+          p_retailer_id?: string
+          p_trigger_type: string
+          p_user_id: string
+        }
+        Returns: {
+          action_id: string
+          action_name: string
+          awarded: boolean
+          points: number
+          reason: string
+        }[]
+      }
+      gam_compute_expiry: {
+        Args: { p_expiry_days: number; p_expiry_type: string; p_ts?: string }
+        Returns: string
+      }
+      gam_conditions_match: {
+        Args: { p_conditions: Json; p_context: Json }
+        Returns: boolean
+      }
+      gam_consume_cap: {
+        Args: {
+          p_action_id: string
+          p_retailer_id: string
+          p_ts: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      gam_evaluate_target_tiers: {
+        Args: { p_dry_run?: boolean; p_period_key?: string }
+        Returns: number
+      }
+      gam_expire_points: { Args: never; Returns: number }
+      gam_fy_end: { Args: { p_ts?: string }; Returns: string }
+      gam_is_eligible: {
+        Args: { p_action_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      gam_period_key: {
+        Args: { p_scope: string; p_ts?: string }
+        Returns: string
+      }
+      gam_redeem_points: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
+      gam_refresh_leaderboard: {
+        Args: { p_period_type?: string }
+        Returns: number
+      }
+      gam_user_balance: { Args: { p_user_id: string }; Returns: number }
       generate_grn_number: { Args: never; Returns: string }
       generate_invoice_number: { Args: never; Returns: string }
       generate_primary_invoice_number: { Args: never; Returns: string }
@@ -24305,6 +24670,47 @@ export type Database = {
         }[]
       }
       get_database_metrics: { Args: never; Returns: Json }
+      get_db_health_drift: {
+        Args: { p_days?: number }
+        Returns: {
+          change_type: string
+          detail_after: Json
+          detail_before: Json
+          object_name: string
+          object_type: string
+          parent_name: string
+        }[]
+      }
+      get_db_health_object_history: {
+        Args: {
+          p_days?: number
+          p_object_name: string
+          p_object_type: string
+          p_parent_name?: string
+        }
+        Returns: {
+          captured_at: string
+          detail: Json
+          present: boolean
+        }[]
+      }
+      get_db_health_overview: { Args: never; Returns: Json }
+      get_db_health_trend: {
+        Args: { p_days?: number }
+        Returns: {
+          captured_at: string
+          column_count: number
+          cron_job_count: number
+          db_size_bytes: number
+          function_count: number
+          index_count: number
+          rls_disabled_table_count: number
+          rls_policy_count: number
+          source: string
+          table_count: number
+          trigger_count: number
+        }[]
+      }
       get_direct_reports: {
         Args: { manager_user_id: string }
         Returns: {
@@ -24538,6 +24944,38 @@ export type Database = {
           state: string
         }[]
       }
+      get_retailer_invoices: {
+        Args: { p_retailer_id: string }
+        Returns: {
+          has_pdf: boolean
+          invoice_date: string
+          invoice_id: string
+          invoice_number: string
+          order_id: string
+          order_status: string
+          status: string
+          storage_path: string
+          total_amount: number
+        }[]
+      }
+      get_retailer_payment_ledger: {
+        Args: { p_retailer_id: string }
+        Returns: {
+          collection_id: string
+          credit: number
+          debit: number
+          detail: string
+          entry_at: string
+          entry_type: string
+          is_credit_order: boolean
+          order_id: string
+          order_status: string
+          payment_method: string
+          payment_status: string
+          reference: string
+          running_balance: number
+        }[]
+      }
       get_retailer_photos_dec25_jan26: {
         Args: never
         Returns: {
@@ -24693,6 +25131,7 @@ export type Database = {
         Args: { p_policy_id: string }
         Returns: undefined
       }
+      invoice_pdf_exists: { Args: { p_path: string }; Returns: boolean }
       is_account_locked: { Args: { user_email: string }; Returns: boolean }
       is_admin_or_manager: { Args: never; Returns: boolean }
       is_approver_for_audit: {
@@ -24830,6 +25269,10 @@ export type Database = {
       }
       process_monthly_leave_accrual: { Args: never; Returns: undefined }
       process_year_end_carry_forward: { Args: never; Returns: undefined }
+      prune_db_health_snapshots: {
+        Args: { p_keep_days?: number }
+        Returns: number
+      }
       quarantine_orphan_orders: {
         Args: { p_grace_minutes?: number }
         Returns: number
