@@ -23957,6 +23957,57 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_inbound_messages: {
+        Row: {
+          body: string | null
+          created_at: string
+          direction: string
+          error_code: string | null
+          from_number: string | null
+          id: string
+          media_urls: Json
+          message_sid: string | null
+          processed: boolean
+          processing_notes: string | null
+          raw_payload: Json
+          to_number: string | null
+          twilio_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          direction?: string
+          error_code?: string | null
+          from_number?: string | null
+          id?: string
+          media_urls?: Json
+          message_sid?: string | null
+          processed?: boolean
+          processing_notes?: string | null
+          raw_payload?: Json
+          to_number?: string | null
+          twilio_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          direction?: string
+          error_code?: string | null
+          from_number?: string | null
+          id?: string
+          media_urls?: Json
+          message_sid?: string | null
+          processed?: boolean
+          processing_notes?: string | null
+          raw_payload?: Json
+          to_number?: string | null
+          twilio_status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       whatsapp_phone_name_cache: {
         Row: {
           name: string
