@@ -11,7 +11,9 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Zap, FileText, Loader2, Check, GripVertical, Users, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, LayoutGrid, List as ListIcon, MoreVertical, Calendar, Clock, FileSpreadsheet, FileType2, Send, TrendingUp, PlayCircle, CalendarClock, MailCheck, X, Rows3, Sigma, Database, ChevronDown, Lock as LockIcon, Network as NetworkIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, Zap, FileText, Loader2, Check, GripVertical, Users, Search, Filter, ArrowUpDown, ArrowUp, ArrowDown, LayoutGrid, List as ListIcon, MoreVertical, Calendar, Clock, FileSpreadsheet, FileType2, Send, TrendingUp, PlayCircle, CalendarClock, MailCheck, X, Rows3, Sigma, Database, ChevronDown, Lock as LockIcon, Network as NetworkIcon, Eye, RefreshCw } from 'lucide-react';
+import { PdfInlinePreview } from './PdfInlinePreview';
+import { PDF_THEMES, getPdfTheme } from '@/lib/pdfThemes';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -49,6 +51,7 @@ interface Subscription {
   attachment_format: string;
   push_to_phone: boolean;
   scope: string;
+  respect_hierarchy?: boolean;
   status: string;
   last_fired_at: string | null;
 }
@@ -60,6 +63,16 @@ const CADENCES = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
 ];
+/** Cadences whose reporting period is a single day.
+ *  Mirrors computePeriod() in supabase/functions/_shared/reportPeriod.ts. */
+const DAILY_CADENCES = new Set(['today', 'daily', 'weekday']);
+
+/** A daily report should describe the day it arrives on. Weekly and monthly still
+ *  default to the last completed period — a month-to-date total sent on the 1st
+ *  would be near-empty and read as broken. */
+const defaultPeriodBasisFor = (cadence: string): 'current' | 'previous' =>
+  DAILY_CADENCES.has(cadence) ? 'current' : 'previous';
+
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const FORMATS = [
   { value: 'summary_only', label: 'Summary only (in-app text)' },
@@ -159,8 +172,16 @@ export function ReportSubscriptionsTab() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      toast.success('Report dispatched');
+    onSuccess: (data: any) => {
+      const delivered = data?.delivered ?? 0;
+      const empty = data?.empty === true;
+      if (delivered === 0) {
+        toast.error('Manual run failed — no recipients delivered');
+      } else if (empty) {
+        toast.success(`Sent — no records for this period (${delivered} recipient${delivered === 1 ? '' : 's'})`);
+      } else {
+        toast.success(`Report dispatched to ${delivered} recipient${delivered === 1 ? '' : 's'}`);
+      }
       qc.invalidateQueries({ queryKey: ['report-subscriptions'] });
     },
     onError: (e: any) => toast.error(e.message || 'Failed to run'),
@@ -413,9 +434,22 @@ export function ReportSubscriptionsTab() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={cn('inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border', fmt.tint)}>
-                            {fmt.icon} {fmt.label}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn('inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium border', fmt.tint)}>
+                              {fmt.icon} {fmt.label}
+                            </span>
+                            <span
+                              title={s.push_to_phone ? 'Phone push enabled' : 'Phone push OFF'}
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium border',
+                                s.push_to_phone
+                                  ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200 line-through'
+                              )}
+                            >
+                              <Send size={10} /> Push
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           {s.recipient_mode === 'all_managers' ? (
@@ -607,16 +641,48 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
 
   // Step 2 — schedule + delivery
   const [cadence, setCadence] = useState(editing?.sub.cadence ?? 'daily');
+
+  /**
+   * A daily report is expected to be about the day it lands on, so it defaults to
+   * the current period. Weekly and monthly default to the last COMPLETED period —
+   * a month-to-date figure sent on the 1st would be near-empty and misleading.
+   */
+  const isDailyCadence = DAILY_CADENCES.has(cadence);
   const [fireDay, setFireDay] = useState(editing?.sub.fire_day ?? 'Mon');
   const [fireTime, setFireTime] = useState(String(editing?.sub.fire_time ?? '09:00').slice(0, 5));
   const [timezone, setTimezone] = useState(editing?.sub.timezone ?? 'Asia/Kolkata');
   const [format, setFormat] = useState(editing?.sub.attachment_format ?? 'summary_only');
   const [pushToPhone, setPushToPhone] = useState(editing?.sub.push_to_phone ?? false);
+  const [periodBasis, setPeriodBasis] = useState<'current' | 'previous'>(
+    ((editing?.sub as any)?.period_basis as any) ??
+      defaultPeriodBasisFor(editing?.sub.cadence ?? 'daily')
+  );
+  // Once the user picks a window explicitly we stop re-deriving it from cadence.
+  const [basisTouched, setBasisTouched] = useState(
+    Boolean((editing?.sub as any)?.period_basis)
+  );
+  // Empty sort_key = the RPC's default order, which puts rows that actually
+  // sold ahead of the zero rows rather than interleaving them alphabetically.
+  const [sortKey, setSortKey] = useState<string>(editing?.def.config?.filters?.sort_key ?? '');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+    (editing?.def.config?.filters?.sort_dir as any) === 'asc' ? 'asc' : 'desc'
+  );
   const [scope, setScope] = useState(editing?.sub.scope ?? 'shared');
+  const [respectHierarchy, setRespectHierarchy] = useState(
+    (editing?.sub as any)?.respect_hierarchy !== false
+  );
   const [recipientIds, setRecipientIds] = useState<string[]>(editing?.sub.recipient_user_ids ?? []);
   const [recipientMode, setRecipientMode] = useState<'named_users' | 'all_managers'>(
     ((editing?.sub as any)?.recipient_mode as any) ?? 'named_users'
   );
+  const [pdfTemplate, setPdfTemplate] = useState<any>(
+    ((editing?.sub as any)?.pdf_template as any) ?? {}
+  );
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [pdfPreviewRefreshKey, setPdfPreviewRefreshKey] = useState(0);
+  React.useEffect(() => {
+    if (format !== 'pdf') setPdfPreviewOpen(false);
+  }, [format]);
 
   // Live manager count for all_managers mode
   const { data: managerList = [] } = useQuery({
@@ -665,7 +731,14 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
         rows,
         columns: columns ? [columns] : [],
         values,
-        filters: { date_from: dateFrom, date_to: dateTo, scope_user_id: scopeUserId || null, distributor_id: distributorId || null },
+        filters: {
+          date_from: dateFrom,
+          date_to: dateTo,
+          scope_user_id: scopeUserId || null,
+          distributor_id: distributorId || null,
+          sort_key: sortKey || null,
+          sort_dir: sortKey ? sortDir : null,
+        },
       };
 
 
@@ -687,7 +760,10 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
             recipient_mode: recipientMode,
             attachment_format: format,
             push_to_phone: pushToPhone,
+            period_basis: periodBasis,
             scope: effectiveScope,
+            respect_hierarchy: respectHierarchy,
+            pdf_template: format === 'pdf' ? pdfTemplate : {},
           } as any)
           .eq('id', editing.sub.id);
         if (sErr) throw sErr;
@@ -709,11 +785,20 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
             recipient_mode: recipientMode,
             attachment_format: format,
             push_to_phone: pushToPhone,
+            period_basis: periodBasis,
             scope: effectiveScope,
             status: 'active',
           },
         });
         if (error) throw error;
+        // period_basis + pdf_template aren't in the RPC signature — set directly after insert.
+        if (data) {
+          await supabase.from('report_subscriptions').update({
+            period_basis: periodBasis,
+            respect_hierarchy: respectHierarchy,
+            pdf_template: format === 'pdf' ? pdfTemplate : {},
+          } as any).eq('id', data);
+        }
         return data;
       }
     },
@@ -752,6 +837,8 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
             dateTo={dateTo} setDateTo={setDateTo}
             scopeUserId={scopeUserId} setScopeUserId={setScopeUserId}
             distributorId={distributorId} setDistributorId={setDistributorId}
+            sortKey={sortKey} setSortKey={setSortKey}
+            sortDir={sortDir} setSortDir={setSortDir}
             onCancel={onClose}
             onNext={() => setStep(2)}
             canNext={!!canNext1}
@@ -764,7 +851,14 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cadence</Label>
-                <Select value={cadence} onValueChange={setCadence}>
+                <Select
+                  value={cadence}
+                  onValueChange={(v) => {
+                    setCadence(v);
+                    // Follow the cadence's sensible default until the user overrides it.
+                    if (!basisTouched) setPeriodBasis(defaultPeriodBasisFor(v));
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CADENCES.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
@@ -805,23 +899,116 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
                   </SelectContent>
                 </Select>
               </div>
+              {format === 'pdf' && (
+                <div className="md:col-span-2">
+                  <PdfTemplatePanel
+                    value={pdfTemplate}
+                    onChange={setPdfTemplate}
+                    onPreview={() => {
+                      if (!pdfPreviewOpen) setPdfPreviewOpen(true);
+                      else setPdfPreviewRefreshKey(k => k + 1);
+                    }}
+                    previewOpen={pdfPreviewOpen}
+                  />
+                  <PdfInlinePreview
+                    open={pdfPreviewOpen}
+                    template={pdfTemplate}
+                    name={name}
+                    dataset={dataset}
+                    layout={layout}
+                    rows={rows}
+                    columns={columns}
+                    values={values}
+                    filters={{
+                      date_from: dateFrom,
+                      date_to: dateTo,
+                      scope_user_id: scopeUserId || null,
+                      distributor_id: distributorId || null,
+                      sort_key: sortKey || null,
+                      sort_dir: sortKey ? sortDir : null,
+                    }}
+                    refreshKey={pdfPreviewRefreshKey}
+                  />
+                </div>
+              )}
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                  <div className="space-y-0.5">
+                    <Label className="flex items-center gap-1.5">
+                      <NetworkIcon size={13} className="text-muted-foreground" />
+                      Respect reporting hierarchy
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">
+                      Each recipient's report covers only themselves and the people below them
+                      in the reporting tree — never a peer or a manager above them. System
+                      admins still receive the organisation-wide report.
+                    </p>
+                  </div>
+                  <Switch checked={respectHierarchy} onCheckedChange={setRespectHierarchy} />
+                </div>
+                {!respectHierarchy && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-500">
+                    Every recipient will see the whole organisation's data, including people
+                    above them. Only turn this off for a deliberately org-wide report.
+                  </p>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   Scope
-                  {recipientMode === 'all_managers' && <LockIcon size={12} className="text-muted-foreground" />}
+                  {(recipientMode === 'all_managers' || respectHierarchy) && (
+                    <LockIcon size={12} className="text-muted-foreground" />
+                  )}
                 </Label>
-                <Select value={scope} onValueChange={setScope} disabled={recipientMode === 'all_managers'}>
+                <Select
+                  value={respectHierarchy ? 'per_recipient' : scope}
+                  onValueChange={setScope}
+                  disabled={recipientMode === 'all_managers' || respectHierarchy}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="shared">Shared — one report for everyone</SelectItem>
                     <SelectItem value="per_recipient">Per recipient — filtered by their scope</SelectItem>
                   </SelectContent>
                 </Select>
-                {recipientMode === 'all_managers' && (
+                {respectHierarchy ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Set by the hierarchy rule above.
+                  </p>
+                ) : recipientMode === 'all_managers' ? (
                   <p className="text-[11px] text-muted-foreground">
                     Per recipient is required so each manager sees only their own team.
                   </p>
-                )}
+                ) : null}
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Reporting window</Label>
+                <Select
+                  value={periodBasis}
+                  onValueChange={(v) => {
+                    setBasisTouched(true);
+                    setPeriodBasis(v as any);
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">
+                      {isDailyCadence ? 'This period to date (recommended)' : 'This period to date'}
+                    </SelectItem>
+                    <SelectItem value="previous">
+                      {isDailyCadence ? 'Previous complete period' : 'Previous complete period (recommended)'}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {periodBasis === 'current'
+                    ? isDailyCadence
+                      ? `Covers that same day's activity, up to the ${fireTime} send time.`
+                      : 'Covers the current period up to the send time — useful for progress summaries.'
+                    : isDailyCadence
+                      ? 'Covers the previous day. The report that arrives today describes yesterday.'
+                      : 'Covers the last completed period (last week for weekly, last month for monthly).'}
+                </p>
               </div>
               <div className="flex items-center gap-3 md:col-span-2 pt-2">
                 <Switch checked={pushToPhone} onCheckedChange={setPushToPhone} id="push" />
@@ -907,7 +1094,23 @@ function SubscriptionWizard({ datasets, editing, onClose, onSaved }: WizardProps
               <div><span className="font-medium">Measures:</span> {values.join(', ')}</div>
               <div><span className="font-medium">Schedule:</span> {cadence}{['weekly','monthly'].includes(cadence) ? ` · ${fireDay}` : ''} · {fireTime} ({timezone})</div>
               <div><span className="font-medium">Format:</span> {format} {pushToPhone ? '· + phone push' : ''}</div>
-              <div><span className="font-medium">Scope:</span> {recipientMode === 'all_managers' ? 'per_recipient (locked)' : scope}</div>
+              {format === 'pdf' && (
+                <div className="text-[12px] text-muted-foreground pl-1">
+                  PDF template · Theme: <b>{getPdfTheme(pdfTemplate.theme).label}</b>
+                  {' · '}Header: <b>{pdfTemplate.header_style || 'standard'}</b>
+                  {' · '}Orientation: <b>{pdfTemplate.orientation || 'auto'}</b>
+                  {' · '}Branding: <b>{pdfTemplate.branding || 'company'}</b>
+                  {pdfTemplate.footer_note ? <> · Footer: <b>{pdfTemplate.footer_note}</b></> : null}
+                </div>
+              )}
+              <div>
+                <span className="font-medium">Scope:</span>{' '}
+                {respectHierarchy
+                  ? 'per recipient — own team only (hierarchy enforced)'
+                  : recipientMode === 'all_managers'
+                    ? 'per_recipient (locked)'
+                    : `${scope} — organisation-wide, hierarchy off`}
+              </div>
               <div>
                 <span className="font-medium">Recipients:</span>{' '}
                 {recipientMode === 'all_managers'
@@ -985,13 +1188,15 @@ interface Step1Props {
   dateTo: string; setDateTo: (v: string) => void;
   scopeUserId: string; setScopeUserId: (v: string) => void;
   distributorId: string; setDistributorId: (v: string) => void;
+  sortKey: string; setSortKey: (v: string) => void;
+  sortDir: 'asc' | 'desc'; setSortDir: (v: 'asc' | 'desc') => void;
   onCancel: () => void;
   onNext: () => void;
   canNext: boolean;
 }
 
 function Step1Body(p: Step1Props) {
-  const { dataset, layout, rows, columns, values, datasetKey, dateFrom, dateTo, scopeUserId, distributorId } = p;
+  const { dataset, layout, rows, columns, values, datasetKey, dateFrom, dateTo, scopeUserId, distributorId, sortKey, sortDir } = p;
   const { user } = useAuth();
   const { subordinates } = useSubordinates();
 
@@ -1072,6 +1277,22 @@ function Step1Body(p: Step1Props) {
     ? (scopeOptions.find(o => o.id === scopeUserId)?.label ?? 'Selected user')
     : 'Everyone I can see';
 
+  // Sortable columns are exactly what this report selected, in the order it
+  // arranged them — nothing enumerated here. The RPC whitelists the key against
+  // the same set, so anything stale just falls back to the default order.
+  const sortOptions = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: Array<{ key: string; label: string }> = [];
+    const push = (key: string, label: string) => {
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push({ key, label });
+    };
+    rows.forEach(k => push(k, dims.find(d => d.key === k)?.label ?? k));
+    values.forEach(k => push(k, measures.find(m => m.key === k)?.label ?? k));
+    return out;
+  }, [rows, values, dims, measures]);
+
   const hasDistributorDim = dims.some(d => d.key === 'distributor');
   const { data: distributors = [] } = useQuery({
     queryKey: ['report-distributors'],
@@ -1087,11 +1308,11 @@ function Step1Body(p: Step1Props) {
     enabled: hasDistributorDim,
   });
 
-  const [debounced, setDebounced] = React.useState({ datasetKey, layout, rows, columns, values, dateFrom, dateTo, scopeUserId, distributorId });
+  const [debounced, setDebounced] = React.useState({ datasetKey, layout, rows, columns, values, dateFrom, dateTo, scopeUserId, distributorId, sortKey, sortDir });
   React.useEffect(() => {
-    const t = setTimeout(() => setDebounced({ datasetKey, layout, rows, columns, values, dateFrom, dateTo, scopeUserId, distributorId }), 250);
+    const t = setTimeout(() => setDebounced({ datasetKey, layout, rows, columns, values, dateFrom, dateTo, scopeUserId, distributorId, sortKey, sortDir }), 250);
     return () => clearTimeout(t);
-  }, [datasetKey, layout, rows, columns, values, dateFrom, dateTo, scopeUserId, distributorId]);
+  }, [datasetKey, layout, rows, columns, values, dateFrom, dateTo, scopeUserId, distributorId, sortKey, sortDir]);
 
   const preview = useQuery({
     queryKey: [
@@ -1100,11 +1321,12 @@ function Step1Body(p: Step1Props) {
       debounced.rows.join(','), debounced.columns,
       debounced.values.join(','),
       debounced.dateFrom, debounced.dateTo, debounced.scopeUserId, debounced.distributorId,
+      debounced.sortKey, debounced.sortDir,
     ],
     enabled: !!dataset && !!dataset.source && (debounced.values.length > 0 || (debounced.layout === 'tabular' && debounced.rows.length > 0)),
     retry: false,
     queryFn: async () => {
-      const payload = {
+      const payload: Record<string, unknown> = {
         p_layout: debounced.layout,
         p_rows: debounced.layout === 'tabular' ? null : (debounced.rows[0] || null),
         p_columns: debounced.layout === 'matrix' ? (debounced.columns || null) : null,
@@ -1114,8 +1336,16 @@ function Step1Body(p: Step1Props) {
           date_to: debounced.dateTo,
           scope_user_id: debounced.scopeUserId || null,
           distributor_id: debounced.distributorId || null,
+          sort_key: debounced.sortKey || null,
+          sort_dir: debounced.sortKey ? debounced.sortDir : null,
         },
       };
+      // Only send p_row_keys when it is actually needed. Adding the key
+      // unconditionally makes PostgREST look for an overload with that
+      // parameter, which fails for datasets whose function does not declare it.
+      if (debounced.layout === 'grouped' && debounced.rows.length > 1) {
+        payload.p_row_keys = debounced.rows;
+      }
       // eslint-disable-next-line no-console
       console.debug('[ReportPreview] rpc', dataset!.source, payload);
       const { data, error } = await supabase.rpc(dataset!.source as any, payload as any);
@@ -1238,6 +1468,9 @@ function Step1Body(p: Step1Props) {
                   distributorId={distributorId} setDistributorId={p.setDistributorId}
                   distributors={distributors}
                   showDistributor={hasDistributorDim}
+                  sortKey={sortKey} setSortKey={p.setSortKey}
+                  sortDir={sortDir} setSortDir={p.setSortDir}
+                  sortOptions={sortOptions}
                 />
               }
             />
@@ -1481,7 +1714,7 @@ function EmptyChip({ text }: { text: string }) {
   return <span className="text-[11px] text-muted-foreground/60 italic px-2 py-1">{text}</span>;
 }
 
-function FiltersPanel({ dateFrom, setDateFrom, dateTo, setDateTo, scopeUserId, setScopeUserId, scopeOptions, scopeLabel, distributorId, setDistributorId, distributors, showDistributor }: {
+function FiltersPanel({ dateFrom, setDateFrom, dateTo, setDateTo, scopeUserId, setScopeUserId, scopeOptions, scopeLabel, distributorId, setDistributorId, distributors, showDistributor, sortKey, setSortKey, sortDir, setSortDir, sortOptions }: {
   dateFrom: string; setDateFrom: (v: string) => void;
   dateTo: string; setDateTo: (v: string) => void;
   scopeUserId: string; setScopeUserId: (v: string) => void;
@@ -1490,6 +1723,9 @@ function FiltersPanel({ dateFrom, setDateFrom, dateTo, setDateTo, scopeUserId, s
   distributorId?: string; setDistributorId?: (v: string) => void;
   distributors?: Array<{ id: string; name: string }>;
   showDistributor?: boolean;
+  sortKey?: string; setSortKey?: (v: string) => void;
+  sortDir?: 'asc' | 'desc'; setSortDir?: (v: 'asc' | 'desc') => void;
+  sortOptions?: Array<{ key: string; label: string }>;
 }) {
   return (
     <div className="space-y-3 text-xs">
@@ -1541,6 +1777,36 @@ function FiltersPanel({ dateFrom, setDateFrom, dateTo, setDateTo, scopeUserId, s
           </SelectContent>
         </Select>
       </div>
+      {setSortKey && setSortDir && (sortOptions?.length ?? 0) > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5 flex items-center gap-1">
+            <ArrowUpDown className="h-3 w-3" /> Sort by
+          </div>
+          <div className="flex gap-2">
+            <Select value={sortKey || '__default__'} onValueChange={(v) => setSortKey(v === '__default__' ? '' : v)}>
+              <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="__default__" className="text-xs">Default — rows with orders first</SelectItem>
+                {sortOptions!.map(o => (
+                  <SelectItem key={o.key} value={o.key} className="text-xs">{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sortDir ?? 'desc'} onValueChange={(v) => setSortDir(v as 'asc' | 'desc')} disabled={!sortKey}>
+              <SelectTrigger className="h-8 text-xs w-[104px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc" className="text-xs">Descending</SelectItem>
+                <SelectItem value="asc" className="text-xs">Ascending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {sortKey
+              ? 'Applies to the preview and to every delivered report.'
+              : 'People who sold appear first; everyone else follows, ordered by the grouping columns.'}
+          </p>
+        </div>
+      )}
       {showDistributor && setDistributorId && (
         <div>
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5">Distributor</div>
@@ -1607,7 +1873,7 @@ function PreviewHero({ state, error, rowsData, layout, rowKey, selectedColumns, 
         ) : layout === 'tabular' ? (
           <TabularTable rowsData={rowsData} selectedColumns={selectedColumns || []} labelOf={labelOf} isMeasure={isMeasure} sort={sort} setSort={setSort} onRemoveColumn={onRemoveColumn} onReorderColumn={onReorderColumn} />
         ) : layout === 'grouped' ? (
-          <SummaryTable rowsData={rowsData} rowKey={rowKey} values={values} labelOf={labelOf} onRemoveValue={onRemoveValue} onReorderValue={onReorderValue} />
+          <SummaryTable rowsData={rowsData} rowKey={rowKey} rowKeys={selectedColumns} values={values} labelOf={labelOf} onRemoveValue={onRemoveValue} onReorderValue={onReorderValue} />
         ) : (
           <MatrixTable rowsData={rowsData} rowKey={rowKey} columnKey={columnKey} valueKey={values[0] || ''} labelOf={labelOf} onRemoveValue={onRemoveValue} />
         )}
@@ -1761,19 +2027,25 @@ function TabularTable({ rowsData, selectedColumns, labelOf, isMeasure, sort, set
   );
 }
 
-function SummaryTable({ rowsData, rowKey, values, labelOf, onRemoveValue, onReorderValue }: {
-  rowsData: any[]; rowKey: string; values: string[]; labelOf: (k: string) => string; onRemoveValue: (k: string) => void;
+function SummaryTable({ rowsData, rowKey, rowKeys = [], values, labelOf, onRemoveValue, onReorderValue }: {
+  rowsData: any[]; rowKey: string; rowKeys?: string[]; values: string[]; labelOf: (k: string) => string;
+  onRemoveValue: (k: string) => void;
   onReorderValue?: (fromKey: string, toKey: string) => void;
 }) {
   const keys = Object.keys(rowsData[0] ?? {});
-  const groupCol = rowKey && keys.includes(rowKey) ? rowKey : keys[0];
-  const valueCols = values.length ? values.filter(v => keys.includes(v)) : keys.filter(k => k !== groupCol);
+  // Grouping by several dimensions returns one named column each; a single
+  // dimension still comes back under the generic "grp".
+  const dimCols = rowKeys.filter(k => keys.includes(k));
+  const groupCols = dimCols.length ? dimCols : [rowKey && keys.includes(rowKey) ? rowKey : keys[0]];
+  const valueCols = values.length
+    ? values.filter(v => keys.includes(v))
+    : keys.filter(k => !groupCols.includes(k));
 
   return (
     <table className="w-full text-xs">
       <thead className="bg-muted/30 sticky top-0">
         <tr>
-          <ColMenu label={labelOf(groupCol)} keyName={groupCol} />
+          {groupCols.map(gc => <ColMenu key={gc} label={labelOf(gc)} keyName={gc} />)}
           {valueCols.map(k => (
             <ColMenu
               key={k}
@@ -1791,14 +2063,17 @@ function SummaryTable({ rowsData, rowKey, values, labelOf, onRemoveValue, onReor
       <tbody>
         {rowsData.map((r, i) => (
           <tr key={i} className="bg-muted/25 border-t border-border/50">
-            <td className="px-3 py-2 font-semibold text-foreground">{fmtCell(r?.[groupCol])}</td>
+            {groupCols.map(gc => (
+              <td key={gc} className="px-3 py-2 font-semibold text-foreground">{fmtCell(r?.[gc])}</td>
+            ))}
             {valueCols.map(k => (
               <td key={k} className="px-3 py-2 text-right tabular-nums font-semibold text-foreground">{fmtCell(r?.[k])}</td>
             ))}
           </tr>
         ))}
         <tr className="bg-[#eaf3de] dark:bg-[#22350f] border-t-2 border-[#639922]/50">
-          <td className="px-3 py-2 font-bold text-[#3b6d11] dark:text-[#97c459]">Grand total</td>
+          <td className="px-3 py-2 font-bold text-[#3b6d11] dark:text-[#97c459]"
+              colSpan={groupCols.length}>Grand total</td>
           {valueCols.map(k => {
             const total = sumNumeric(rowsData, k);
             return (
@@ -1905,3 +2180,172 @@ function MatrixTable({ rowsData, rowKey, columnKey, valueKey, labelOf, onRemoveV
 }
 
 
+
+// ---------- PDF template panel (inline, Schedule step) ----------
+
+interface PdfTemplatePanelProps {
+  value: any;
+  onChange: (v: any) => void;
+  onPreview: () => void;
+  previewOpen: boolean;
+}
+
+const HEADER_STYLES: Array<{ id: string; label: string }> = [
+  { id: 'standard', label: 'Standard' },
+  { id: 'centered', label: 'Centered' },
+  { id: 'band', label: 'Band' },
+  { id: 'compact', label: 'Compact' },
+];
+const ORIENTATIONS: Array<{ id: string; label: string }> = [
+  { id: 'auto', label: 'Auto' },
+  { id: 'portrait', label: 'Portrait' },
+  { id: 'landscape', label: 'Landscape' },
+];
+
+function Seg({
+  options, value, onChange,
+}: { options: Array<{ id: string; label: string }>; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="inline-flex w-full rounded-md border bg-background overflow-hidden">
+      {options.map((o, i) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={cn(
+            'flex-1 text-xs py-1.5 transition-colors',
+            i > 0 && 'border-l',
+            value === o.id ? 'bg-[#eeedfe] text-[#534ab7] font-medium dark:bg-[#2a2560] dark:text-[#afa9ec]' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PdfTemplatePanel({ value, onChange, onPreview, previewOpen }: PdfTemplatePanelProps) {
+  const t = value ?? {};
+  const set = (k: string, v: any) => onChange({ ...t, [k]: v });
+  const bool = (k: string, def = true) => (t[k] === undefined ? def : !!t[k]);
+
+  return (
+    <div className="rounded-xl border border-[#afa9ec] bg-[#eeedfe]/60 dark:bg-[#2a2560]/40 p-4 space-y-4">
+      <div className="flex items-center gap-2 text-[12px] font-semibold text-[#534ab7] dark:text-[#afa9ec]">
+        <FileType2 size={14} /> PDF template
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Theme</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {PDF_THEMES.map(th => {
+            const active = (t.theme ?? 'default') === th.id;
+            return (
+              <button
+                key={th.id}
+                type="button"
+                onClick={() => set('theme', th.id)}
+                className={cn(
+                  'flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors bg-background',
+                  active ? 'border-[#534ab7] ring-1 ring-[#534ab7]/40 font-medium' : 'border-border text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <span className="h-3.5 w-3.5 rounded-full shrink-0 border border-black/10" style={{ background: th.accent }} />
+                <span className="truncate">{th.label}</span>
+                {active && <Check size={13} className="ml-auto text-[#534ab7]" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Branding</Label>
+          <Select value={t.branding ?? 'company'} onValueChange={v => set('branding', v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="company">Company</SelectItem>
+              <SelectItem value="distributor">Distributor (scoped)</SelectItem>
+              <SelectItem value="none">No branding</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Orientation</Label>
+          <Seg options={ORIENTATIONS} value={t.orientation ?? 'auto'} onChange={v => set('orientation', v)} />
+        </div>
+      </div>
+
+
+      <div className="h-px bg-[#afa9ec]/50" />
+
+      <div className="text-[12px] font-semibold text-[#534ab7] dark:text-[#afa9ec]">Header</div>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Header style</Label>
+          <Seg options={HEADER_STYLES} value={t.header_style ?? 'standard'} onChange={v => set('header_style', v)} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Title override</Label>
+            <Input value={t.title_override ?? ''} placeholder="Leave blank to use the report name"
+              onChange={e => set('title_override', e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Subtitle (optional)</Label>
+            <Input value={t.subtitle ?? ''} placeholder="e.g. Prepared for the regional review"
+              onChange={e => set('subtitle', e.target.value)} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={bool('show_period', true)} onCheckedChange={c => set('show_period', !!c)} />
+            Show reporting period
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={bool('show_contact_line', false)} onCheckedChange={c => set('show_contact_line', !!c)} />
+            Show address &amp; GSTIN line
+          </label>
+        </div>
+      </div>
+
+      <div className="h-px bg-[#afa9ec]/50" />
+
+      <div className="text-[12px] font-semibold text-[#534ab7] dark:text-[#afa9ec]">Body</div>
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={bool('include_meta', true)} onCheckedChange={c => set('include_meta', !!c)} />
+            Meta block (generated, filters, recipient)
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={bool('include_totals', true)} onCheckedChange={c => set('include_totals', !!c)} />
+            Totals row
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Checkbox checked={bool('include_page_numbers', true)} onCheckedChange={c => set('include_page_numbers', !!c)} />
+            Page numbers
+          </label>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Footer note (optional)</Label>
+          <Input value={t.footer_note ?? ''} placeholder="e.g. Confidential — internal use only"
+            onChange={e => set('footer_note', e.target.value)} />
+        </div>
+      </div>
+
+      <div className="pt-1">
+        <Button type="button" variant="outline" className="w-full" onClick={onPreview}>
+          {previewOpen ? <><RefreshCw size={14} className="mr-2" />Refresh preview</> : <><Eye size={14} className="mr-2" />Preview PDF</>}
+        </Button>
+        {!previewOpen && (
+          <p className="mt-2 text-[11px] text-muted-foreground text-center">
+            Press Preview PDF to render the template.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
