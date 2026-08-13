@@ -12194,6 +12194,24 @@ export type Database = {
           },
         ]
       }
+      order_price_fix_backup_20260813: {
+        Row: {
+          captured_at: string | null
+          row_before: Json | null
+          src: string | null
+        }
+        Insert: {
+          captured_at?: string | null
+          row_before?: Json | null
+          src?: string | null
+        }
+        Update: {
+          captured_at?: string | null
+          row_before?: Json | null
+          src?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           amount_collected: number | null
@@ -17053,6 +17071,30 @@ export type Database = {
           },
         ]
       }
+      report_delivery_claims: {
+        Row: {
+          claimed_at: string
+          period: string
+          recipient_user_id: string
+          subscription_id: string
+          trigger_type: string
+        }
+        Insert: {
+          claimed_at?: string
+          period: string
+          recipient_user_id: string
+          subscription_id: string
+          trigger_type: string
+        }
+        Update: {
+          claimed_at?: string
+          period?: string
+          recipient_user_id?: string
+          subscription_id?: string
+          trigger_type?: string
+        }
+        Relationships: []
+      }
       report_delivery_log: {
         Row: {
           created_at: string
@@ -17064,7 +17106,8 @@ export type Database = {
           push_status: string | null
           recipient_user_id: string
           storage_path: string | null
-          subscription_id: string
+          subscription_id: string | null
+          trigger_type: string
         }
         Insert: {
           created_at?: string
@@ -17076,7 +17119,8 @@ export type Database = {
           push_status?: string | null
           recipient_user_id: string
           storage_path?: string | null
-          subscription_id: string
+          subscription_id?: string | null
+          trigger_type: string
         }
         Update: {
           created_at?: string
@@ -17088,7 +17132,8 @@ export type Database = {
           push_status?: string | null
           recipient_user_id?: string
           storage_path?: string | null
-          subscription_id?: string
+          subscription_id?: string | null
+          trigger_type?: string
         }
         Relationships: [
           {
@@ -17102,6 +17147,9 @@ export type Database = {
       }
       report_subscriptions: {
         Row: {
+          admin_scope: string
+          ai_enabled: boolean
+          ai_prompt: string | null
           attachment_format: string
           cadence: string
           created_at: string
@@ -17110,17 +17158,25 @@ export type Database = {
           fire_time: string
           id: string
           last_fired_at: string | null
+          last_scheduled_fire_at: string | null
+          last_scheduled_period_key: string | null
           name: string
+          pdf_template: Json
+          period_basis: string
           push_to_phone: boolean
           recipient_mode: string
           recipient_user_ids: string[]
           report_definition_id: string
+          respect_hierarchy: boolean
           scope: string
           status: string
           timezone: string
           updated_at: string
         }
         Insert: {
+          admin_scope?: string
+          ai_enabled?: boolean
+          ai_prompt?: string | null
           attachment_format?: string
           cadence: string
           created_at?: string
@@ -17129,17 +17185,25 @@ export type Database = {
           fire_time?: string
           id?: string
           last_fired_at?: string | null
+          last_scheduled_fire_at?: string | null
+          last_scheduled_period_key?: string | null
           name: string
+          pdf_template?: Json
+          period_basis?: string
           push_to_phone?: boolean
           recipient_mode?: string
           recipient_user_ids?: string[]
           report_definition_id: string
+          respect_hierarchy?: boolean
           scope?: string
           status?: string
           timezone?: string
           updated_at?: string
         }
         Update: {
+          admin_scope?: string
+          ai_enabled?: boolean
+          ai_prompt?: string | null
           attachment_format?: string
           cadence?: string
           created_at?: string
@@ -17148,11 +17212,16 @@ export type Database = {
           fire_time?: string
           id?: string
           last_fired_at?: string | null
+          last_scheduled_fire_at?: string | null
+          last_scheduled_period_key?: string | null
           name?: string
+          pdf_template?: Json
+          period_basis?: string
           push_to_phone?: boolean
           recipient_mode?: string
           recipient_user_ids?: string[]
           report_definition_id?: string
+          respect_hierarchy?: boolean
           scope?: string
           status?: string
           timezone?: string
@@ -24803,6 +24872,17 @@ export type Database = {
         }[]
       }
       get_estimated_memory_usage: { Args: never; Returns: number }
+      get_field_activity_report: {
+        Args: {
+          p_columns: string
+          p_filters: Json
+          p_layout: string
+          p_row_keys?: string[]
+          p_rows: string
+          p_values: string[]
+        }
+        Returns: Json[]
+      }
       get_invoice_filenames_apr_2026: {
         Args: never
         Returns: {
@@ -25076,6 +25156,7 @@ export type Database = {
           p_columns: string
           p_filters: Json
           p_layout: string
+          p_row_keys?: string[]
           p_rows: string
           p_values: string[]
         }
@@ -25324,6 +25405,10 @@ export type Database = {
         Args: { p_keep_days?: number }
         Returns: number
       }
+      prune_report_delivery_claims: {
+        Args: { p_keep_days?: number }
+        Returns: number
+      }
       quarantine_orphan_orders: {
         Args: { p_grace_minutes?: number }
         Returns: number
@@ -25347,6 +25432,25 @@ export type Database = {
         Args: never
         Returns: {
           full_name: string
+          user_id: string
+        }[]
+      }
+      report_can_view_user: {
+        Args: { _target: string; _viewer: string }
+        Returns: boolean
+      }
+      report_claim_delivery: {
+        Args: {
+          p_period: string
+          p_recipient_user_id: string
+          p_subscription_id: string
+          p_trigger_type: string
+        }
+        Returns: boolean
+      }
+      report_system_admins: {
+        Args: { p_user_ids: string[] }
+        Returns: {
           user_id: string
         }[]
       }
