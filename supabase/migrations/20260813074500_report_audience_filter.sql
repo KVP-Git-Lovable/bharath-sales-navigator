@@ -1,0 +1,27 @@
+-- Report audience control: which users' data appears in a report.
+--
+-- Distinct from report_subscriptions.recipient_user_ids, which is who RECEIVES
+-- the report. This is who the report is ABOUT.
+--
+-- Stored in report_definitions.config.filters beside the existing scope_user_id,
+-- so generate-report carries it to the RPCs with NO edge function change and no
+-- new columns (callRpc already merges config.filters into p_filters verbatim).
+--
+-- Applied to production as two migrations, in this order:
+--   1. report_audience_filter_helper        -- report_apply_audience()
+--   2. report_rpcs_apply_audience_filter    -- wires it into all five report RPCs
+--
+-- The RPCs were patched from their own pg_get_functiondef rather than by pasting
+-- fresh bodies: production's copies are NOT byte-identical to staging's, and
+-- these are 3-16KB of live reporting SQL where retyping risks silent damage. The
+-- anchor was verified to appear exactly once in each and the migration aborts
+-- unless all five are patched.
+--
+-- report_apply_audience only ever NARROWS the set it is given. Each RPC resolves
+-- the hierarchy scope first and the audience is intersected with it, so a report
+-- author cannot widen what a recipient sees by listing someone outside their tree.
+--
+-- Verified on production: June 2026 sales 31 -> 28 rows and attendance 346 -> 323
+-- with exclude_inactive on, the three deactivated reps dropping out.
+--
+-- See the applied migrations for the exact statements.
