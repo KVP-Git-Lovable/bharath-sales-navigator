@@ -1751,6 +1751,7 @@ export const MyVisits = () => {
             <ActivityEventsTable
               userId={isViewingSelf ? user!.id : selectedUserIds[0]}
               selectedDate={selectedDate}
+              canEditEvent={can('action_activity_edit', 'edit')}
               onActivitiesLoaded={(count) => setHasActivities(count > 0)}
               onActivityChanged={() => {
                 refreshActivityVisits();
