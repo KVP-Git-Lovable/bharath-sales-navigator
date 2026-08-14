@@ -41,7 +41,7 @@ import { useOrderBasedDelivery } from "@/hooks/useOrderBasedDelivery";
 import { useVanSales } from "@/hooks/useVanSales";
 import { useOrderEditPolicy } from "@/hooks/useOrderEditPolicy";
 import { shouldGenerateInvoiceAtCart, getOrderConfirmationMessage } from "@/utils/invoiceGenerationUtils";
-import { computeLineTax, sumLineTaxes } from "@/utils/taxCalc";
+import { computeLineTax, sumLineTaxes, roundHalfUp } from "@/utils/taxCalc";
 
 interface CartItem {
   id: string;
@@ -525,7 +525,11 @@ export const Cart = () => {
       if (!item) return 0;
       const subtotal = computeItemSubtotal(item);
       const discount = computeItemDiscount(item);
-      return Math.max(0, subtotal - discount);
+      // Round here (not just at the order-level sum) so every downstream consumer
+      // (order_items.total, tax basis, order-level totals) uses the SAME rounded
+      // per-line value. Summing raw unrounded floats caused a ~0.003 drift that,
+      // compounded through GST, turned a true 404.50 total into 404.4988 -> 404.
+      return roundHalfUp(Math.max(0, subtotal - discount));
     } catch (error) {
       console.error('Error computing total:', error);
       return 0;
@@ -710,9 +714,13 @@ export const Cart = () => {
   };
   const getAmountAfterDiscount = () => {
     try {
-      const subtotal = getSubtotal();
-      const discount = getDiscount();
-      return Math.max(0, subtotal - discount);
+      // Build from the SAME rounded per-item totals used for the tax basis and
+      // order_items.total, instead of getSubtotal() - getDiscount() (two
+      // independently-drifting raw aggregates) — see computeItemTotal.
+      return cartItems.reduce((sum, item) => {
+        if (!item) return sum;
+        return sum + computeItemTotal(item);
+      }, 0);
     } catch (error) {
       console.error('Error computing amount after discount:', error);
       return 0;
