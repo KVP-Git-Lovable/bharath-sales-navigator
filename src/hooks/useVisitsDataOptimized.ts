@@ -112,11 +112,23 @@ const calculateStats = (visits: any[], orders: any[], retailers: any[], selected
     ? visits.filter(v => v.planned_date === selectedDate)
     : visits;
   
-  // Also filter orders by date
+  // Also filter orders by date, and to retailer orders only. Counter/event
+  // orders carry retailer_id = null, so a set built from o.retailer_id gets a
+  // literal `null` entry — never in countedRetailers, so it always reads as an
+  // extra productive retailer, and the reduce below adds its amount straight
+  // into a KPI titled "Today's Progress" for a beat that never saw it. This is
+  // the retailer/beat widget; activity and event figures are added separately
+  // by the caller (see actTotal/actProductive in MyVisits.tsx).
   const dateFilteredOrders = selectedDate
-    ? orders.filter(o => o.order_date === selectedDate)
-    : orders;
+    ? orders.filter(o => o.order_date === selectedDate && o.retailer_id)
+    : orders.filter(o => o.retailer_id);
   
+  // Activity visits (events, meetings, leave) carry retailer_id = null. A caller
+  // that derives its retailer list from visits therefore hands us an entry with
+  // no id, and counting it as a planned retailer double-counts the activity —
+  // once here and once again as an activity card in MyVisits.
+  const realRetailers = retailers.filter(r => r?.id);
+
   const retailersWithOrders = new Set(dateFilteredOrders.map(o => o.retailer_id));
   const visitsByRetailer = new Map<string, any[]>();
   
@@ -145,14 +157,14 @@ const calculateStats = (visits: any[], orders: any[], retailers: any[], selected
     }
   });
 
-  retailers.forEach(r => {
+  realRetailers.forEach(r => {
     if (!countedRetailers.has(r.id)) planned++;
   });
 
   // Total planned = all retailers in the beat
   // SAFETY: If retailers array is momentarily empty (transient sync), use visited retailer count
   // This prevents totalPlanned from flashing to 0 during sync cycles
-  const totalPlanned = retailers.length > 0 ? retailers.length : countedRetailers.size;
+  const totalPlanned = realRetailers.length > 0 ? realRetailers.length : countedRetailers.size;
 
   // Teammate breakdown — rows tagged with _source === 'teammate' by the smart sync.
   const teamOrdersList = dateFilteredOrders.filter((o: any) => o?._source === 'teammate');
@@ -223,12 +235,24 @@ const _fetchPointsForDateImpl = async (uid: string, date: string): Promise<Point
   const dateEnd = new Date(date);
   dateEnd.setHours(23, 59, 59, 999);
 
-  const { data: pointsRaw } = await supabase
+  let { data: pointsRaw, error: pointsError } = await supabase
     .from('gamification_points')
     .select('points, reference_id, metadata, gamification_games(name), gamification_actions(action_name)')
     .eq('user_id', uid)
     .gte('earned_at', dateStart.toISOString())
     .lte('earned_at', dateEnd.toISOString());
+
+  // Fallback: if the embedded relations fail (e.g. missing FK), still show totals
+  if (pointsError) {
+    console.warn('[points] embed query failed, falling back to plain select:', pointsError.message);
+    const fallback = await supabase
+      .from('gamification_points')
+      .select('points, reference_id, metadata')
+      .eq('user_id', uid)
+      .gte('earned_at', dateStart.toISOString())
+      .lte('earned_at', dateEnd.toISOString());
+    pointsRaw = (fallback.data as any) || [];
+  }
 
   const total = pointsRaw?.reduce((sum, p) => sum + (p.points || 0), 0) || 0;
   const byRetailer = new Map<
@@ -575,7 +599,7 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
     // Use visits as fallback to keep stats visible during transient empty-retailer state.
     const safeRetailers = retailers.length > 0
       ? retailers
-      : visits.filter((v: any) => v.planned_date === selectedDate && !v._source)
+      : visits.filter((v: any) => v.planned_date === selectedDate && !v._source && v.retailer_id)
                .map((v: any) => ({ id: v.retailer_id }));
     return calculateStats(visits, orders, safeRetailers, selectedDate);
   }, [visits, orders, retailers, selectedDate]);
@@ -989,10 +1013,27 @@ export const useVisitsDataOptimized = ({ userId, selectedDate, viewUserId }: Use
       const visitRetailerIds = newVisits.map(v => v.retailer_id);
       const orderRetailerIds = newOrders.map(o => o.retailer_id);
 
-      // CORRECT: Only use beats that the user has PLANNED for today.
-      // Shared beat access grants visibility but retailers only load when the beat is planned.
-      // This prevents ALL shared beats (regardless of plan) from inflating the retailer count.
-      const beatIds = [...new Set(planBeatIds)];
+      // Beats the user has PLANNED for today PLUS beats explicitly shared with the
+      // user via an active `beat_user_access` grant covering today. An active dated
+      // share is an intentional grant, so its retailers must load for the sharee —
+      // otherwise Rep B (whom Rep A shared a beat with) sees an empty list while
+      // Rep A still sees both sides.
+      let sharedBeatIds: string[] = [];
+      try {
+        const { data: shareRows } = await supabase
+          .from('beat_user_access')
+          .select('beat_id')
+          .eq('user_id', uid)
+          .eq('is_active', true)
+          .lte('effective_from', `${date}T23:59:59.999Z`)
+          .or(`effective_to.is.null,effective_to.gte.${date}T00:00:00.000Z`);
+        sharedBeatIds = (shareRows || [])
+          .map((r: any) => r.beat_id)
+          .filter(Boolean);
+      } catch (e) {
+        console.warn('[SmartSync] Shared-beat fetch failed (non-fatal):', e);
+      }
+      const beatIds = [...new Set([...planBeatIds, ...sharedBeatIds])];
 
       // Get explicit retailer IDs from beat_data
       const explicitRetailerIds: string[] = [];

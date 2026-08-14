@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, Clock, MapPin, MessageSquare, Loader2, Play, CheckCircle2, Navigation, Timer, IndianRupee, ShoppingCart, Package, BarChart3 } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, MessageSquare, Loader2, Play, CheckCircle2, Navigation, Timer, IndianRupee, ShoppingCart, Package, BarChart3, Pencil } from 'lucide-react';
 import { useActivityEvents, ActivityEvent, formatActivityDuration } from '@/hooks/useActivityEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -21,6 +21,10 @@ interface ActivityEventsTableProps {
     activity: ActivityEvent,
     visitStatus?: { status: string | null; check_in_time: string | null; check_out_time: string | null } | null,
   ) => void;
+  /** Opens the scheduling dialog in edit mode for a not-yet-started activity. */
+  /** Shows Edit on Event cards. Events only — other activity types are not
+   *  editable from this list. */
+  canEditEvent?: boolean;
 }
 
 interface VisitStatus {
@@ -62,7 +66,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof
   },
 };
 
-export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, onActivityChanged, onOpenDetail }: ActivityEventsTableProps) => {
+export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, onActivityChanged, onOpenDetail, canEditEvent }: ActivityEventsTableProps) => {
   const { fetchActivitiesForDate, updateActivityLocation } = useActivityEvents();
   const { types: activityTypeMaster } = useActivityTypes();
   const navigate = useNavigate();
@@ -80,6 +84,9 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
   const [visitStatuses, setVisitStatuses] = useState<Record<string, VisitStatus>>({});
   const [eventTotals, setEventTotals] = useState<Record<string, { revenue: number; orders: number }>>({});
+  // event id -> the viewer's own visit row for it. Check-in, check-out and
+  // Complete all act on this, never on the event's shared visit.
+  const [myVisitIds, setMyVisitIds] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -100,27 +107,52 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
       setActivities(data);
       onActivitiesLoadedRef.current?.(data.length);
 
-      // Fetch visit statuses
+      // Fetch visit statuses.
+      //
+      // Two different visit ids are in play on a team event and mixing them up
+      // is the easy mistake here. `activity.visit_id` is the EVENT's visit —
+      // orders and totals hang off it and it is shared by the whole team. But
+      // check-in/check-out is per person: each rep has their own visit row for
+      // the event, so reading status off the shared id would show every rep the
+      // owner's progress. Status is keyed on the viewer's own row.
       const visitIds = data.map(a => a.visit_id).filter(Boolean);
+      const eventIds = data.map(a => a.id).filter(Boolean);
       if (visitIds.length > 0) {
         const { data: visits } = await supabase
           .from('visits')
-          .select('id, check_in_time, check_out_time, status')
-          .in('id', visitIds);
+          .select('id, check_in_time, check_out_time, status, activity_event_id')
+          .or(
+            [
+              `id.in.(${visitIds.join(',')})`,
+              ...(eventIds.length ? [`activity_event_id.in.(${eventIds.join(',')})`] : []),
+            ].join(',')
+          )
+          .eq('user_id', userId);
 
         if (visits) {
           const map: Record<string, VisitStatus> = {};
+          const mine: Record<string, string> = {};
           visits.forEach(v => {
-            map[v.id] = {
+            const st = {
               check_in_time: v.check_in_time,
               check_out_time: v.check_out_time,
               status: v.status,
             };
+            map[v.id] = st;
+            // Also file it under the event, so a participant whose own visit id
+            // differs from the event's still finds their own status.
+            if ((v as any).activity_event_id) {
+              map[(v as any).activity_event_id] = st;
+              mine[(v as any).activity_event_id] = v.id;
+            }
           });
           setVisitStatuses(map);
+          setMyVisitIds(mine);
         }
 
-        // Fetch real revenue/order totals per visit (events)
+        // Totals for the whole event, every team member's orders included —
+        // these are keyed on the event's shared visit id, so all three reps see
+        // the same figure on their card.
         const { data: orderRows } = await supabase
           .from('orders')
           .select('visit_id, total_amount, status')
@@ -178,31 +210,56 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
     }
   };
 
+  // The viewer's OWN visit row for this activity. On a team event that is not
+  // activity.visit_id — that one belongs to the owner and is shared for orders.
+  // Starting or completing through it would check the owner in instead.
+  const myVisitFor = (activity: ActivityEvent): string | null =>
+    myVisitIds[activity.id] ?? activity.visit_id ?? null;
+
+  const isOwnerOf = (activity: ActivityEvent): boolean =>
+    !activity.user_id || activity.user_id === userId;
+
   const handleStartActivity = async (activity: ActivityEvent) => {
-    if (!activity.visit_id) return;
+    const myVisitId = myVisitFor(activity);
+    if (!myVisitId) return;
     setActionLoading(activity.id + '-start');
     try {
       const now = new Date().toISOString();
       const gps = await captureGPS();
 
-      // Update visit to in-progress with check_in_time
-      const { error: visitError } = await supabase
+      // Where you started goes on YOUR visit row, so three reps working one
+      // stall each record their own arrival rather than overwriting each other.
+      const { data: startedRows, error: visitError } = await supabase
         .from('visits')
-        .update({ 
-          check_in_time: now, 
+        .update({
+          check_in_time: now,
           status: 'in-progress',
+          ...(gps ? { check_in_location: { lat: gps.lat, lng: gps.lng, at: now } } : {}),
         } as any)
-        .eq('id', activity.visit_id);
+        .eq('id', myVisitId)
+        .select('id');
 
       if (visitError) throw visitError;
+      // RLS filters a rejected row instead of raising, so an update can report
+      // success having changed nothing.
+      if (!startedRows || startedRows.length === 0) {
+        throw new Error('You do not have permission to start this activity');
+      }
 
-      // Update activity_events with start location and time
-      await updateActivityLocation(activity.id, {
-        start_time: now,
-        ...(gps ? { start_latitude: gps.lat, start_longitude: gps.lng } : {}),
-      });
+      // The event row records the ACTUAL start in check_in_*, never in
+      // start_time — start_time holds the planned schedule the event was
+      // created with and is what the card shows. Owner only: the event has one
+      // official start, and RLS would refuse a participant here anyway.
+      if (isOwnerOf(activity)) {
+        await updateActivityLocation(activity.id, {
+          check_in_time: now,
+          ...(gps ? { check_in_latitude: gps.lat, check_in_longitude: gps.lng } : {}),
+        });
+      }
 
-      toast.success('Activity started — tracking in progress');
+      toast.success(
+        gps ? 'Started — time and location recorded' : 'Started — location unavailable, time recorded'
+      );
       window.dispatchEvent(new CustomEvent('visitDataChanged'));
       onActivityChanged?.();
       await loadActivities();
@@ -215,8 +272,9 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
   };
 
   const handleCompleteActivity = (activity: ActivityEvent) => {
-    if (!activity.visit_id) return;
-    setCompletionTarget({ id: activity.id, visitId: activity.visit_id });
+    const myVisitId = myVisitFor(activity);
+    if (!myVisitId) return;
+    setCompletionTarget({ id: activity.id, visitId: myVisitId });
   };
 
 
@@ -235,7 +293,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
   };
 
   const getActivityStatus = (activity: ActivityEvent): string => {
-    const visit = activity.visit_id ? visitStatuses[activity.visit_id] : null;
+    const visit = visitStatuses[activity.id] ?? (activity.visit_id ? visitStatuses[activity.visit_id] : null);
     if (!visit) return 'planned';
     if (visit.status === 'productive' || visit.check_out_time) return 'productive';
     if (visit.status === 'in-progress' || visit.check_in_time) return 'in-progress';
@@ -261,7 +319,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
       </CardHeader>
       <CardContent className="px-4 pb-3 space-y-2">
         {activities.map((activity) => {
-          const visitStatus = activity.visit_id ? visitStatuses[activity.visit_id] : null;
+          const visitStatus = visitStatuses[activity.id] ?? (activity.visit_id ? visitStatuses[activity.visit_id] : null);
           const status = getActivityStatus(activity);
           const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
           const StatusIcon = statusConfig.icon;
@@ -289,6 +347,13 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
                 : 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300';
             const statusLabel =
               status === 'productive' ? 'Completed' : status === 'in-progress' ? 'Active' : 'Upcoming';
+            // Drives both the button and the Open Event column span, so the grid
+            // never leaves a half-width orphan on a phone.
+            // Owner only. An assigned rep works the event but does not get to
+            // rename or re-date it — and the RLS update policy would refuse
+            // them anyway, so showing the button would only produce an error.
+            const isOwner = !activity.user_id || activity.user_id === userId;
+            const showEdit = !!canEditEvent && isOwner && status !== 'productive';
             const totals = activity.visit_id ? eventTotals[activity.visit_id] : undefined;
             const revenue = totals?.revenue || 0;
             const orderCount = totals?.orders || 0;
@@ -307,22 +372,24 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
 
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                   {/* Left: identity */}
-                  <div className="flex items-center gap-3 lg:min-w-[220px]">
+                  <div className="flex items-center gap-3 min-w-0 lg:min-w-[220px]">
                     <div className="h-11 w-11 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 flex items-center justify-center text-sm font-semibold shrink-0">
                       {initials || 'EV'}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold text-sm truncate">{name}</h4>
-                        <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
+                    <div className="min-w-0 flex-1">
+                      {/* Name, type, status and time on one line. The badges and the
+                          time keep their size and the name is the only thing that
+                          gives, so a long event name truncates instead of pushing
+                          the status onto a second row. */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h4 className="font-semibold text-sm truncate min-w-0">{name}</h4>
+                        <Badge variant="outline" className="shrink-0 whitespace-nowrap text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
                           Event
                         </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <Badge className={`text-[10px] px-2 py-0.5 border ${statusBadgeClass}`}>
+                        <Badge className={`shrink-0 whitespace-nowrap text-[10px] px-2 py-0.5 border ${statusBadgeClass}`}>
                           {statusLabel}
                         </Badge>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {timeLabel}
                         </span>
@@ -348,11 +415,36 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
                     </div>
                   </div>
 
-                  {/* Right: actions */}
-                  <div className="flex flex-wrap lg:flex-nowrap gap-2 lg:justify-end">
+                  {/* Right: actions.
+                      Two even columns on a phone rather than flex-wrap: the four
+                      labels are different lengths, so wrapping left ragged rows
+                      with buttons of mismatched widths. Back to a single row from
+                      lg up, where there is width for all four. */}
+                  <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-nowrap lg:justify-end">
+                    {/* An Event runs for hours or days, so it stays editable while it is
+                        live — that is precisely when a wrong name or date needs fixing.
+                        It locks once completed. */}
+                    {showEdit && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full lg:w-auto h-9 lg:h-8 text-xs gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Events go to their own form, not the generic activity
+                          // modal — that modal would overwrite activity_name with
+                          // the type ("test" becomes "Event") and cannot touch the
+                          // venue, budget, target, footfall or assigned reps.
+                          navigate(`/event/${activity.visit_id ?? activity.id}/edit`);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                    )}
                     <Button
                       size="sm"
-                      className="h-8 text-xs gap-1"
+                      className={`w-full lg:w-auto h-9 lg:h-8 text-xs gap-1 ${showEdit ? '' : 'col-span-2 lg:col-span-1'}`}
                       onClick={() => activity.visit_id && navigate(`/event/${activity.visit_id}/orders`)}
                     >
                       <Play className="h-3.5 w-3.5" />
@@ -361,7 +453,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs gap-1"
+                      className="w-full lg:w-auto h-9 lg:h-8 text-xs gap-1"
                       onClick={() => activity.visit_id && navigate(`/event/${activity.visit_id}/stock`)}
                     >
                       <Package className="h-3.5 w-3.5" />
@@ -370,7 +462,7 @@ export const ActivityEventsTable = ({ userId, selectedDate, onActivitiesLoaded, 
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs gap-1"
+                      className="w-full lg:w-auto h-9 lg:h-8 text-xs gap-1"
                       onClick={() => activity.visit_id && navigate(`/event/${activity.visit_id}/summary`)}
                     >
                       <BarChart3 className="h-3.5 w-3.5" />

@@ -180,11 +180,11 @@ const normalizeItemForDisplay = (item: any) => {
   // deduction.
   //
   // This used to read `storedTotal - discountAmt`, which charged the discount a
-  // second time. On a 50% scheme the two values are equal by definition, so every
-  // line rendered as exactly 0.00 — see the 12 Aug 2026 orders for Pushpagiri
-  // Store and ANEMAHAL SPICES & COFFEE. At any other percentage it produced a
-  // wrong-but-plausible figure instead, which is why it went unnoticed across 296
-  // orders and roughly Rs.86,800 of understated invoices since 18 May 2026.
+  // second time. On a 50% scheme the two values are equal by definition, so
+  // every line rendered as exactly 0.00 — see the 12 Aug 2026 orders for
+  // Pushpagiri Store and ANEMAHAL SPICES & COFFEE, where a global 50% scheme was
+  // briefly live. At any other percentage it produced a wrong-but-plausible
+  // figure instead, which is why it went unnoticed for so long.
   //
   // The Math.max(0, ...) clamp is deliberately gone as well: it turned negative
   // arithmetic into a clean-looking zero and hid the fault. A future error here
@@ -253,10 +253,43 @@ const normalizeItemForDisplay = (item: any) => {
 };
 
 /**
- * Generate Template 4 (Green Accent Professional) invoice PDF
- * This is the ONLY template used throughout the application
+ * Generate the invoice PDF.
+ *
+ * SINGLE SOURCE OF TRUTH: this renders the exact same <InvoicePreview />
+ * component the on-screen preview uses, so preview and download are identical.
+ * The legacy hand-drawn jsPDF layout below is kept only as a safety fallback.
  */
 export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob> {
+  try {
+    const { renderInvoicePreviewToPdfBlob } = await import('./renderInvoicePreviewPdf');
+    let displaySettings = data.displaySettings;
+    if (!displaySettings) {
+      try {
+        displaySettings = await getInvoiceDisplaySettingsMap();
+      } catch {
+        displaySettings = undefined;
+      }
+    }
+    return await renderInvoicePreviewToPdfBlob({
+      company: data.company,
+      retailer: data.retailer,
+      cartItems: data.cartItems,
+      orderId: data.displayInvoiceNumber || data.orderId,
+      beatName: data.beatName,
+      salesmanName: data.salesmanName,
+      invoiceTime: data.displayInvoiceTime,
+      schemeDetails: data.schemeDetails,
+      displaySettings,
+    });
+  } catch (err) {
+    console.error('Preview-based invoice render failed, falling back to legacy layout', err);
+    return generateTemplate4InvoiceLegacy(data);
+  }
+}
+
+/** @deprecated Legacy hand-drawn jsPDF layout — fallback only. */
+async function generateTemplate4InvoiceLegacy(data: InvoiceData): Promise<Blob> {
+
   const { orderId, company, retailer, cartItems, displayInvoiceNumber, displayInvoiceDate, displayInvoiceTime, beatName, salesmanName, schemeDetails, orderDiscount, orderTotal } = data;
   
   // Fetch display settings for customizable invoice fields
@@ -674,9 +707,9 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   //     GST         on the net
   //     TOTAL
   //
-  // so it needs the GROSS figure on the SUB-TOTAL line. Printing the net there
-  // and then also printing a DISCOUNT deduction below it would imply the discount
-  // comes off twice — the very thing this fix removes.
+  // so it needs the GROSS figure to show on the SUB-TOTAL line. Printing the net
+  // there and then also printing a DISCOUNT deduction below it would imply the
+  // discount comes off twice — the very thing this fix removes.
   const itemSubtotalGross = itemSubtotal + appliedOrderDiscount;
   const subtotal = itemSubtotal;
 
@@ -773,7 +806,7 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
   doc.setFont("helvetica", "normal");
   doc.setTextColor(0, 0, 0);
   
-  // SUB-TOTAL (sum of item totals, before order-level discount)
+  // SUB-TOTAL at list price, so SUB-TOTAL - DISCOUNT = the taxable net below.
   doc.text("SUB-TOTAL", totalsBoxX + labelOffset, innerY);
   doc.text(`Rs.${formatExact(itemSubtotalGross)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
   
@@ -1005,7 +1038,7 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
     // Fetch retailer details and order info from the original order
     const { data: order } = await supabase
       .from("orders")
-      .select("retailer_id, user_id, created_at")
+      .select("retailer_id, retailer_name, user_id, created_at")
       .eq("id", orderId)
       .single();
 
@@ -1031,7 +1064,11 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
     }
 
     if (!retailer) {
-      retailer = { name: "Customer", address: "", phone: "", gst_number: "", state: "" };
+      // A counter/event sale has no retailer row — retailer_id is null by
+      // design. The order still carries the walk-in's actual name in
+      // retailer_name; falling back to a bare "Customer" printed the same
+      // word on every stall invoice regardless of who bought.
+      retailer = { name: order?.retailer_name || "Customer", address: "", phone: "", gst_number: "", state: "" };
     }
 
     // Fetch salesman name
@@ -1193,7 +1230,9 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
   }
 
   if (!retailer) {
-    retailer = { name: "Customer", address: "", phone: "", gst_number: "", state: "" };
+    // Same reasoning as the edited-invoice branch above: order.retailer_name
+    // is the walk-in's real name for a counter/event sale.
+    retailer = { name: order.retailer_name || "Customer", address: "", phone: "", gst_number: "", state: "" };
   }
 
   // Fetch beat name - try retailer.beat_name first, then lookup from beats table

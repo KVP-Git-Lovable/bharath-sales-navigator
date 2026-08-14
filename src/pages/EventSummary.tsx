@@ -5,6 +5,7 @@ import {
   Download, Play, BarChart3, Calendar, Clock, MapPin, Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchEventByRouteId } from "@/lib/eventLookup";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { toast } from "sonner";
+import { Navbar } from "@/components/Navbar";
 
 interface EventInfo {
   id: string;
@@ -93,19 +95,22 @@ export default function EventSummary() {
     (async () => {
       setLoading(true);
       try {
-        const { data: ev } = await supabase
-          .from("activity_events")
-          .select("id,visit_id,event_name,activity_name,activity_type,activity_date,from_date,to_date,start_time,end_time,activity_place")
-          .eq("visit_id", id)
-          .maybeSingle();
+        const ev = await fetchEventByRouteId(
+          id,
+          "id,visit_id,event_name,activity_name,activity_type,activity_date,from_date,to_date,start_time,end_time,activity_place"
+        );
         if (!alive) return;
         if (!ev) { toast.error("Event not found"); setLoading(false); return; }
         setEvent(ev as EventInfo);
 
+        // Deliberately NOT filtered by user: Summary is the team view, showing
+        // what everyone working the event has taken. Keyed on the event's own
+        // visit id so a participant opening it through their own visit still
+        // sees the whole event.
         const { data: ordRows } = await supabase
           .from("orders")
-          .select("id,total_amount,retailer_id,retailer_name,counter_customer_id,order_date,created_at,status")
-          .eq("visit_id", id)
+          .select("id,total_amount,retailer_id,retailer_name,counter_customer_id,order_date,created_at,status,user_id")
+          .eq("visit_id", (ev as any).visit_id ?? id)
           .order("created_at", { ascending: true });
         const ords = (ordRows || []) as OrderRow[];
         if (!alive) return;
@@ -261,17 +266,23 @@ export default function EventSummary() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-muted/20">
+        <Navbar />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3">
-        <p className="text-sm text-muted-foreground">Event not found.</p>
-        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>Go back</Button>
+      <div className="min-h-screen bg-muted/20">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center gap-3 py-24">
+          <p className="text-sm text-muted-foreground">Event not found.</p>
+          <Button variant="outline" size="sm" onClick={() => navigate(-1)}>Go back</Button>
+        </div>
       </div>
     );
   }
@@ -281,8 +292,9 @@ export default function EventSummary() {
 
   return (
     <div className="min-h-screen bg-muted/20">
+      <Navbar />
       {/* Top bar */}
-      <div className="sticky top-0 z-10 bg-background border-b">
+      <div className="bg-background border-b">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4" />

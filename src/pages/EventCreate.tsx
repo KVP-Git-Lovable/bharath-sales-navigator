@@ -1,13 +1,14 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import {
-  ArrowLeft, CalendarIcon, Save, Navigation, X, Loader2,
+  CalendarIcon, Save, Navigation, X, Loader2, ArrowLeft,
   Info, MapPin, Wallet, Users, Target, UsersRound, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
+import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,10 +27,18 @@ import { Geolocation } from "@capacitor/geolocation";
 
 const EVENT_TYPES = ["Sales Promotion", "Awareness Campaign", "Retail Activation", "Others"];
 
-interface ProfileOption { id: string; full_name: string }
+interface ProfileOption { id: string; full_name: string; is_active?: boolean | null }
 
 export default function EventCreate() {
   const navigate = useNavigate();
+  // Same page serves create and edit. An Event carries a dozen fields — name,
+  // address, GPS, budget, target, footfall, assigned reps — and a second form
+  // would drift from this one the moment any of them changes.
+  const { id: editEventId } = useParams<{ id: string }>();
+  const isEdit = !!editEventId;
+  const [loadingEvent, setLoadingEvent] = useState(false);
+  // Resolved from the loaded row: the route param may be the visit id.
+  const [activityId, setActivityId] = useState<string | null>(null);
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,19 +67,39 @@ export default function EventCreate() {
   // Team
   const [selectedReps, setSelectedReps] = useState<ProfileOption[]>([]);
   const [repPickerOpen, setRepPickerOpen] = useState(false);
+  // The event's own user — whoever created it. They are the one person actually
+  // attached to the event (they hold the paired visit row), so they belong in the
+  // team and cannot be taken out of it.
+  const [loadedOwnerId, setLoadedOwnerId] = useState<string | null>(null);
+  // Creating: it is you. Editing: whoever the event belongs to, which need not
+  // be you — a manager can be editing someone else's event.
+  const ownerId = isEdit ? loadedOwnerId : user?.id ?? null;
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-event-team"],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name").order("full_name");
+      // is_active so the picker can leave out deactivated users. They are still
+      // fetched, because one already on an event must keep showing as a chip.
+      const { data } = await supabase.from("profiles").select("id, full_name, is_active").order("full_name");
       return (data || []) as ProfileOption[];
     },
     staleTime: 5 * 60 * 1000,
   });
 
+  const owner = useMemo(
+    () => profiles.find((p) => p.id === ownerId) ?? null,
+    [profiles, ownerId]
+  );
+
   const availableReps = useMemo(
-    () => profiles.filter((p) => !selectedReps.some((s) => s.id === p.id)),
-    [profiles, selectedReps]
+    () =>
+      profiles.filter(
+        (p) =>
+          p.id !== ownerId &&
+          p.is_active !== false &&
+          !selectedReps.some((s) => s.id === p.id)
+      ),
+    [profiles, selectedReps, ownerId]
   );
 
   const captureLocation = async () => {
@@ -103,6 +132,70 @@ export default function EventCreate() {
     }
   };
 
+  // Load the event being edited. activity_events is the source of truth; the
+  // paired visit only carries the planned date and status.
+  useEffect(() => {
+    if (!editEventId) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingEvent(true);
+      try {
+        // The sibling event routes (/event/:id/orders, /stock, /summary) key on
+        // visit_id, so this one does too — but accept either id, because the
+        // param reads identically at every call site and a mismatch here would
+        // just silently load nothing.
+        const { data, error } = await supabase
+          .from("activity_events")
+          .select("*")
+          .or(`id.eq.${editEventId},visit_id.eq.${editEventId}`)
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data || cancelled) return;
+        const d = data as any;
+        setActivityId(d.id);
+        setLoadedOwnerId(d.user_id ?? null);
+        const toDate = (v?: string | null) => (v ? new Date(`${v}T00:00:00`) : undefined);
+        const toTime = (iso?: string | null) =>
+          iso ? new Date(iso).toTimeString().slice(0, 5) : undefined;
+
+        setEventName(d.event_name ?? d.activity_name ?? "");
+        setDescription(d.description ?? "");
+        setComments(d.comments ?? "");
+        setStartDate(toDate(d.from_date ?? d.activity_date));
+        setEndDate(toDate(d.to_date ?? d.activity_date));
+        if (toTime(d.start_time)) setStartTime(toTime(d.start_time)!);
+        if (toTime(d.end_time)) setEndTime(toTime(d.end_time)!);
+        setAddress(d.activity_place ?? "");
+        setLandmark(d.landmark ?? "");
+        if (d.start_latitude != null) setLatitude(String(d.start_latitude));
+        if (d.start_longitude != null) setLongitude(String(d.start_longitude));
+        if (d.budget != null) setBudget(String(d.budget));
+        if (d.sales_target != null) setSalesTarget(String(d.sales_target));
+        setExpectedFootfall(d.expected_footfall ?? "");
+        // remarks was written as "<eventType> — <description>" on create.
+        if (typeof d.remarks === "string" && d.remarks.trim()) {
+          setEventType(d.remarks.split("—")[0].trim() || "Sales Promotion");
+        }
+        if (Array.isArray(d.sales_reps) && d.sales_reps.length) {
+          const { data: reps } = await supabase
+            .from("profiles").select("id, full_name, is_active").in("id", d.sales_reps);
+          // Drop the owner: they render as their own pinned chip, and older
+          // events stored them in sales_reps while newer ones did not.
+          if (reps && !cancelled) {
+            setSelectedReps((reps as ProfileOption[]).filter((r) => r.id !== d.user_id));
+          }
+        }
+      } catch (e: any) {
+        console.error(e);
+        toast.error(e?.message || "Could not load the event");
+      } finally {
+        if (!cancelled) setLoadingEvent(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editEventId]);
+
   const addRep = (id: string) => {
     const p = profiles.find((x) => x.id === id);
     if (p) setSelectedReps((prev) => [...prev, p]);
@@ -118,7 +211,7 @@ export default function EventCreate() {
     if (!address.trim()) return "Address is required";
     if (!budget || isNaN(Number(budget))) return "Budget is required and must be numeric";
     if (salesTarget && isNaN(Number(salesTarget))) return "Sales Target must be numeric";
-    if (selectedReps.length === 0) return "At least one Sales Rep is required";
+    if (!ownerId && selectedReps.length === 0) return "At least one Sales Rep is required";
     if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return "Invalid time format";
     return null;
   };
@@ -134,6 +227,80 @@ export default function EventCreate() {
       const endDateStr = format(endDate!, "yyyy-MM-dd");
       const isMulti = startDateStr !== endDateStr;
 
+      const payload = {
+        activity_type: "Event",
+        activity_name: eventName,
+        event_name: eventName,
+        description: description || null,
+        comments: comments || null,
+        duration_type: isMulti ? "multiple_days" : "hour_based",
+        activity_date: startDateStr,
+        from_date: isMulti ? startDateStr : null,
+        to_date: isMulti ? endDateStr : null,
+        total_days: isMulti
+          ? Math.max(1, Math.round((endDate!.getTime() - startDate!.getTime()) / 86400000) + 1)
+          : 1,
+        start_time: new Date(`${startDateStr}T${startTime}:00`).toISOString(),
+        end_time: new Date(`${endDateStr}T${endTime}:00`).toISOString(),
+        activity_place: address,
+        landmark: landmark || null,
+        start_latitude: latitude ? Number(latitude) : null,
+        start_longitude: longitude ? Number(longitude) : null,
+        budget: Number(budget),
+        sales_target: salesTarget ? Number(salesTarget) : null,
+        expected_footfall: expectedFootfall || null,
+        // Owner first, so what is stored matches what the form shows.
+        sales_reps: Array.from(new Set([...(ownerId ? [ownerId] : []), ...selectedReps.map((r) => r.id)])),
+        remarks: `${eventType}${description ? ` — ${description}` : ""}`,
+      };
+
+      // ---- edit -------------------------------------------------------------
+      if (isEdit) {
+        if (!activityId) throw new Error("Event is still loading, please try again");
+        // .select() because RLS filters a rejected row rather than raising: the
+        // update would report success having changed nothing.
+        const { data: updated, error: uErr } = await supabase
+          .from("activity_events")
+          .update(payload as any)
+          .eq("id", activityId!)
+          .select("id, visit_id");
+        if (uErr) throw uErr;
+        if (!updated || updated.length === 0) {
+          throw new Error("You do not have permission to edit this event");
+        }
+
+        // Keep the paired visit on the day the event now starts, or My Visits
+        // shows it under the old date while the event says otherwise.
+        const visitId = (updated[0] as any).visit_id;
+        if (visitId) {
+          const { data: vRows, error: vuErr } = await supabase
+            .from("visits")
+            .update({ planned_date: startDateStr } as any)
+            .eq("id", visitId)
+            .select("id");
+          if (vuErr || !vRows || vRows.length === 0) {
+            throw new Error(vuErr?.message ?? "You do not have permission to move this event's visit");
+          }
+        }
+
+        // Staff the event: creates a visit row for anyone newly assigned, and
+        // moves the team's rows if the date changed. Must run server-side —
+        // visits_insert requires auth.uid() = user_id, so this session cannot
+        // write onto another rep's calendar directly.
+        const { error: syncErr } = await supabase.rpc("event_sync_participants", {
+          p_event_id: activityId!,
+        } as any);
+        if (syncErr) {
+          console.error("[EventCreate] participant sync failed:", syncErr);
+          toast.warning("Event saved, but the team could not be updated. Reopen and save again.");
+        }
+
+        toast.success("Event updated");
+        window.dispatchEvent(new Event("visitDataChanged"));
+        navigate("/visits/retailers");
+        return;
+      }
+
       // 1) create visit
       const { data: visit, error: vErr } = await supabase
         .from("visits")
@@ -148,39 +315,27 @@ export default function EventCreate() {
       if (vErr) throw vErr;
 
       // 2) create activity_event
-      const startISO = new Date(`${startDateStr}T${startTime}:00`).toISOString();
-      const endISO = new Date(`${endDateStr}T${endTime}:00`).toISOString();
-
-      const { error: aErr } = await supabase.from("activity_events").insert({
-        visit_id: visit.id,
-        user_id: user.id,
-        activity_type: "Event",
-        activity_name: eventName,
-        event_name: eventName,
-        description: description || null,
-        comments: comments || null,
-        duration_type: isMulti ? "multiple_days" : "hour_based",
-        activity_date: startDateStr,
-        from_date: isMulti ? startDateStr : null,
-        to_date: isMulti ? endDateStr : null,
-        total_days: isMulti
-          ? Math.max(1, Math.round((endDate!.getTime() - startDate!.getTime()) / 86400000) + 1)
-          : 1,
-        start_time: startISO,
-        end_time: endISO,
-        activity_place: address,
-        landmark: landmark || null,
-        start_latitude: latitude ? Number(latitude) : null,
-        start_longitude: longitude ? Number(longitude) : null,
-        budget: Number(budget),
-        sales_target: salesTarget ? Number(salesTarget) : null,
-        expected_footfall: expectedFootfall || null,
-        sales_reps: selectedReps.map((r) => r.id),
-        remarks: `${eventType}${description ? ` — ${description}` : ""}`,
-      } as any);
+      const { data: created, error: aErr } = await supabase
+        .from("activity_events")
+        .insert({
+          visit_id: visit.id,
+          user_id: user.id,
+          ...payload,
+        } as any)
+        .select("id")
+        .maybeSingle();
       if (aErr) {
         await supabase.from("visits").delete().eq("id", visit.id);
         throw aErr;
+      }
+
+      // Same sync on create, so reps assigned up front get the event straight
+      // away rather than only after the first edit.
+      if (created?.id) {
+        const { error: syncErr } = await supabase.rpc("event_sync_participants", {
+          p_event_id: created.id,
+        } as any);
+        if (syncErr) console.error("[EventCreate] participant sync failed:", syncErr);
       }
 
       toast.success("Event created successfully");
@@ -188,7 +343,7 @@ export default function EventCreate() {
       navigate("/visits/retailers");
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.message || "Failed to create event");
+      toast.error(e?.message || (isEdit ? "Failed to update event" : "Failed to create event"));
     } finally {
       setSubmitting(false);
     }
@@ -199,28 +354,41 @@ export default function EventCreate() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 dark:bg-muted/20">
+      <Navbar />
       {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b border-border/60">
-        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)} aria-label="Back">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-[15px] font-semibold leading-tight tracking-tight">Event Details</h1>
-              <p className="text-[11px] text-muted-foreground leading-tight">Add event information</p>
-            </div>
+      <div
+        className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border shadow-sm"
+
+      >
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="h-9 w-9 rounded-lg shrink-0"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-bold leading-tight tracking-tight text-foreground truncate">
+              {isEdit ? "Edit Event" : "Event Details"}
+            </h1>
+            <p className="text-xs text-muted-foreground leading-tight truncate">
+              {isEdit ? "Update event information" : "Add event information"}
+            </p>
           </div>
           <Button
             onClick={handleSave}
-            disabled={submitting}
-            className="h-9 px-4 rounded-lg bg-gradient-to-b from-primary to-primary/90 shadow-sm hover:shadow"
+            disabled={submitting || loadingEvent}
+            className="h-9 px-4 rounded-lg shrink-0 bg-gradient-to-b from-primary to-primary/90 shadow-sm hover:shadow"
           >
             {submitting ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Save className="h-4 w-4 mr-1.5" />}
-            Save
+            {isEdit ? "Save changes" : "Save"}
           </Button>
         </div>
       </div>
+
 
       <div className="max-w-5xl mx-auto p-4 space-y-3">
         {/* Basic Information */}
@@ -350,6 +518,17 @@ export default function EventCreate() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
             <Field label="Sales Reps Involved" required>
               <div className="rounded-lg border border-border/70 bg-background min-h-9 px-2 py-1.5 flex flex-wrap gap-1.5 items-center">
+                {/* The owner, pinned first and not removable — the event is on
+                    their calendar, so they cannot be dropped from its team. */}
+                {owner && (
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full px-2 py-0.5 gap-1 text-xs font-medium bg-primary/10 text-primary border-0"
+                  >
+                    {owner.full_name}
+                    <span className="text-[10px] font-normal text-primary/70">Owner</span>
+                  </Badge>
+                )}
                 {selectedReps.map((r) => (
                   <Badge
                     key={r.id}
@@ -367,7 +546,7 @@ export default function EventCreate() {
                     </button>
                   </Badge>
                 ))}
-                {selectedReps.length === 0 && (
+                {!owner && selectedReps.length === 0 && (
                   <span className="text-xs text-muted-foreground px-1">No reps selected</span>
                 )}
               </div>
