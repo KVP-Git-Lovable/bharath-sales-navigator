@@ -1875,7 +1875,14 @@ export default function CounterSales({ eventContext }: { eventContext?: EventCon
         const amt = parseFloat(r.partialAmount || "");
         if (!amt || amt <= 0) return "Enter a valid partial payment amount";
       }
-      if (isPaymentProofMandatory && navigator.onLine) {
+      // Not at an event: the screen never offered a way to capture cheque,
+      // UPI or NEFT proof there (event mode is Cash/UPI only, no camera step),
+      // so requiring one made UPI silently unsubmittable — Cash worked only
+      // because it has no proof requirement at all. A retailer order still
+      // needs it exactly as before. This database currently has payment_proof
+      // _mandatory OFF, so it wasn't yet visible here — but keeping this
+      // consistent with staging closes it before that flag is ever turned on.
+      if (!eventContext && isPaymentProofMandatory && navigator.onLine) {
         if (r.paymentMethod === "cheque" && !r.chequePhotoUrl) return "Capture cheque photo";
         if (r.paymentMethod === "upi" && !r.upiPhotoUrl) return "Capture payment confirmation";
         if (r.paymentMethod === "neft" && !r.neftPhotoUrl) return "Capture NEFT confirmation";
