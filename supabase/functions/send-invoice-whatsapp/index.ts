@@ -1,86 +1,88 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const GATEWAY_URL = 'https://connector-gateway.lovable.dev/twilio';
+const WHATSAPP_FROM = 'whatsapp:+917411679191';
+const CONTENT_SID = 'HXb413b5dd909cc84c449262ec9cc85559';
 
-serve(async (req) => {
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+/** Normalise an Indian mobile number to E.164 (+91XXXXXXXXXX). */
+function toE164(raw: string): string | null {
+  const digits = String(raw).replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) {
+    return /^\+\d{10,15}$/.test(digits) ? digits : null;
+  }
+  const plain = digits.replace(/^0+/, '');
+  if (/^91\d{10}$/.test(plain)) return `+${plain}`;
+  if (/^[6-9]\d{9}$/.test(plain)) return `+91${plain}`;
+  return null;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { invoiceNumber, pdfUrl } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const invoiceNumber = typeof body?.invoiceNumber === 'string' ? body.invoiceNumber.trim() : '';
+    const customerPhoneRaw = typeof body?.customerPhone === 'string' ? body.customerPhone.trim() : '';
 
     if (!invoiceNumber) {
-      throw new Error('invoiceNumber is required');
+      return json({ error: 'invoiceNumber is required' }, 400);
+    }
+    if (!customerPhoneRaw) {
+      return json({ error: 'customerPhone is required' }, 400);
     }
 
-    const accountSid = 'AC2bed17b2742df7031ebc7de2d726b62f';
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    if (!authToken) {
-      throw new Error('TWILIO_AUTH_TOKEN not configured');
+    const to = toE164(customerPhoneRaw);
+    if (!to) {
+      return json({ error: `Invalid phone number: ${customerPhoneRaw}` }, 400);
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const invoiceUrl = pdfUrl || `${supabaseUrl}/storage/v1/object/public/invoices/public/${invoiceNumber}.pdf`;
+    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const twilioApiKey = Deno.env.get('TWILIO_API_KEY');
+    if (!lovableApiKey || !twilioApiKey) {
+      return json({ error: 'Twilio connector is not configured for this project' }, 500);
+    }
 
-    const recipients = ['whatsapp:+919741435887', 'whatsapp:+919845671333'];
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const base64Auth = btoa(`${accountSid}:${authToken}`);
-
-    const contentVariables = JSON.stringify({
-      "1": invoiceNumber,
-      "2": invoiceUrl,
-      "invoice_number": invoiceNumber,
-      "invoiceNumber": invoiceNumber,
-      "invoice_url": invoiceUrl,
-      "invoiceUrl": invoiceUrl,
-      "Infinity": invoiceNumber,
-      "-Infinity": invoiceNumber,
+    const form = new URLSearchParams({
+      To: `whatsapp:${to}`,
+      From: WHATSAPP_FROM,
+      ContentSid: CONTENT_SID,
+      ContentVariables: JSON.stringify({ '1': invoiceNumber }),
     });
 
-    console.log(`Sending WhatsApp for invoice ${invoiceNumber}, URL: ${invoiceUrl}`);
-    console.log(`Using ContentVariables: ${contentVariables}`);
+    console.log(`Sending WhatsApp invoice ${invoiceNumber} to ${to}`);
 
-    const results = await Promise.all(
-      recipients.map(async (to) => {
-        const formBody = new URLSearchParams({
-          To: to,
-          From: 'whatsapp:+917411679191',
-          ContentSid: 'HX2b27e4c3a2353117297ef3d48c04e292',
-          ContentVariables: contentVariables,
-        });
+    const response = await fetch(`${GATEWAY_URL}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${lovableApiKey}`,
+        'X-Connection-Api-Key': twilioApiKey,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form,
+    });
 
-        const response = await fetch(twilioUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${base64Auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: formBody,
-        });
+    if (!response.ok) {
+      const details = await response.text();
+      console.error(`Twilio request failed [${response.status}]: ${details}`);
+      return json(
+        { error: 'WhatsApp send failed', status: response.status, details },
+        response.status,
+      );
+    }
 
-        const result = await response.json();
-        if (!response.ok) {
-          console.error(`Twilio error for ${to}:`, result);
-        } else {
-          console.log(`✅ WhatsApp sent to ${to}:`, result.sid);
-        }
-        return { to, success: response.ok, result };
-      })
-    );
-
-    return new Response(
-      JSON.stringify({ success: true, results }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const result = await response.json();
+    console.log(`✅ WhatsApp queued to ${to}: ${result?.sid}`);
+    return json({ success: true, to, sid: result?.sid, status: result?.status });
   } catch (error) {
     console.error('❌ WhatsApp send failed:', error);
-    return new Response(
-      JSON.stringify({ error: (error as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return json({ error: (error as Error).message }, 500);
   }
 });
