@@ -44,7 +44,7 @@ export default function AllInvoicesList() {
       // ever-growing unbounded select is its own slow-render risk.
       const { data, error } = await supabase
         .from("orders")
-        .select("*, retailers(name)")
+        .select("*, retailers(name, phone)")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -54,6 +54,7 @@ export default function AllInvoicesList() {
       const invoicesWithRetailers = orders.map((order: any) => ({
         ...order,
         retailer_name: order.retailers?.name || "Unknown Retailer",
+        retailer_phone: order.retailers?.phone || null,
       })) as Invoice[];
 
       setInvoices(invoicesWithRetailers);
@@ -109,7 +110,11 @@ export default function AllInvoicesList() {
         .getPublicUrl(filePath);
 
       // Now send via WhatsApp with explicit PDF URL + invoice number template variable
-      await autoSendInvoiceWhatsApp({ invoiceNumber, pdfUrl: urlData.publicUrl });
+      await autoSendInvoiceWhatsApp({
+        invoiceNumber,
+        pdfUrl: urlData.publicUrl,
+        customerPhone: (invoices.find((inv) => inv.id === orderId) as any)?.retailer_phone,
+      });
       toast.success("Invoice sent via WhatsApp!");
     } catch (error: any) {
       console.error("Error sending invoice via WhatsApp:", error);
