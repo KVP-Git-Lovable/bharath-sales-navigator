@@ -130,7 +130,7 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
         .getPublicUrl(filePath);
 
       // Send via WhatsApp using the same template-based approach as AllInvoicesList
-      await autoSendInvoiceWhatsApp({ invoiceNumber, pdfUrl: urlData.publicUrl });
+      await autoSendInvoiceWhatsApp({ invoiceNumber, pdfUrl: urlData.publicUrl, customerPhone });
       
       toast.success("Invoice sent via WhatsApp!");
     } catch (error: any) {
