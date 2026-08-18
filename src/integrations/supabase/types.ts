@@ -10480,6 +10480,33 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_generation_failures: {
+        Row: {
+          context: Json | null
+          failed_at: string
+          id: string
+          message: string | null
+          order_id: string | null
+          sqlstate: string | null
+        }
+        Insert: {
+          context?: Json | null
+          failed_at?: string
+          id?: string
+          message?: string | null
+          order_id?: string | null
+          sqlstate?: string | null
+        }
+        Update: {
+          context?: Json | null
+          failed_at?: string
+          id?: string
+          message?: string | null
+          order_id?: string | null
+          sqlstate?: string | null
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           cgst_amount: number | null
@@ -24404,6 +24431,15 @@ export type Database = {
         Args: { p_source?: string }
         Returns: string
       }
+      _invoice_pad: {
+        Args: { p_value: number; p_width: number }
+        Returns: string
+      }
+      _invoice_setting: {
+        Args: { p_default: string; p_key: string }
+        Returns: string
+      }
+      _invoice_year_part: { Args: { p_on?: string }; Returns: string }
       _post_credit_note_to_ledger: {
         Args: {
           p_actor: string
@@ -24618,6 +24654,10 @@ export type Database = {
       create_approval_workflow: {
         Args: { user_id_param: string }
         Returns: undefined
+      }
+      create_invoice_for_order: {
+        Args: { p_order_id: string }
+        Returns: string
       }
       create_report_subscription: {
         Args: { p_definition: Json; p_subscription: Json }
@@ -24916,6 +24956,7 @@ export type Database = {
           name: string
         }[]
       }
+      get_invoice_seq_preview: { Args: never; Returns: number }
       get_leave_date_constraints: {
         Args: { p_leave_type_id: string; p_user_id: string }
         Returns: Json
