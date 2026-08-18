@@ -48,6 +48,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { fetchAllPaginated } from "@/utils/fetchAllPaginated";
 import { useAuth } from "@/hooks/useAuth";
+import { invalidateUserTargetProgressCache } from "@/hooks/useUserTargetProgress";
 import { useHierarchyTargetAllocation } from "@/hooks/useHierarchyTargetAllocation";
 
 const QUANTITY_UNITS = ['Units', 'Kg', 'Liters', 'Pcs', 'Boxes', 'Cartons', 'Tonnes', 'Quintals'];
@@ -843,6 +844,7 @@ export function UserFYPlanTarget({
         .single();
 
       if (error) throw error;
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("FY Plan created");
       setDialogOpen(false);
       setPlanForm({
@@ -882,6 +884,7 @@ export function UserFYPlanTarget({
         .eq('id', selectedPlan.id);
 
       if (error) throw error;
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("FY Plan updated");
       setEditDialogOpen(false);
       loadPlans();
@@ -905,6 +908,7 @@ export function UserFYPlanTarget({
         .eq('id', selectedPlan.id);
 
       if (error) throw error;
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("FY Plan deleted");
       setDeleteDialogOpen(false);
       setSelectedPlan(null);
@@ -1335,6 +1339,7 @@ export function UserFYPlanTarget({
         if (error) throw error;
       }
 
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("Distributor targets saved");
     } catch (error: any) {
       toast.error("Failed to save: " + error.message);
@@ -1369,6 +1374,7 @@ export function UserFYPlanTarget({
         if (error) throw error;
       }
 
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("Product targets saved");
     } catch (error: any) {
       toast.error("Failed to save: " + error.message);
@@ -1405,6 +1411,7 @@ export function UserFYPlanTarget({
         if (error) throw error;
       }
 
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("Retailer targets saved");
     } catch (error: any) {
       toast.error("Failed to save: " + error.message);
@@ -1633,6 +1640,7 @@ export function UserFYPlanTarget({
         if (error) throw error;
       }
 
+      invalidateUserTargetProgressCache(effectiveUserId);
       toast.success("Monthly targets saved");
     } catch (error: any) {
       toast.error("Failed to save: " + error.message);
@@ -1969,6 +1977,7 @@ export function UserFYPlanTarget({
                           await saveMonthTargets();
                           await saveDistributorTargets();
 
+                          invalidateUserTargetProgressCache(effectiveUserId);
                           toast.success("All targets saved successfully");
                           loadPlans();
                         } catch (error: any) {
