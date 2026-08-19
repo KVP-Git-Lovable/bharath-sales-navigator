@@ -3390,7 +3390,7 @@ export const VisitCard = ({
                         invoice_number: o.invoice_number,
                         total_amount: o.total_amount,
                         created_at: o.created_at
-                      }))} customerPhone={visit.phone} className="w-full" />
+                      }))} customerPhone={visit.phone} customerName={visit.retailerName} className="w-full" />
                       
                       {/* Cancel Order Button */}
                       <Button 
