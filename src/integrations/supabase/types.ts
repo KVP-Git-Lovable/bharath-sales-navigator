@@ -21576,27 +21576,33 @@ export type Database = {
         Row: {
           business_plan_id: string
           created_at: string
+          deactivated_at: string | null
           distributor_id: string
           distributor_name: string
           id: string
+          is_active: boolean
           quantity_target: number | null
           revenue_target: number | null
         }
         Insert: {
           business_plan_id: string
           created_at?: string
+          deactivated_at?: string | null
           distributor_id: string
           distributor_name: string
           id?: string
+          is_active?: boolean
           quantity_target?: number | null
           revenue_target?: number | null
         }
         Update: {
           business_plan_id?: string
           created_at?: string
+          deactivated_at?: string | null
           distributor_id?: string
           distributor_name?: string
           id?: string
+          is_active?: boolean
           quantity_target?: number | null
           revenue_target?: number | null
         }
@@ -21621,7 +21627,9 @@ export type Database = {
         Row: {
           business_plan_id: string
           created_at: string
+          deactivated_at: string | null
           id: string
+          is_active: boolean
           month_name: string
           month_number: number
           percentage: number | null
@@ -21634,7 +21642,9 @@ export type Database = {
         Insert: {
           business_plan_id: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
+          is_active?: boolean
           month_name: string
           month_number: number
           percentage?: number | null
@@ -21647,7 +21657,9 @@ export type Database = {
         Update: {
           business_plan_id?: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
+          is_active?: boolean
           month_name?: string
           month_number?: number
           percentage?: number | null
@@ -21678,7 +21690,9 @@ export type Database = {
         Row: {
           business_plan_id: string
           created_at: string
+          deactivated_at: string | null
           id: string
+          is_active: boolean
           month_name: string
           month_number: number
           quantity_target: number | null
@@ -21689,7 +21703,9 @@ export type Database = {
         Insert: {
           business_plan_id: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
+          is_active?: boolean
           month_name: string
           month_number: number
           quantity_target?: number | null
@@ -21700,7 +21716,9 @@ export type Database = {
         Update: {
           business_plan_id?: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
+          is_active?: boolean
           month_name?: string
           month_number?: number
           quantity_target?: number | null
@@ -21722,7 +21740,9 @@ export type Database = {
         Row: {
           business_plan_id: string
           created_at: string
+          deactivated_at: string | null
           id: string
+          is_active: boolean
           product_id: string
           product_name: string
           quantity_target: number | null
@@ -21731,7 +21751,9 @@ export type Database = {
         Insert: {
           business_plan_id: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
+          is_active?: boolean
           product_id: string
           product_name: string
           quantity_target?: number | null
@@ -21740,7 +21762,9 @@ export type Database = {
         Update: {
           business_plan_id?: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
+          is_active?: boolean
           product_id?: string
           product_name?: string
           quantity_target?: number | null
@@ -21767,8 +21791,10 @@ export type Database = {
         Row: {
           business_plan_id: string
           created_at: string
+          deactivated_at: string | null
           growth_percent: number | null
           id: string
+          is_active: boolean
           last_year_revenue: number | null
           quantity_target: number | null
           retailer_id: string
@@ -21778,8 +21804,10 @@ export type Database = {
         Insert: {
           business_plan_id: string
           created_at?: string
+          deactivated_at?: string | null
           growth_percent?: number | null
           id?: string
+          is_active?: boolean
           last_year_revenue?: number | null
           quantity_target?: number | null
           retailer_id: string
@@ -21789,8 +21817,10 @@ export type Database = {
         Update: {
           business_plan_id?: string
           created_at?: string
+          deactivated_at?: string | null
           growth_percent?: number | null
           id?: string
+          is_active?: boolean
           last_year_revenue?: number | null
           quantity_target?: number | null
           retailer_id?: string

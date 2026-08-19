@@ -132,6 +132,7 @@ export async function awardPointsForOrder(context: OrderContext) {
             .select("quantity_target, revenue_target, working_days")
             .eq("business_plan_id", userPlanData.id)
             .eq("month_number", fyMonthNum)
+            .eq("is_active", true)
             .single();
           
           // Calculate daily target (monthly target / working days)
