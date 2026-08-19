@@ -16,10 +16,11 @@ import { InvoiceSelectionModal, OrderForInvoice } from "./InvoiceSelectionModal"
 interface VisitInvoicePDFGeneratorProps {
   orders: OrderForInvoice[];
   customerPhone?: string;
+  customerName?: string;
   className?: string;
 }
 
-export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: VisitInvoicePDFGeneratorProps) => {
+export const VisitInvoicePDFGenerator = ({ orders, customerPhone, customerName, className }: VisitInvoicePDFGeneratorProps) => {
   const [loading, setLoading] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
