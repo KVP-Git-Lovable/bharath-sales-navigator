@@ -16,10 +16,11 @@ import { InvoiceSelectionModal, OrderForInvoice } from "./InvoiceSelectionModal"
 interface VisitInvoicePDFGeneratorProps {
   orders: OrderForInvoice[];
   customerPhone?: string;
+  customerName?: string;
   className?: string;
 }
 
-export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: VisitInvoicePDFGeneratorProps) => {
+export const VisitInvoicePDFGenerator = ({ orders, customerPhone, customerName, className }: VisitInvoicePDFGeneratorProps) => {
   const [loading, setLoading] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -180,9 +181,14 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
       toast.error("No orders to share invoice for");
       return;
     }
-    
+
+    if (!customerPhone) {
+      toast.error("Customer phone number not available");
+      return;
+    }
+
     if (orders.length === 1) {
-      sendViaSMS();
+      sendViaSMSForOrder(orders[0].id);
     } else {
       setActionType('sms');
       setShowSelectionModal(true);
@@ -202,13 +208,41 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
     }
   };
 
-  const sendViaSMS = async () => {
+  const sendViaSMSForOrder = async (orderId: string) => {
+    if (!customerPhone) {
+      toast.error("Customer phone number not available");
+      return;
+    }
+
+    const order = orders.find(o => o.id === orderId);
+    if (!order) {
+      toast.error("Order not found");
+      return;
+    }
+
+    if (!order.invoice_number) {
+      toast.error("Invoice number not available for this order");
+      return;
+    }
+
     setSendingSMS(true);
     try {
-      toast.info("SMS sharing coming soon!");
+      const { data, error } = await supabase.functions.invoke('send-invoice-sms', {
+        body: {
+          retailer_name: customerName || 'Customer',
+          invoice_number: order.invoice_number,
+          total_amount: Number(order.total_amount || 0),
+          mobile: customerPhone,
+        },
+      });
+
+      if (error) throw error;
+      if (data && data.success === false) throw new Error(data.error || 'Failed to send SMS');
+
+      toast.success("Invoice details sent via SMS!");
     } catch (error: any) {
       console.error('Error sending SMS:', error);
-      toast.error("Failed to send SMS");
+      toast.error(error?.message || "Failed to send SMS");
     } finally {
       setSendingSMS(false);
       setShowSelectionModal(false);
@@ -244,7 +278,7 @@ export const VisitInvoicePDFGenerator = ({ orders, customerPhone, className }: V
         sendViaEmail();
         break;
       case 'sms':
-        sendViaSMS();
+        sendViaSMSForOrder(orderId);
         break;
       case 'view': {
         const o = orders.find(x => x.id === orderId);
