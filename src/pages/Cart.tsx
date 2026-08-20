@@ -485,7 +485,7 @@ export const Cart = () => {
   // Calculate order totals using scheme engine
   const orderCalculation = React.useMemo(() => {
     const schemeItems: SchemeItem[] = cartItems.map(item => {
-      const { qty: displayQuantity } = getDisplayQuantityAndUnit(item);
+      const { qty: displayQuantity, unit: displayUnit } = getDisplayQuantityAndUnit(item);
       const isKgDisplayUnit = (item.display_unit || item.unit || '').toLowerCase() === 'kg';
       const displayRate = isKgDisplayUnit && item.unit?.toLowerCase() === 'grams'
         ? getDisplayRate(item) * 1000
@@ -497,7 +497,8 @@ export const Cart = () => {
         variant_id: item.id.includes('_variant_') ? item.id.split('_variant_')[1] : undefined,
         quantity: displayQuantity,
         rate: displayRate,
-        name: item.name
+        name: item.name,
+        unit: displayUnit
       };
     });
     

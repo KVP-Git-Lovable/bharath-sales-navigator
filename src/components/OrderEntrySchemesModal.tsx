@@ -259,7 +259,8 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         variant_id: row.variant?.id,
         quantity: row.quantity,
         rate: row.variant?.price ?? row.product!.rate,
-        name: row.variant?.variant_name || row.product!.name
+        name: row.variant?.variant_name || row.product!.name,
+        unit: row.product!.unit
       }));
   }, [orderRows]);
 

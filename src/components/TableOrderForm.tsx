@@ -665,10 +665,11 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
           variant_id: row.variant?.id,
           quantity: row.quantity,
           rate: eff,
-          name: row.variant?.variant_name || row.product!.name
+          name: row.variant?.variant_name || row.product!.name,
+          unit: row.uomCode || row.unit
         };
       });
-    
+
     if (items.length === 0) return;
     
     const subtotal = items.reduce((sum, item) => sum + (item.rate * item.quantity), 0);
@@ -1258,10 +1259,11 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
           variant_id: row.variant?.id,
           quantity: row.quantity,
           rate: eff,
-          name: row.variant?.variant_name || row.product!.name
+          name: row.variant?.variant_name || row.product!.name,
+          unit: row.uomCode || row.unit
         };
       });
-    
+
     return calculateOrderWithSchemes(schemeItems, schemes, appliedSchemeIds, manualSelections);
   }, [orderRows, schemes, appliedSchemeIds, manualSelections]);
 
