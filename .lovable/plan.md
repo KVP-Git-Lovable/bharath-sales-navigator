@@ -1,42 +1,64 @@
-# Correct the two 18% GST invoices back to 5%
+# Tax Master flipping — code diagnosis (no changes made)
 
-Two orders were placed on 25 Aug 2026 while the product GST rate was wrongly set to 18%. Everything else has already been reset to 5%; only these two documents still carry 18%.
+## Verdict
 
-## Affected records
+The flipping is **manual**, not automatic. The bulk writes match, statement for statement, the "Move to bracket" button on the Tax Master screen. I found **no** code path anywhere that writes to `tax_masters`, `products.tax_master_id`, `products.gst_percentage`, `product_variants.*` or `tax_product_map` on render, mount, focus or refetch. Your auto-sync hypothesis is ruled out by the code.
 
-| Invoice | Retailer | Lines | Sub-total | Tax | Total |
-|---|---|---|---|---|---|
-| INV2026-25431 | Anand Bandasale | 2 | 192.19 | 34.60 | 227.00 |
-| INV2026-25433 | Sri Ram store acharpalke | 4 | 494.29 | 88.98 | 583.00 |
+## 1. Every write path (confirmed by reading the files)
 
-Both are `status = generated`, not cancelled, not edited.
+Writes to `tax_masters`
+- `src/pages/admin/TaxMaster.tsx:292` — `toggleActive()`, the Switch on each bracket card (`:630`). One click flips `is_active`.
+- `src/pages/admin/TaxMaster.tsx:348` — `handleSave()` edit: name, `is_active`, applicability, `effective_from/to`.
+- `src/pages/admin/TaxMaster.tsx:367` — create; `:307` — clone (always `is_active: false`).
+- `tax_components` rewritten wholesale on every edit: delete `:355`, insert `:356`.
 
-## Which figure stays fixed
+Writes to `products.tax_master_id` / `product_variants.tax_master_id`
+- `src/pages/admin/TaxMaster.tsx:248` — `products.update({tax_master_id}).in('id', productIds)`
+- `src/pages/admin/TaxMaster.tsx:249` — `product_variants.update({tax_master_id}).in('id', variantIds)`
+  Both inside `handleBulkMove()` (`:238`), fired only by the `Move` button (`:426`).
+- `src/components/ProductManagement.tsx:688` / `:730` — single product create/edit form.
+- `src/components/ProductManagement.tsx:1804`, `:1924` — single variant form.
+- `src/utils/productImportRunner.ts:317`, `:473`, `:829` — CSV/Excel product import upsert (`:578`, `:687`, `:853`). Explicit user-triggered import only.
 
-These orders were priced from a tax-inclusive amount (192.19 x 1.18 = 227). So correcting the rate can only preserve one of two things:
+`gst_percentage` is almost never written directly. It is derived in the DB: trigger `sync_product_tax_link` / `sync_variant_tax_link` does `SELECT total_rate INTO NEW.gst_percentage FROM tax_masters WHERE id = NEW.tax_master_id`. So writing `tax_master_id` alone rewrites the percentage — which is exactly what you observed.
 
-- **Option A (recommended, default): keep the amount collected from the retailer.** Totals stay 227.00 and 583.00. The taxable value is re-derived at 5% (227 / 1.05 = 216.19, tax 10.81) and line rates move up accordingly. Nothing changes for the retailer or for collections; only the GST split is corrected.
-- **Option B: keep the taxable value.** Line rates and sub-totals stay as they are; tax drops to 5% and the invoice total falls to about 201.80 and 519.00. This changes what the retailer owes and would need a collection/ledger adjustment.
+`tax_product_map` — **zero write paths in the codebase**. Nothing reads it either. It is dead legacy data; its 34 orphan rows are inert and not part of this incident.
 
-The plan below assumes Option A. Say the word and I will switch it to B.
+## 2. The bulk writes at 11:42:42 and 11:46:49
 
-## What gets changed
+`handleBulkMove` matches the fingerprint precisely:
+- `PAGE_SIZE = 50` (`:59`) and the header "select all" checkbox (`:438`) select every row on the page in one click — with 12 products that is the whole catalogue.
+- Products and variants go out as **two separate `.in(...)` statements fired in parallel** (`:248`/`:249`), which produces exactly what you saw: 12 product rows sharing one microsecond timestamp, and at 11:46:49 12 products + 32 variants written as two statements microseconds apart.
+- The 11:27/11:29 `tax_masters` edits immediately before are the `toggleActive`/`handleSave` clicks that made the 18% bracket selectable in the "Move to bracket" dropdown, which filters on `t.is_active` (`:420`).
 
-A single data-correction migration, applied only to the six line IDs already identified:
+Reading: someone with admin access opened Tax Master, activated/edited the brackets, expanded a bracket card, hit select-all, and moved the catalogue — twice, four minutes apart (the second move being the correction back to 5%). **Confirmed as the only code capable of that write shape; the attribution to a human is inferred**, since `updated_by` is NULL and there is no audit row.
 
-1. `order_items` (6 rows) — set `tax_rate_snapshot = 5`, `cgst_rate = 2.5`, `sgst_rate = 2.5`, recompute `rate`, `total`, `cgst_amount`, `sgst_amount` so each line's tax-inclusive value is unchanged.
-2. `invoice_items` (6 rows) — set `gst_rate = 5`, recompute `taxable_amount`, `price_per_unit`, `cgst_amount`, `sgst_amount`; `total_amount` unchanged.
-3. `invoices` (2 rows) — recompute `sub_total` and `total_tax`; `total_amount` unchanged.
-4. `orders` (2 rows) — recompute any stored tax/sub-total columns; `total_amount` unchanged.
+## 3. Auto-sync on render — ruled out
 
-Rounding follows the app's existing half-up-to-2-decimals rule, with the residual absorbed into the line taxable value so line totals still sum exactly to the invoice total.
+The only `useEffect` in `TaxMaster.tsx` is `:104`, which calls `loadTaxes()`. `loadTaxes` (`:108`) issues `select`/`count head` queries only — no `update`, no `upsert`. `loadPanelProducts` (`:165`) is read-only. `ProductManagement.tsx` has no `update`/`upsert` inside any effect. No edge function and **no cron job** touches tax tables (I listed all 13 `cron.job` entries: leave accrual, auto-end-day, orphan orders, RLS drift, health checks, visits, delegations, delete-guard, report dispatcher, snapshots, gamification). No trigger on `tax_masters` propagates to products.
 
-## Verification after the change
+## 4. The Inactive badge
 
-- Re-query the six lines and both invoices to confirm no 18% value remains anywhere and both totals still read 227.00 and 583.00.
-- Confirm `select count(*) from order_items where tax_rate_snapshot = 18` returns 0.
-- Open both invoices in the app to confirm the PDF preview shows CGST 2.5% / SGST 2.5%.
+`TaxMaster.tsx:601-603` renders the badge from `tax.is_active` **only** — the effective date window is never evaluated anywhere in the app. It is written (`:352`) and read back into the form (`:281`) and otherwise ignored. So the expired 5% window is cosmetic and cannot cause a fallthrough to 18%.
 
-## Not included
+That means "the UI lists all three as Inactive while the DB has 5% GST active" is a **staleness or ordering artefact, not a computed state**: the page loads once on mount and only refreshes after a write, so a screen left open across the 11:27–11:46 toggles will show whatever the flags were at load time. Worth re-checking with a hard refresh; if it still shows Inactive against `is_active = true`, that is a separate bug and I would need the exact row state at that moment.
 
-No schema changes, no audit-trail work, no code changes — this is a scoped data correction to six lines and two invoices.
+## 5. `is_active` at pricing time — never checked
+
+`Cart.tsx:764` fetches `gst_percentage` straight off `products`; `Cart.tsx:1256` and `:2156` snapshot `tax_rate_snapshot` from that value; `taxCalc.ts:109` uses `tax_rate_snapshot ?? gst_percentage`. Nothing joins `tax_masters`, so neither `is_active` nor the effective window gates order pricing. An inactive bracket assigned to a product is applied to live orders exactly as if it were active. This is why the 09:31 and 10:01 orders took 18%.
+
+## 6. Root cause, stated plainly
+
+Two facts combine:
+1. `products.gst_percentage` is the single source of truth at order time, and it is a DB-derived mirror of whichever bracket was last assigned — with no activity or date validation.
+2. The Tax Master screen exposes a one-click select-all bulk reassignment of the entire catalogue, with no confirmation dialog, no preview of affected count, no audit trail, and no `updated_by` capture.
+
+So any admin exploring that screen can repoint all 12 products in a single click, and nothing in the system records that it happened. "Several times a day with nobody knowingly doing it" is consistent with repeated exploratory clicking on that screen, not with automation.
+
+## Suggested follow-ups (not implemented — awaiting your agreement)
+
+1. Add a confirmation step to `handleBulkMove` showing "N products + M variants → bracket X".
+2. Populate `created_by` / `updated_by` and write a `tax_change_audit` row on every bracket edit and bulk move, so the next occurrence is attributable.
+3. Guard `sync_product_tax_from_hsn` with `IF FOUND` so the empty `hsn_master` cannot null a bracket.
+4. Decide whether `is_active` / effective window should gate order pricing, and enforce it in one place if so.
+5. Fix the 5% bracket's one-day effective window, and drop the orphaned `tax_product_map` rows.
