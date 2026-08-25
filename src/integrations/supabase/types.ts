@@ -19292,6 +19292,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rls_drift_state: {
+        Row: {
+          event_type: string
+          first_seen: string
+          last_seen: string
+          policy_name: string
+          table_name: string
+        }
+        Insert: {
+          event_type: string
+          first_seen?: string
+          last_seen?: string
+          policy_name?: string
+          table_name: string
+        }
+        Update: {
+          event_type?: string
+          first_seen?: string
+          last_seen?: string
+          policy_name?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       roi_calculator_entries: {
         Row: {
           calculated_results: Json
