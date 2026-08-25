@@ -1,40 +1,42 @@
-# "ADDUKU FREE approved in meeting" scheme — what the data shows, and closing the audit gap
+# Correct the two 18% GST invoices back to 5%
 
-## What I found (verified by querying the database)
+Two orders were placed on 25 Aug 2026 while the product GST rate was wrongly set to 18%. Everything else has already been reset to 5%; only these two documents still carry 18%.
 
-One matching row in `product_schemes`:
+## Affected records
 
-- Name: `ADDUKU FREE approved in meeting`
-- Description: `ADDUKU FREE`
-- ID: `25321b13-391b-44fa-9a3f-c8b06d942f06`
-- Type: `percentage_discount`, 50% off, applies to 44 target products
-- Source: `manual` (not AI-generated)
-- Created: 2026-08-12 07:24:03 UTC (12:54 PM IST)
-- Start date: 2026-08-12, no end date
-- Last updated: 2026-08-20 05:13:55 UTC (10:43 AM IST)
-- Current state: `is_active = false` (it is switched OFF right now)
+| Invoice | Retailer | Lines | Sub-total | Tax | Total |
+|---|---|---|---|---|---|
+| INV2026-25431 | Anand Bandasale | 2 | 192.19 | 34.60 | 227.00 |
+| INV2026-25433 | Sri Ram store acharpalke | 4 | 494.29 | 88.98 | 583.00 |
 
-## Why "who created it" cannot be answered today
+Both are `status = generated`, not cancelled, not edited.
 
-The `product_schemes` table has no `created_by` or `updated_by` column, and the only trigger on it is the generic `updated_at` timestamp trigger. There is no scheme audit log table. So the database physically does not store which user inserted or toggled this row — the timestamps above are all the evidence that exists.
+## Which figure stays fixed
 
-Related checks I ran, all negative:
-- No matching row in `ai_scheme_suggestions` (so it was not created by the AI scheme suggestion flow — `source` is `manual`, meaning it came from the Scheme Master UI).
-- No cron/automation trigger on the table.
-- `user_page_views.page_path` is stored as NULL, and `module_usage_logs` only records coarse modules (Dashboard, Visit, Orders...) with no "Scheme Master" entries, so activity logs cannot pin the actor either.
+These orders were priced from a tax-inclusive amount (192.19 x 1.18 = 227). So correcting the rate can only preserve one of two things:
 
-On "activated without any manual user": there is no automated process that creates or activates schemes. `source = 'manual'` plus the absence of any AI suggestion record indicates a signed-in admin created it through Scheme Master on 12 Aug and someone toggled it on 20 Aug — we just have no stored identity for either action.
+- **Option A (recommended, default): keep the amount collected from the retailer.** Totals stay 227.00 and 583.00. The taxable value is re-derived at 5% (227 / 1.05 = 216.19, tax 10.81) and line rates move up accordingly. Nothing changes for the retailer or for collections; only the GST split is corrected.
+- **Option B: keep the taxable value.** Line rates and sub-totals stay as they are; tax drops to 5% and the invoice total falls to about 201.80 and 519.00. This changes what the retailer owes and would need a collection/ledger adjustment.
 
-## Proposed fix: make schemes fully auditable
+The plan below assumes Option A. Say the word and I will switch it to B.
 
-1. Add `created_by uuid` and `updated_by uuid` to `product_schemes`, auto-populated from `auth.uid()` by a trigger on INSERT/UPDATE.
-2. Add a `product_scheme_audit_log` table capturing: scheme id, action (created / updated / activated / deactivated / deleted), changed fields (old → new), actor user id, and timestamp — written by an AFTER INSERT/UPDATE/DELETE trigger, with GRANTs and admin-read RLS.
-3. Surface the history in the Scheme Master UI: an "Activity" panel on each scheme showing who created it, who last changed it, and every activate/deactivate toggle with name and timestamp.
+## What gets changed
 
-Existing rows (including this one) will show `created_by` as unknown — history starts from the migration date forward.
+A single data-correction migration, applied only to the six line IDs already identified:
 
-## Technical notes
+1. `order_items` (6 rows) — set `tax_rate_snapshot = 5`, `cgst_rate = 2.5`, `sgst_rate = 2.5`, recompute `rate`, `total`, `cgst_amount`, `sgst_amount` so each line's tax-inclusive value is unchanged.
+2. `invoice_items` (6 rows) — set `gst_rate = 5`, recompute `taxable_amount`, `price_per_unit`, `cgst_amount`, `sgst_amount`; `total_amount` unchanged.
+3. `invoices` (2 rows) — recompute `sub_total` and `total_tax`; `total_amount` unchanged.
+4. `orders` (2 rows) — recompute any stored tax/sub-total columns; `total_amount` unchanged.
 
-- Migration: `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`, `CREATE OR REPLACE FUNCTION` — fully idempotent, no data changes to existing schemes.
-- Audit reads restricted to admins via `public.is_system_admin(auth.uid())`.
-- No change to how schemes are calculated or applied to orders.
+Rounding follows the app's existing half-up-to-2-decimals rule, with the residual absorbed into the line taxable value so line totals still sum exactly to the invoice total.
+
+## Verification after the change
+
+- Re-query the six lines and both invoices to confirm no 18% value remains anywhere and both totals still read 227.00 and 583.00.
+- Confirm `select count(*) from order_items where tax_rate_snapshot = 18` returns 0.
+- Open both invoices in the app to confirm the PDF preview shows CGST 2.5% / SGST 2.5%.
+
+## Not included
+
+No schema changes, no audit-trail work, no code changes — this is a scoped data correction to six lines and two invoices.
