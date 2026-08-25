@@ -4,6 +4,8 @@ import { upsertSingleCartItem, upsertCartItems } from '@/utils/customerCartHelpe
 import { toast } from 'sonner';
 import { VoiceOrderItem, VoiceProduct } from './useVoiceOrderAssistant';
 import { findBestMatch, normalizeUnit, buildProductShortlist } from '@/utils/productFuzzyMatch';
+import { confirmLargeLine } from '@/utils/orderQuantityGuard';
+
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -29,7 +31,14 @@ function parseOrderItems(reply: string, products: VoiceProduct[]): { text: strin
     for (const order of parsed) {
       const { product, variant, confidence } = findBestMatch(order.productSearch, products);
       if (product) {
-        const voiceUnit = normalizeUnit(order.unit || 'kg');
+        // Never silently assume KG: only map a unit the user actually stated.
+        // Otherwise fall back to the product's own catalogue unit, and if that
+        // is missing too, leave it blank so the UI must ask.
+        const spoken = (order.unit || '').trim();
+        const voiceUnit = spoken ? normalizeUnit(spoken) : '';
+        const resolvedUnit = voiceUnit
+          ? (voiceUnit === 'g' ? 'Grams' : voiceUnit === 'pieces' ? 'Pieces' : 'KG')
+          : (product.unit || '');
         items.push({
           id: crypto.randomUUID(),
           productId: product.id,
@@ -37,8 +46,9 @@ function parseOrderItems(reply: string, products: VoiceProduct[]): { text: strin
           variantId: variant?.id,
           variantName: variant?.variant_name,
           quantity: order.quantity || 1,
-          unit: voiceUnit === 'g' ? 'Grams' : voiceUnit === 'pieces' ? 'Pieces' : 'KG',
-          confidence,
+          unit: resolvedUnit,
+          confidence: resolvedUnit ? confidence : Math.min(confidence, 0.4),
+
           searchTerm: order.productSearch,
           rate: variant?.price ?? product.rate ?? 0,
           sku: variant?.sku || product.sku || '',
@@ -133,8 +143,14 @@ export const useChatOrderAssistant = (products: VoiceProduct[], retailerId?: str
     if (!retailerId) return;
     const item = pendingItems.find(i => i.id === itemId);
     if (!item) return;
+    if (!item.unit) {
+      toast.error(`Please pick a unit for ${item.variantName || item.productName} before adding it`);
+      return;
+    }
+    if (!confirmLargeLine(item.variantName || item.productName, item.quantity, item.unit, item.quantity * (item.rate || 0))) return;
 
     setAddingItemId(itemId);
+
     try {
       await upsertSingleCartItem({
         retailer_id: retailerId,
@@ -156,7 +172,16 @@ export const useChatOrderAssistant = (products: VoiceProduct[], retailerId?: str
 
   const addAllToCart = useCallback(async () => {
     if (!retailerId || pendingItems.length === 0) return;
+    const missingUnit = pendingItems.find(i => !i.unit);
+    if (missingUnit) {
+      toast.error(`Please pick a unit for ${missingUnit.variantName || missingUnit.productName} first`);
+      return;
+    }
+    for (const item of pendingItems) {
+      if (!confirmLargeLine(item.variantName || item.productName, item.quantity, item.unit, item.quantity * (item.rate || 0))) return;
+    }
     setIsConfirming(true);
+
     try {
       const rows = pendingItems.map(item => ({
         retailer_id: retailerId,
