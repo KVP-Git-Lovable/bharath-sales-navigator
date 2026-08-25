@@ -71,6 +71,8 @@ const formatINR = (amount: number | string | null | undefined): string => {
   }).format(n);
 };
 import LineItemUomSelect, { type LineItemUomSelection } from "@/components/uom/LineItemUomSelect";
+import { convertQtyBetweenUnits, convertQtyByConversion, confirmLargeLine } from "@/utils/orderQuantityGuard";
+
 
 // ---------- types ----------
 interface CounterCustomer {
@@ -3125,7 +3127,11 @@ function ProductPickerDialog({
   const [picked, setPicked] = useState<any | null>(null);
   const [qty, setQty] = useState(1);
   const [unit, setUnit] = useState("Pcs");
+  // Conversion factor of the currently selected UOM, so a unit change can
+  // rescale the typed quantity instead of silently multiplying the order.
+  const [unitConversion, setUnitConversion] = useState<number | null>(null);
   const [price, setPrice] = useState(0);
+
 
   useEffect(() => {
     if (!open) {
@@ -3207,7 +3213,9 @@ function ProductPickerDialog({
                 <label className="text-xs text-muted-foreground">Quantity</label>
                 <Input
                   type="number"
-                  min={1}
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
                   value={qty}
                   onChange={(e) => setQty(Number(e.target.value) || 0)}
                 />
@@ -3221,12 +3229,24 @@ function ProductPickerDialog({
                   hideWhenSingle={false}
                   className="h-10 w-full"
                   onChange={(sel) => {
-                    if (sel.uomCode === unit) return;
+                    if (sel.uomCode === unit) {
+                      setUnitConversion(sel.conversionToBase ?? null);
+                      return;
+                    }
+                    // Preserve the physical amount across the unit change
+                    // (5000 G → 5 KG, never 5000 KG).
+                    const converted =
+                      unitConversion && sel.conversionToBase
+                        ? convertQtyByConversion(qty, unitConversion, sel.conversionToBase)
+                        : convertQtyBetweenUnits(qty, unit, sel.uomCode);
+                    if (converted > 0) setQty(converted);
                     setUnit(sel.uomCode);
+                    setUnitConversion(sel.conversionToBase ?? null);
                     setPrice(uomUnitPrice(Number(picked.rate) || 0, sel));
                   }}
                 />
               </div>
+
               <div>
                 <label className="text-xs text-muted-foreground">Price ({currencySymbol})</label>
                 <Input
@@ -3259,7 +3279,9 @@ function ProductPickerDialog({
                     toast.error("Quantity must be > 0");
                     return;
                   }
+                  if (!confirmLargeLine(picked.name, qty, unit, qty * price)) return;
                   onAdd(picked, qty, unit, price);
+
                 }}
               >
                 Add to order

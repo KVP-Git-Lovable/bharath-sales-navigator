@@ -32,6 +32,8 @@ import { useRetailerVisitTracking } from "@/hooks/useRetailerVisitTracking";
 import { RetailerVisitDetailsModal } from "@/components/RetailerVisitDetailsModal";
 import { getLocalTodayDate } from "@/utils/dateUtils";
 import { OrderGuideManualButton } from "@/components/OrderGuideManualButton";
+import { convertQtyBetweenUnits, confirmLargeLine } from "@/utils/orderQuantityGuard";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1485,6 +1487,13 @@ export const OrderEntry = () => {
     }
     const baseTotal = effectiveRate * Number(quantity);
 
+    // Guard-rail: restate the physical quantity for implausibly large lines
+    // (the ×1000 unit-mismatch defect) before anything reaches the cart.
+    if (!confirmLargeLine(displayProduct.name, Number(quantity), selectedUnit, baseTotal)) {
+      return;
+    }
+
+
     // Determine the variant ID for scheme calculation
     let variantIdForScheme = null;
     if (displayProduct.id.includes('_variant_')) {
@@ -2681,10 +2690,16 @@ export const OrderEntry = () => {
                             </div>
                             <div>
                               <Select value={selectedUnits[product.id] || product.unit || 'kg'} onValueChange={value => {
+                                const prevUnit = selectedUnits[product.id] || product.unit || 'kg';
                                 setSelectedUnits(prev => ({
                                   ...prev,
                                   [product.id]: value
                                 }));
+                                // Preserve the physical amount: 5000 grams → 5 kg (never 5000 kg).
+                                const currentQty = quantities[product.id] || 0;
+                                if (currentQty > 0 && prevUnit !== value) {
+                                  handleQuantityChange(product.id, convertQtyBetweenUnits(currentQty, prevUnit, value));
+                                }
                               }}>
                                 <SelectTrigger className="h-6 text-xs p-1 w-full">
                                   <SelectValue />
@@ -2697,13 +2712,13 @@ export const OrderEntry = () => {
                             </div>
                             <div>
                               <Input type="number" placeholder="0" value={quantities[product.id] || ""} onChange={e => {
-                                console.log('Base product quantity change:', product.id, e.target.value);
-                                const qty = parseInt(e.target.value) || 0;
+                                const qty = parseFloat(e.target.value) || 0;
                                 handleQuantityChange(product.id, qty);
                                 if (qty > 0) {
                                   handleVariantChange(product.id, "base");
                                 }
-                              }} className="h-6 text-xs p-1" min="0" disabled={false} />
+                              }} className="h-6 text-xs p-1" min="0" step="any" inputMode="decimal" disabled={false} />
+
                             </div>
                              <div>
                                <Input type="number" placeholder="0" value={(() => {
@@ -2777,10 +2792,16 @@ export const OrderEntry = () => {
                                     <Select 
                                       value={selectedUnits[variantCompositeId] || product.unit || 'kg'} 
                                       onValueChange={(value) => {
+                                        const prevUnit = selectedUnits[variantCompositeId] || product.unit || 'kg';
                                         setSelectedUnits(prev => ({
                                           ...prev,
                                           [variantCompositeId]: value
                                         }));
+                                        // Preserve the physical amount on unit change.
+                                        const currentQty = quantities[variantCompositeId] || 0;
+                                        if (currentQty > 0 && prevUnit !== value) {
+                                          handleQuantityChange(variantCompositeId, convertQtyBetweenUnits(currentQty, prevUnit, value));
+                                        }
                                       }}
                                     >
                                       <SelectTrigger className="h-6 text-xs p-1 w-full">
@@ -2794,13 +2815,14 @@ export const OrderEntry = () => {
                                   </div>
                                  <div>
                                   <Input type="number" placeholder="0" value={variantQuantity || ""} onChange={e => {
-                                  const qty = parseInt(e.target.value) || 0;
+                                  const qty = parseFloat(e.target.value) || 0;
                                   const variantCompositeId = `${product.id}_variant_${variant.id}`;
                                   handleQuantityChange(variantCompositeId, qty);
                                   if (qty > 0) {
                                     handleVariantChange(product.id, variant.id);
                                   }
-                                }} className="h-6 text-xs p-1" min="0" />
+                                }} className="h-6 text-xs p-1" min="0" step="any" inputMode="decimal" />
+
                                 </div>
                                  <div>
                                    <Input type="number" placeholder="0" value={(() => {
@@ -2841,9 +2863,10 @@ export const OrderEntry = () => {
                            <div className="font-medium">₹{product.rate % 1 === 0 ? product.rate.toString() : product.rate.toFixed(2)}</div>
                            <div>
                              <Input type="number" placeholder="0" value={quantities[product.id] || ""} onChange={e => {
-                            const qty = parseInt(e.target.value) || 0;
+                            const qty = parseFloat(e.target.value) || 0;
                             handleQuantityChange(product.id, qty);
-                          }} className="h-6 text-xs p-1" min="0" />
+                          }} className="h-6 text-xs p-1" min="0" step="any" inputMode="decimal" />
+
                            </div>
                            <div>
                              <Input type="number" placeholder="0" value={(() => {
