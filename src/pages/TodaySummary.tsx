@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { useManagedInterval } from "@/utils/intervalManager";
-import { Download, Share, FileText, Clock, MapPin, CalendarIcon, ExternalLink, Users, X, CreditCard, Wallet, Banknote } from "lucide-react";
+import { Download, Share, FileText, Clock, MapPin, CalendarIcon, ExternalLink, Users, X, CreditCard, Wallet, Banknote, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,6 +40,11 @@ export const TodaySummary = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  // True when this load fell back to the local offline cache/snapshot for
+  // today's orders (device offline at fetch time) — numbers may not yet
+  // reflect a cancellation/edit that happened server-side, since that
+  // reconciliation only runs once the device is back online.
+  const [isShowingOfflineData, setIsShowingOfflineData] = useState(false);
   const initialLoadDone = useRef(false);
   const { user } = useAuth();
   const { types: activityTypesMaster } = useActivityTypes();
@@ -425,13 +431,20 @@ export const TodaySummary = () => {
       if (isTodayFilter && targetUserIds.length === 1 && targetUserIds[0] === authUser.id) {
         // For single user "today" filter, use unified orders source
         console.log('📊 [SUMMARY] Using unified orders source for today');
+        // Reconciliation with the server (dropping cancelled/replaced orders
+        // picked up from the local cache) only happens inside getOrdersForDate
+        // when the device is online — capture that before the call so a stale
+        // local-only result can be flagged to the rep.
+        const wasOffline = !navigator.onLine;
         const ordersResult = await getOrdersForDate(authUser.id, targetDate, {
           includeSnapshot: true,
           forceOfflineFirst: false
         });
         todayOrders = ordersResult.orders;
+        setIsShowingOfflineData(wasOffline && todayOrders.length > 0);
         console.log(`📊 [SUMMARY] Got ${ordersResult.totalCount} orders from unified source`, ordersResult.sourceBreakdown);
       } else {
+        setIsShowingOfflineData(false);
         // For date ranges or multiple users, fetch from DB directly
         const orderFromDate = new Date(dateRange.from);
         orderFromDate.setHours(0, 0, 0, 0);
@@ -2112,6 +2125,15 @@ export const TodaySummary = () => {
             )}
           </CardHeader>
         </Card>
+
+        {isShowingOfflineData && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+            <WifiOff className="h-4 w-4" />
+            <AlertDescription className="text-xs sm:text-sm">
+              You're offline — these numbers are from the last saved data on this device and may not include recent cancellations or edits. They'll update automatically once you're back online.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Date Filter Controls */}
         <Card className="shadow-card">
