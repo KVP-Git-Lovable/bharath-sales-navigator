@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { isFocusedProductActive } from "@/utils/focusedProductChecker";
+import { computeLineTax } from "@/utils/taxCalc";
 import { ApplyOfferSection } from "@/components/ApplyOfferSection";
 import { OrderEntrySchemesModal } from "@/components/OrderEntrySchemesModal";
 import { useOfflineSchemes, ProductScheme } from "@/hooks/useOfflineSchemes";
@@ -214,8 +215,9 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   // Per-row raw text for admin price inputs so partial values ("", "18.", "0.") are allowed.
   // Key = row.id, value = { rate?: rawUnitPriceText, total?: rawLineTotalText }.
   // Only the field currently being typed holds its own text; the other stays derived.
-  const [priceEditText, setPriceEditText] = useState<Record<string, { rate?: string; total?: string }>>({});
-  
+  const [priceEditText, setPriceEditText] = useState<Record<string, { rate?: string; total?: string; rate_incl_gst?: string }>>({});
+  const [stockModeEnabled, setStockModeEnabled] = useState(false);
+
   // Load schemes with offline support
   const { schemes, loading: schemesLoading, isOnline } = useOfflineSchemes();
   
@@ -1140,8 +1142,8 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
    * unit price, or mode='total' with the new line total (rate is back-computed from quantity).
    * Passing an empty/invalid value clears the override so the catalog price returns.
    */
-  const applyAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
-    if (!canEditPrice) return;
+  const applyAdminPrice = (rowId: string, mode: 'rate' | 'total' | 'rate_incl_gst', rawValue: string) => {
+    if (!canEditAnyPrice) return;
     setOrderRows(prev => {
       const updated = prev.map(row => {
         if (row.id !== rowId || !row.product) return row;
@@ -1154,6 +1156,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
           row.conversionToBase,
           row.priceBasisConversionToBase,
         );
+        const gstPct = Number((row.product as any)?.gst_percentage) || 0;
 
         // Empty input clears the override.
         const parsed = Number(rawValue);
@@ -1165,6 +1168,12 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
         let nextRate: number;
         if (mode === 'rate') {
           nextRate = +parsed.toFixed(2);
+        } else if (mode === 'rate_incl_gst') {
+          nextRate = +(parsed / (1 + gstPct / 100)).toFixed(2);
+          // Entry-price editing can be restricted to "raise only" via Operations Config.
+          if (canEditEntryPrice && editPolicy.entry_price_edit_direction === 'higher_only' && nextRate < catalogRate) {
+            nextRate = catalogRate;
+          }
         } else {
           // total mode: rate = total / qty. Guard qty=0.
           if (qty <= 0) return row;
@@ -1192,8 +1201,8 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
    * pushes a parseable number into editedRate WITHOUT clearing the override on
    * empty/invalid input. Clearing happens on blur only (see onBlurAdminPrice).
    */
-  const onChangeAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
-    if (!canEditPrice) return;
+  const onChangeAdminPrice = (rowId: string, mode: 'rate' | 'total' | 'rate_incl_gst', rawValue: string) => {
+    if (!canEditAnyPrice) return;
     // Keep only the field being typed in state; the other should recompute.
     setPriceEditText(prev => ({ ...prev, [rowId]: { [mode]: rawValue } }));
     const parsed = Number(rawValue);
@@ -1202,9 +1211,17 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       const updated = prev.map(row => {
         if (row.id !== rowId || !row.product) return row;
         const qty = Number(row.quantity) || 0;
+        const gstPct = Number((row.product as any)?.gst_percentage) || 0;
         let nextRate: number;
         if (mode === 'rate') {
           nextRate = +parsed.toFixed(2);
+        } else if (mode === 'rate_incl_gst') {
+          nextRate = +(parsed / (1 + gstPct / 100)).toFixed(2);
+          if (canEditEntryPrice && editPolicy.entry_price_edit_direction === 'higher_only') {
+            const selectedUnit = row.uomCode || row.unit || row.product.unit || 'PC';
+            const catalogRate = getPricePerUnit(row.product, row.variant, selectedUnit, row.conversionToBase, row.priceBasisConversionToBase);
+            if (nextRate < catalogRate) nextRate = catalogRate;
+          }
         } else {
           if (qty <= 0) return row;
           nextRate = +(parsed / qty).toFixed(2);
@@ -1218,8 +1235,24 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   };
 
   /** On blur: if the field was left empty, clear the override back to catalog. Always drop the raw text buffer. */
-  const onBlurAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
-    if (!canEditPrice) return;
+  const onBlurAdminPrice = (rowId: string, mode: 'rate' | 'total' | 'rate_incl_gst', rawValue: string) => {
+    if (!canEditAnyPrice) return;
+    if (mode === 'rate_incl_gst' && canEditEntryPrice && editPolicy.entry_price_edit_direction === 'higher_only' && rawValue.trim() !== '') {
+      const parsed = Number(rawValue);
+      const row = orderRows.find(r => r.id === rowId);
+      if (row?.product && Number.isFinite(parsed)) {
+        const gstPct = Number((row.product as any)?.gst_percentage) || 0;
+        const selectedUnit = row.uomCode || row.unit || row.product.unit || 'PC';
+        const catalogRate = getPricePerUnit(row.product, row.variant, selectedUnit, row.conversionToBase, row.priceBasisConversionToBase);
+        const catalogInclGst = catalogRate * (1 + gstPct / 100);
+        if (parsed < catalogInclGst - 0.005) {
+          toast({
+            title: 'Price can only be raised',
+            description: `This policy only allows increasing the price — it's been kept at the catalog price of ₹${catalogInclGst.toFixed(2)}.`,
+          });
+        }
+      }
+    }
     if (rawValue.trim() === '') {
       applyAdminPrice(rowId, mode, '');
     }
@@ -1330,7 +1363,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
       const eff = (r.editedRate != null && Number.isFinite(r.editedRate)) ? Number(r.editedRate) : catalog;
       const lineTaxable = eff * r.quantity * discountFactor;
       const gstPct = Number((r.product as any)?.gst_percentage) || 0;
-      return tax + lineTaxable * gstPct / 100;
+      return tax + computeLineTax({ taxableAmount: lineTaxable, gstPercentage: gstPct }).totalTax;
     }, 0);
   };
 
@@ -1394,9 +1427,9 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
             {onReloadProducts && (
               <Button
                 type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 md:h-10 text-xs md:text-sm ml-auto"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 md:h-10 md:w-10 shrink-0"
                 disabled={refreshingProducts}
                 onClick={async () => {
                   try {
@@ -1412,20 +1445,37 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                 }}
                 title="Reload products from server"
               >
-                <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshingProducts && 'animate-spin')} />
-                {refreshingProducts ? 'Refreshing…' : 'Refresh products'}
+                <RefreshCw className={cn('h-3.5 w-3.5', refreshingProducts && 'animate-spin')} />
               </Button>
             )}
+            <Button
+              type="button"
+              variant={stockModeEnabled ? "default" : "outline"}
+              size="sm"
+              className="h-9 md:h-10 text-xs md:text-sm ml-auto"
+              onClick={() => setStockModeEnabled(v => !v)}
+            >
+              <Package className="h-3.5 w-3.5 mr-1.5" />
+              <span className="hidden md:inline">{stockModeEnabled ? 'Done Adding Stock' : 'Add Stock'}</span>
+              <span className="md:hidden">{stockModeEnabled ? 'Done' : 'Stock'}</span>
+            </Button>
           </div>
 
-          
+
           <div className="w-full">
             {/* Table Header - Responsive */}
             <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_0.6fr_auto] md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 md:gap-4 px-2 md:px-4 py-2 md:py-3 bg-muted/50 border-b border-border">
               <div className="font-semibold text-xs md:text-sm">Product</div>
               <div className="font-semibold text-xs md:text-sm">Unit</div>
               <div className="font-semibold text-xs md:text-sm text-center">Qty</div>
-              <div className="font-semibold text-xs md:text-sm text-center">Stock</div>
+              <div className="font-semibold text-xs md:text-sm text-center">
+                {stockModeEnabled ? 'Stock' : (
+                  <>
+                    <span className="md:hidden">Price</span>
+                    <span className="hidden md:inline">Price (incl. GST)</span>
+                  </>
+                )}
+              </div>
               <div className="w-8"></div>
             </div>
               
@@ -1690,22 +1740,50 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                       )}
                     </div>
                     
-                    {/* Stock Column */}
+                    {/* Stock / Price (incl. GST) Column — Stock is occasional, so it stays
+                        behind the top "Add Stock" toggle and this column shows
+                        Price (incl. GST) by default. */}
                     <div>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={row.closingStock === 0 ? "" : row.closingStock}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          updateRow(row.id, "closingStock", value === "" ? 0 : parseInt(value) || 0);
-                        }}
-                        className={cn(
-                          "h-9 md:h-11 text-xs md:text-sm text-center bg-background px-1",
-                          row.closingStock === 0 && "text-muted-foreground"
-                        )}
-                        disabled={!row.product}
-                      />
+                      {stockModeEnabled ? (
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={row.closingStock === 0 ? "" : row.closingStock}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            updateRow(row.id, "closingStock", value === "" ? 0 : parseInt(value) || 0);
+                          }}
+                          className={cn(
+                            "h-9 md:h-11 text-xs md:text-sm text-center bg-background px-1",
+                            row.closingStock === 0 && "text-muted-foreground"
+                          )}
+                          disabled={!row.product}
+                        />
+                      ) : row.product ? (() => {
+                        const displayUnit = row.uomCode || row.unit;
+                        const catalogRate = getPricePerUnit(row.product, row.variant, displayUnit, row.conversionToBase, row.priceBasisConversionToBase);
+                        const hasEdited = row.editedRate != null && Number.isFinite(row.editedRate);
+                        const shownRate = hasEdited ? Number(row.editedRate) : catalogRate;
+                        const gstPct = Number((row.product as any)?.gst_percentage) || 0;
+                        const inclGstRate = shownRate * (1 + gstPct / 100);
+                        const buf = priceEditText[row.id]?.rate_incl_gst;
+                        return canEditEntryPrice ? (
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={buf !== undefined ? buf : inclGstRate.toFixed(2)}
+                            onChange={(e) => onChangeAdminPrice(row.id, 'rate_incl_gst', e.target.value)}
+                            onBlur={(e) => onBlurAdminPrice(row.id, 'rate_incl_gst', e.target.value)}
+                            className="h-9 md:h-11 text-xs md:text-sm text-center bg-background px-1"
+                          />
+                        ) : (
+                          <div className="h-9 md:h-11 flex items-center justify-center text-xs md:text-sm">
+                            ₹{inclGstRate.toFixed(2)}
+                          </div>
+                        );
+                      })() : (
+                        <div className="h-9 md:h-11 flex items-center justify-center text-xs text-muted-foreground">—</div>
+                      )}
                     </div>
                     
                     {/* Delete Button */}
@@ -1787,10 +1865,10 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
           
           <div className="flex justify-end items-center gap-2 pt-1 border-t border-border">
             <p className="text-sm font-semibold">Total:</p>
-            <p className="text-lg font-bold">₹{getFinalTotal().toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+            <p className="text-lg font-bold">₹{(getFinalTotal() + getGstAmount()).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
           </div>
           <p className="text-xs text-muted-foreground">
-            (incl. GST: ₹{(getFinalTotal() + getGstAmount()).toLocaleString('en-IN', { maximumFractionDigits: 2 })})
+            (excl. GST: ₹{getFinalTotal().toLocaleString('en-IN', { maximumFractionDigits: 2 })})
           </p>
         </div>
       </div>
