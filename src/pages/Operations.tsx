@@ -78,6 +78,7 @@ interface OrderData {
   retailer_phone: string | null;
   created_at: string;
   updated_at: string;
+  order_date?: string | null;
   total_amount: number;
   subtotal: number;
   discount_amount: number;
@@ -678,6 +679,7 @@ const Operations = () => {
           user_id,
           created_at,
           updated_at,
+          order_date,
           subtotal,
           discount_amount,
           total_amount,
@@ -774,6 +776,7 @@ const Operations = () => {
           retailer_phone: (retailer?.phone || counter?.phone || null) as string | null,
           created_at: order.created_at,
           updated_at: order.updated_at || order.created_at,
+          order_date: (order as any).order_date || null,
           total_amount: order.total_amount,
           subtotal: Number(order.subtotal || 0),
           discount_amount: Number(order.discount_amount || 0),
@@ -2117,7 +2120,15 @@ const Operations = () => {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                {format(new Date(item.created_at), 'MMM dd, HH:mm')}
+                                {(() => {
+                                  const createdAt = new Date(item.created_at);
+                                  const orderDay = item.order_date ? new Date(`${item.order_date}T00:00:00`) : createdAt;
+                                  const display = new Date(
+                                    orderDay.getFullYear(), orderDay.getMonth(), orderDay.getDate(),
+                                    createdAt.getHours(), createdAt.getMinutes()
+                                  );
+                                  return format(display, 'MMM dd, HH:mm');
+                                })()}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">

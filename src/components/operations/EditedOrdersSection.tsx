@@ -43,13 +43,17 @@ interface MergedItem {
   changedFields: string[];
 }
 
+function itemKey(i: any): string {
+  return i?.product_id || (i?.other_free_product_id && `other:${i.other_free_product_id}`) || `name:${i?.product_name || i?.name || 'unknown'}`;
+}
+
 function mergeItems(original: any, replacement: any): MergedItem[] {
   const origItems = getItems(original);
   const replItems = getItems(replacement);
   const origMap = new Map<string, any>();
-  origItems.forEach((i: any) => i?.product_id && origMap.set(i.product_id, i));
+  origItems.forEach((i: any) => origMap.set(itemKey(i), i));
   const replMap = new Map<string, any>();
-  replItems.forEach((i: any) => i?.product_id && replMap.set(i.product_id, i));
+  replItems.forEach((i: any) => replMap.set(itemKey(i), i));
 
   const allIds = new Set<string>([...origMap.keys(), ...replMap.keys()]);
   const merged: MergedItem[] = [];
