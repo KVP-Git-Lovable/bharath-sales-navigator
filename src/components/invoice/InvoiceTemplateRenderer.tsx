@@ -9,12 +9,27 @@ interface InvoiceTemplateRendererProps {
   orderId: string;
   retailerId: string;
   cartItems: any[];
+  schemeDetails?: string;
+  paymentMode?: string;
+  amountPaid?: number;
+  balanceDue?: number;
+  orderTotal?: number;
+  // The order's actual business date ("YYYY-MM-DD") — pass the cart's
+  // effective (possibly backdated) order date so this pre-submit preview
+  // matches what the real invoice will show. Defaults to today.
+  orderDate?: string;
 }
 
 export default function InvoiceTemplateRenderer({
   orderId,
   retailerId,
   cartItems,
+  paymentMode,
+  amountPaid,
+  balanceDue,
+  orderTotal,
+  schemeDetails = "",
+  orderDate,
 }: InvoiceTemplateRendererProps) {
   const [company, setCompany] = useState<any>(null);
   const [retailer, setRetailer] = useState<any>(null);
@@ -145,9 +160,14 @@ export default function InvoiceTemplateRenderer({
           templateStyle={getTemplateStyle()}
           beatName={beatName}
           salesmanName={salesmanName}
+          invoiceDate={orderDate ? new Date(`${orderDate}T00:00:00`).toLocaleDateString("en-GB") : undefined}
           invoiceTime={invoiceTime}
-          schemeDetails=""
+          schemeDetails={schemeDetails}
           displaySettings={displaySettings}
+          paymentMode={paymentMode}
+          amountPaid={amountPaid}
+          balanceDue={balanceDue}
+          orderTotal={orderTotal}
         />
       ) : (
         <div className="border rounded-lg overflow-hidden">

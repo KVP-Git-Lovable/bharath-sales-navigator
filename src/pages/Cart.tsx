@@ -737,6 +737,38 @@ export const Cart = () => {
   }, [cartItems, orderCalculation.itemDiscounts]);
   const taxTotals = React.useMemo(() => sumLineTaxes(lineTaxes), [lineTaxes]);
 
+  // Read-only enrichment for the pre-submit Invoice Preview dialog. Built entirely
+  // from the same Cart-level numbers already computed above (orderCalculation,
+  // lineTaxes, computeItemTotal/computeItemDiscount) — the invoice preview should
+  // only ever display these, never derive its own rate/discount/tax math.
+  const previewInvoiceItems = React.useMemo(() => {
+    return cartItems.map((item, idx) => {
+      const { qty: displayQuantity, unit: displayUnit } = getDisplayQuantityAndUnit(item);
+      const catalogRate = getDisplayRate(item);
+      const itemDiscount = computeItemDiscount(item);
+      const itemTotal = computeItemTotal(item);
+      const lt = lineTaxes[idx];
+      const discountPerUnit = displayQuantity > 0 ? itemDiscount / displayQuantity : 0;
+      return {
+        ...item,
+        display_quantity: displayQuantity,
+        display_unit: displayUnit,
+        rate: catalogRate - discountPerUnit,
+        original_rate: catalogRate,
+        discount_amount: itemDiscount,
+        total: itemTotal,
+        taxable_amount: itemTotal,
+        tax_rate_snapshot: lt?.taxRate ?? 0,
+        cgst_rate: (lt?.taxRate ?? 0) / 2,
+        sgst_rate: (lt?.taxRate ?? 0) / 2,
+        cgst_amount: lt?.cgst ?? 0,
+        sgst_amount: lt?.sgst ?? 0,
+        igst_amount: lt?.igst ?? 0,
+        cess_amount: lt?.cess ?? 0,
+      };
+    });
+  }, [cartItems, lineTaxes, orderCalculation.itemDiscounts]);
+
   const getCGST = () => taxTotals.cgst;
   const getSGST = () => taxTotals.sgst;
   const getFinalTotal = () => {
@@ -1547,7 +1579,7 @@ export const Cart = () => {
             localStorage.removeItem(tableFormStorageKey);
             clearSchemes();
             setCartItems([]);
-            navigate('/visits/retailers');
+            navigate(isAdminEdit ? '/operations/edited-orders' : '/visits/retailers');
             return;
           }
 
@@ -1695,10 +1727,17 @@ export const Cart = () => {
 
       // Navigate to My Visits page - snapshot is already updated
       console.log('✅ Navigating to My Visits');
-      try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      // Keep the backdate context while the user is still working that past
+      // date — the next retailer's order must land on the same day and ask
+      // for a reason again. My Visits clears/replaces the context whenever a
+      // different date is selected. Returning with ?date= keeps the calendar
+      // on the day being worked instead of snapping back to today.
+      if (!isBackdated) {
+        try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      }
       clearOnBehalfContext();
       clearOutOfBeatContext();
-      navigate('/visits/retailers');
+      navigate(isAdminEdit ? '/operations/edited-orders' : `/visits/retailers?date=${getEffectiveOrderDate()}`);
 
       // BACKGROUND WORK - Don't block user navigation for non-critical tasks
       // Gamification, retailer sequences, and invoice DB records run in background
@@ -2349,7 +2388,7 @@ export const Cart = () => {
             localStorage.removeItem(tableFormStorageKey);
             clearSchemes();
             setCartItems([]);
-            navigate('/visits/retailers');
+            navigate(isAdminEdit ? '/operations/edited-orders' : '/visits/retailers');
             return;
           }
 
@@ -2462,11 +2501,14 @@ export const Cart = () => {
         markVisitDataChanged(orderDate);
       }
 
-      // Navigate back to My Visits
-      try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      // Navigate back to My Visits (same backdate-context handling as the
+      // regular submit path above).
+      if (!isBackdated) {
+        try { sessionStorage.removeItem('backdated_order_context'); } catch {}
+      }
       clearOnBehalfContext();
       clearOutOfBeatContext();
-      navigate('/visits/retailers');
+      navigate(isEditMode && isAdminEdit ? '/operations/edited-orders' : `/visits/retailers?date=${getEffectiveOrderDate()}`);
 
     } catch (error: any) {
       console.error('Error submitting D-1 order:', error);
@@ -2850,10 +2892,30 @@ export const Cart = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-between text-base font-bold border-t pt-2">
-                  <span>Total:</span>
-                  <span>₹{formatExact(getFinalTotal())}</span>
-                </div>
+                {(() => {
+                  // The rounded whole-rupee figure below is exactly what gets
+                  // submitted as orders.total_amount and what the invoice
+                  // shows — surfaced here too instead of only appearing once
+                  // the invoice is generated.
+                  const exactTotal = getFinalTotal();
+                  const roundedTotal = Math.round(Math.max(0, exactTotal));
+                  const roundOff = roundedTotal - exactTotal;
+                  const hasRoundOff = Math.abs(roundOff) >= 0.005;
+                  return (
+                    <>
+                      {hasRoundOff && (
+                        <div className="flex justify-between text-xs text-muted-foreground border-t pt-1">
+                          <span>Round Off:</span>
+                          <span>{roundOff >= 0 ? '+' : '-'}₹{formatExact(Math.abs(roundOff))}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-base font-bold border-t pt-2">
+                        <span>Total:</span>
+                        <span>₹{formatExact(roundedTotal)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
                 <div className="flex justify-between text-[11px] text-muted-foreground -mt-1">
                   <span>(excl. GST)</span>
                   <span>₹{formatExact(getAmountAfterDiscount())}</span>
@@ -3224,7 +3286,11 @@ export const Cart = () => {
               <InvoiceTemplateRenderer
                 orderId={validVisitId || "DRAFT"}
                 retailerId={validRetailerId}
-                cartItems={cartItems}
+                cartItems={previewInvoiceItems}
+                schemeDetails={formatSchemeDetailsForInvoice(orderCalculation.appliedSchemes)}
+                paymentMode={paymentMethod || undefined}
+                orderTotal={Math.round(Math.max(0, getFinalTotal()))}
+                orderDate={getEffectiveOrderDate()}
               />
             )}
           </DialogContent>

@@ -37,6 +37,9 @@ type OpsConfig = {
   edit_approval_threshold: number;
   edit_lock_price: boolean;
   edit_max_edits: number;
+  edit_visible_in_visit_card: boolean;
+  entry_price_edit_enabled: boolean;
+  entry_price_edit_direction: 'higher_only' | 'both';
   auto_cancel_enabled: boolean;
   eod_cutoff_time: string;
   carry_forward_enabled: boolean;
@@ -327,6 +330,13 @@ const OperationsConfig: React.FC = () => {
         </CardHeader>
         {c.edit_enabled && (
           <CardContent className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Show in Visit Card</Label>
+                <p className="text-xs text-muted-foreground">Show the "Edit Order" button on My Visit's visit cards. Turning this off only hides that one entry point — editing stays available wherever else it's exposed (e.g. the admin Operations table).</p>
+              </div>
+              <Switch checked={c.edit_visible_in_visit_card} onCheckedChange={(v) => save('edit_visible_in_visit_card', v)} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Lock point</Label>
@@ -391,6 +401,38 @@ const OperationsConfig: React.FC = () => {
               <Label>Lock price changes</Label>
               <Switch checked={c.edit_lock_price} onCheckedChange={(v) => save('edit_lock_price', v)} />
             </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Allow price edit in Order Entry</Label>
+                <p className="text-xs text-muted-foreground">Lets reps edit a line's price (incl. GST) while placing a NEW order, before it's submitted — separate from editing an already-placed order above.</p>
+              </div>
+              <Switch checked={c.entry_price_edit_enabled} onCheckedChange={(v) => save('entry_price_edit_enabled', v)} />
+            </div>
+
+            {c.entry_price_edit_enabled && (
+              <div className="space-y-2 pl-3 border-l-2 border-border">
+                <Label>Direction</Label>
+                <RadioGroup
+                  value={c.entry_price_edit_direction}
+                  onValueChange={(v) => save('entry_price_edit_direction', v as any)}
+                  className="space-y-2"
+                >
+                  <div className="flex items-start space-x-2">
+                    <RadioGroupItem id="entry-price-higher" value="higher_only" className="mt-1" />
+                    <Label htmlFor="entry-price-higher" className="font-normal cursor-pointer">
+                      Higher only — reps can raise the price above catalog, not lower it
+                    </Label>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <RadioGroupItem id="entry-price-both" value="both" className="mt-1" />
+                    <Label htmlFor="entry-price-both" className="font-normal cursor-pointer">
+                      Both — reps can raise or lower the price
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Max edits per order</Label>

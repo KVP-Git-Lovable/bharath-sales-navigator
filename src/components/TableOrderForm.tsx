@@ -142,6 +142,14 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
   // that would change the per-unit rate (product, variant, UOM) — only qty is editable.
   // Admin edit context always bypasses the price lock (admin is the override authority).
   const priceLocked = isEditMode && editPolicy.edit_lock_price && !isAdminEdit;
+  // Non-admin reps may also edit price on an already-placed order once the
+  // admin hasn't locked pricing for this policy.
+  const canEditPrice = isAdminEdit || (isEditMode && !priceLocked);
+  // Separate capability: editing price while placing a brand-new order,
+  // gated by its own operations_config toggle (entry_price_edit_enabled) —
+  // independent of the above, which only applies to an already-placed order.
+  const canEditEntryPrice = !isEditMode && editPolicy.entry_price_edit_enabled;
+  const canEditAnyPrice = canEditPrice || canEditEntryPrice;
 
   // PERF: disable noisy logs in hot paths
   const DEV_LOG = false;
@@ -1133,7 +1141,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
    * Passing an empty/invalid value clears the override so the catalog price returns.
    */
   const applyAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
-    if (!isAdminEdit) return;
+    if (!canEditPrice) return;
     setOrderRows(prev => {
       const updated = prev.map(row => {
         if (row.id !== rowId || !row.product) return row;
@@ -1185,7 +1193,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
    * empty/invalid input. Clearing happens on blur only (see onBlurAdminPrice).
    */
   const onChangeAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
-    if (!isAdminEdit) return;
+    if (!canEditPrice) return;
     // Keep only the field being typed in state; the other should recompute.
     setPriceEditText(prev => ({ ...prev, [rowId]: { [mode]: rawValue } }));
     const parsed = Number(rawValue);
@@ -1211,7 +1219,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
 
   /** On blur: if the field was left empty, clear the override back to catalog. Always drop the raw text buffer. */
   const onBlurAdminPrice = (rowId: string, mode: 'rate' | 'total', rawValue: string) => {
-    if (!isAdminEdit) return;
+    if (!canEditPrice) return;
     if (rawValue.trim() === '') {
       applyAdminPrice(rowId, mode, '');
     }
@@ -1561,7 +1569,7 @@ export const TableOrderForm = forwardRef<TableOrderFormHandle, TableOrderFormPro
                          const effectiveRate = Math.max(0, shownRate - perUnitDiscount);
                          return (
                            <>
-                              {isAdminEdit ? (() => {
+                              {canEditPrice ? (() => {
                                 const buf = priceEditText[row.id] || {};
                                 const qtyNum = Number(row.quantity) || 0;
                                 const rateDisplay = buf.rate !== undefined

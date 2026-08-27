@@ -20,9 +20,14 @@ export interface InvoicePreviewPdfInput {
   orderId?: string;
   beatName?: string;
   salesmanName?: string;
+  invoiceDate?: string;
   invoiceTime?: string;
   schemeDetails?: string;
   displaySettings?: DisplaySettingsMap;
+  paymentMode?: string;
+  amountPaid?: number;
+  balanceDue?: number;
+  orderTotal?: number;
 }
 
 /** A4 portrait at ~96dpi */
@@ -90,9 +95,14 @@ export async function renderInvoicePreviewToPdfBlob(
             templateStyle="template4"
             beatName={input.beatName || ""}
             salesmanName={input.salesmanName || ""}
+            invoiceDate={input.invoiceDate || ""}
             invoiceTime={input.invoiceTime || ""}
             schemeDetails={input.schemeDetails || ""}
             displaySettings={input.displaySettings || {}}
+            paymentMode={input.paymentMode}
+            amountPaid={input.amountPaid}
+            balanceDue={input.balanceDue}
+            orderTotal={input.orderTotal}
           />
         </div>
       );

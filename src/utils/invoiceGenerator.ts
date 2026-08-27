@@ -111,6 +111,9 @@ interface InvoiceData {
   orderDiscount?: number; // Order-level discount from orders.discount_amount
   orderTotal?: number; // Final total from orders.total_amount (includes GST, discounts)
   displaySettings?: DisplaySettingsMap; // Display settings from Invoice Management
+  paymentMode?: string; // orders.payment_method — read straight through, never derived
+  amountPaid?: number;
+  balanceDue?: number;
 }
 
 // Helper function to format amount with 2 decimal places (exact)
@@ -277,9 +280,14 @@ export async function generateTemplate4Invoice(data: InvoiceData): Promise<Blob>
       orderId: data.displayInvoiceNumber || data.orderId,
       beatName: data.beatName,
       salesmanName: data.salesmanName,
+      invoiceDate: data.displayInvoiceDate,
       invoiceTime: data.displayInvoiceTime,
       schemeDetails: data.schemeDetails,
       displaySettings,
+      paymentMode: data.paymentMode,
+      amountPaid: data.amountPaid,
+      balanceDue: data.balanceDue,
+      orderTotal: data.orderTotal,
     });
   } catch (err) {
     console.error('Preview-based invoice render failed, falling back to legacy layout', err);
@@ -803,8 +811,13 @@ async function generateTemplate4InvoiceLegacy(data: InvoiceData): Promise<Blob> 
   const totalRowHeight = 7;
   const showIgst = igst > 0;
   const showCess = cess > 0;
-  // Rows: SUB-TOTAL, (DISCOUNT if any), SGST, CGST, (IGST?), (CESS?), then TOTAL bar
-  const numRows = 3 + (hasOrderLevelDiscount ? 1 : 0) + (showIgst ? 1 : 0) + (showCess ? 1 : 0);
+  // The Total bar below shows a whole-rupee amount (formatRounded) while every
+  // line above it is exact-to-the-paisa — that gap must be shown as its own
+  // line, never silently absorbed, so the invoice always foots exactly.
+  const roundOffAmount = Math.round(total) - total;
+  const hasRoundOff = Math.abs(roundOffAmount) >= 0.005;
+  // Rows: SUB-TOTAL, (DISCOUNT if any), SGST, CGST, (IGST?), (CESS?), (ROUND OFF?), then TOTAL bar
+  const numRows = 3 + (hasOrderLevelDiscount ? 1 : 0) + (showIgst ? 1 : 0) + (showCess ? 1 : 0) + (hasRoundOff ? 1 : 0);
   const totalsBoxHeight = (numRows * rowHeight) + totalRowHeight + 4;
   
   // Draw border box
@@ -850,6 +863,13 @@ async function generateTemplate4InvoiceLegacy(data: InvoiceData): Promise<Blob> 
     innerY += rowHeight;
     doc.text("CESS", totalsBoxX + labelOffset, innerY);
     doc.text(`Rs.${formatExact(cess)}`, totalsBoxX + valueOffset, innerY, { align: "right" });
+  }
+
+  if (hasRoundOff) {
+    innerY += rowHeight;
+    const sign = roundOffAmount >= 0 ? "+" : "-";
+    doc.text("ROUND OFF", totalsBoxX + labelOffset, innerY);
+    doc.text(`${sign}Rs.${formatExact(Math.abs(roundOffAmount))}`, totalsBoxX + valueOffset, innerY, { align: "right" });
   }
 
 
@@ -1371,8 +1391,22 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
   );
 
   const displayInvoiceNumber = (order as any).invoice_number || `INV-${order.id.substring(0, 8).toUpperCase()}`;
-  const displayInvoiceDate = order.created_at ? new Date(order.created_at).toLocaleDateString("en-GB") : new Date().toLocaleDateString("en-GB");
-  const displayInvoiceTime = order.created_at ? new Date(order.created_at).toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' });
+  // The invoice shows the order's business date (order_date): for a
+  // backdated order that is the day the sale happened, not the day it was
+  // keyed in. The time line is only meaningful when the two fall on the same
+  // day; a backdated invoice shows "—" instead of a misleading entry time.
+  const createdAt = order.created_at ? new Date(order.created_at) : new Date();
+  const orderDateStr: string | null =
+    typeof (order as any).order_date === 'string' && (order as any).order_date
+      ? String((order as any).order_date).slice(0, 10)
+      : null;
+  const localCreatedDate = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}`;
+  const displayInvoiceDate = orderDateStr
+    ? new Date(orderDateStr + 'T00:00:00').toLocaleDateString("en-GB")
+    : createdAt.toLocaleDateString("en-GB");
+  const displayInvoiceTime = (!orderDateStr || orderDateStr === localCreatedDate)
+    ? createdAt.toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' })
+    : "—";
   const invoiceNumber = displayInvoiceNumber;
   
   // Get the selected template from company settings (default to template4)
@@ -1406,7 +1440,13 @@ export async function fetchAndGenerateInvoice(orderId: string): Promise<{ blob: 
         schemeDetails,
         // CRITICAL: Pass order-level discount and total for accurate invoice
         orderDiscount: Number(order.discount_amount) || 0,
-        orderTotal: Number(order.total_amount) || undefined
+        orderTotal: Number(order.total_amount) || undefined,
+        // Payment status is read straight off the order — never derived here.
+        paymentMode: order.payment_method || undefined,
+        amountPaid: order.is_credit_order
+          ? Number(order.credit_paid_amount) || 0
+          : Number(order.total_amount) || 0,
+        balanceDue: order.is_credit_order ? Number(order.credit_pending_amount) || 0 : 0,
       });
       break;
   }

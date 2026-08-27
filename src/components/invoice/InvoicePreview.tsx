@@ -64,10 +64,33 @@ interface InvoicePreviewProps {
   templateStyle: "template1" | "template2" | "template3" | "template4";
   beatName?: string;
   salesmanName?: string;
+  // Pre-formatted (e.g. "24/08/2026") display date — the order's actual
+  // business date, which for a backdated order differs from "today". Falls
+  // back to today's date only when a caller doesn't supply one.
+  invoiceDate?: string;
   invoiceTime?: string;
   schemeDetails?: string;
   displaySettings?: DisplaySettingsMap;
+  // Payment status — read straight from the order (or the rep's current
+  // in-progress selection on a not-yet-submitted cart); never derived here.
+  paymentMode?: string;
+  amountPaid?: number;
+  balanceDue?: number;
+  // The real, final charged amount — Cart's own Math.round(getFinalTotal())
+  // pre-submit, or orders.total_amount post-submit. When given, this (not a
+  // fresh Math.round of the line items) is the Total shown here, so the
+  // invoice is never the one deciding what the rounded total is.
+  orderTotal?: number;
 }
+
+const PAYMENT_MODE_LABELS: Record<string, string> = {
+  cash: "Cash",
+  cheque: "Cheque",
+  upi: "UPI",
+  neft: "NEFT",
+  credit: "Credit",
+  collect_on_delivery: "Collect on Delivery",
+};
 
 export default function InvoicePreview({
   company,
@@ -77,9 +100,14 @@ export default function InvoicePreview({
   templateStyle,
   beatName = "",
   salesmanName = "",
+  invoiceDate = "",
   invoiceTime = "",
   schemeDetails = "",
-  displaySettings = {}
+  displaySettings = {},
+  paymentMode,
+  amountPaid,
+  balanceDue,
+  orderTotal
 }: InvoicePreviewProps) {
   // Unit conversion helper
   const normalizeUnit = (u?: string) => (u || "").toLowerCase().replace(/\./g, "").trim();
@@ -99,6 +127,17 @@ export default function InvoicePreview({
       if (["g", "gm", "gram", "grams"].includes(targetUnit)) return baseRate;
     }
     return baseRate;
+  };
+
+  // Line total: read the stored, already-finalized value directly — never
+  // recompute qty × rate when a stored total exists (that's a live
+  // recalculation, and the invoice should show exactly what was persisted
+  // at order time). Only falls back to qty × rate for legacy rows that
+  // genuinely have no stored total/taxable_amount.
+  const getLineTotal = (item: any, qty: number, rate: number) => {
+    const stored = item.total ?? item.taxable_amount;
+    if (stored != null && Number.isFinite(Number(stored))) return Number(stored);
+    return qty * rate;
   };
 
   // Get display name - show only variant name if it's a variant, or base product name
@@ -136,8 +175,8 @@ export default function InvoicePreview({
     } else {
       rate = getDisplayRate(item);
     }
-    
-    return sum + qty * rate;
+
+    return sum + getLineTotal(item, qty, rate);
   }, 0);
   // Phase 4: read per-line stored tax from order_items; fall back to helper for legacy lines.
   const lineTaxes = cartItems.map((it: any) => resolveLineTax(it));
@@ -146,10 +185,14 @@ export default function InvoicePreview({
   const igst = lineTaxes.reduce((s, l) => s + l.igst, 0);
   const cess = lineTaxes.reduce((s, l) => s + l.cess, 0);
   const total = subtotal + cgst + sgst + igst + cess;
+  // The real, final charged amount — Cart's own rounded total pre-submit, or
+  // orders.total_amount post-submit. Falls back to rounding the line-item sum
+  // only when the caller genuinely has no authoritative total to hand over.
+  const displayTotal = orderTotal != null ? orderTotal : Math.round(total);
 
-  
+
   // Amount in words
-  const totalInWords = numberToWords(Math.round(total)) + ' Rupees Only';
+  const totalInWords = numberToWords(displayTotal) + ' Rupees Only';
 
   const getStyleClasses = () => {
     switch (templateStyle) {
@@ -205,7 +248,7 @@ export default function InvoicePreview({
         <InvoiceStatusBadge invoiceNumber={orderId} variant="banner" />
       </div>
       {/* Header */}
-      <div className={`${styles.header} p-4 rounded-t-lg flex justify-between items-center mb-6`}>
+      <div className={`${styles.header} p-4 rounded-t-lg flex justify-between items-center mb-4`}>
         <div className="flex items-center gap-4">
           {isEnabled('header_company_logo') && company.logo_url && (
             <img src={company.logo_url} alt="Company Logo" className="w-28 h-28 object-contain" />
@@ -237,7 +280,7 @@ export default function InvoicePreview({
       </div>
 
       {/* Bill To & Invoice Details */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-2 gap-6 mb-4">
         <div>
           <h3 className="font-bold text-xs mb-2">BILL TO</h3>
           {isEnabled('billto_retailer_name') && (
@@ -266,7 +309,7 @@ export default function InvoicePreview({
           {isEnabled('details_invoice_date') && (
             <div className="mb-2">
               <span className="font-bold text-xs">DATE:</span>{" "}
-              <span className="text-xs">{new Date().toLocaleDateString("en-GB")}</span>
+              <span className="text-xs">{invoiceDate || new Date().toLocaleDateString("en-GB")}</span>
             </div>
           )}
           {isEnabled('details_invoice_time') && invoiceTime && (
@@ -291,6 +334,11 @@ export default function InvoicePreview({
       </div>
 
       {/* Items Table */}
+      {(() => {
+        // Only show a separate MRP/Offer split when at least one line actually
+        // has a discount — reads the stored discount_amount, never derives one.
+        const hasAnyItemDiscount = cartItems.some(item => (Number(item.discount_amount) || 0) > 0);
+        return (
       <div className="mb-6">
         <table className="w-full border-collapse">
           <thead>
@@ -300,13 +348,19 @@ export default function InvoicePreview({
               {isEnabled('table_hsn_code') && (
                 <th className="border border-gray-300 p-2 text-center text-xs">HSN/SAC</th>
               )}
+              <th className="border border-gray-300 p-2 text-center text-xs">QTY</th>
               {isEnabled('table_unit_column') && (
                 <th className="border border-gray-300 p-2 text-center text-xs">UNIT</th>
               )}
-              <th className="border border-gray-300 p-2 text-center text-xs">QTY</th>
-              <th className="border border-gray-300 p-2 text-right text-xs">PRICE</th>
-              <th className="border border-gray-300 p-2 text-center text-xs">CGST%</th>
-              <th className="border border-gray-300 p-2 text-center text-xs">SGST%</th>
+              {hasAnyItemDiscount ? (
+                <>
+                  <th className="border border-gray-300 p-2 text-right text-xs">MRP</th>
+                  <th className="border border-gray-300 p-2 text-right text-xs">OFFER PRICE</th>
+                </>
+              ) : (
+                <th className="border border-gray-300 p-2 text-right text-xs">PRICE/UNIT</th>
+              )}
+              <th className="border border-gray-300 p-2 text-center text-xs">GST</th>
               <th className="border border-gray-300 p-2 text-right text-xs">TOTAL</th>
             </tr>
           </thead>
@@ -328,14 +382,14 @@ export default function InvoicePreview({
                 rate = getDisplayRate(item);
               }
               
-              const itemTotal = qty * rate;
+              const itemTotal = getLineTotal(item, qty, rate);
+              const itemDiscount = Number(item.discount_amount) || 0;
+              const originalRate = Number(item.original_rate) || rate;
               const fallbackRate = Number(
                 (item as any).tax_rate_snapshot ??
                 (item as any).gst_percentage ??
                 0
               ) || 0;
-              const cgstRate = Number((item as any).cgst_rate ?? (fallbackRate / 2)) || 0;
-              const sgstRate = Number((item as any).sgst_rate ?? (fallbackRate / 2)) || 0;
               const igstRate = Number((item as any).igst_rate ?? 0) || 0;
               return (
                 <tr key={index} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
@@ -344,18 +398,26 @@ export default function InvoicePreview({
                   {isEnabled('table_hsn_code') && (
                     <td className="border border-gray-300 p-2 text-center text-xs">{item.hsn_code || "-"}</td>
                   )}
+                  <td className="border border-gray-300 p-2 text-center text-xs">{qty}</td>
                   {isEnabled('table_unit_column') && (
                     <td className="border border-gray-300 p-2 text-center text-xs">{unit}</td>
                   )}
-                  <td className="border border-gray-300 p-2 text-center text-xs">{qty}</td>
-                  <td className="border border-gray-300 p-2 text-right text-xs">
-                    ₹{rate.toFixed(2)}
-                  </td>
+                  {hasAnyItemDiscount ? (
+                    <>
+                      <td className="border border-gray-300 p-2 text-right text-xs">
+                        ₹{originalRate.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 p-2 text-right text-xs">
+                        {itemDiscount > 0 ? `₹${rate.toFixed(2)}` : "-"}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="border border-gray-300 p-2 text-right text-xs">
+                      ₹{rate.toFixed(2)}
+                    </td>
+                  )}
                   <td className="border border-gray-300 p-2 text-center text-xs">
-                    {igstRate > 0 ? `IGST ${igstRate}%` : (cgstRate > 0 ? `${cgstRate}%` : '-')}
-                  </td>
-                  <td className="border border-gray-300 p-2 text-center text-xs">
-                    {igstRate > 0 ? '-' : (sgstRate > 0 ? `${sgstRate}%` : '-')}
+                    {igstRate > 0 ? `${igstRate}%` : (fallbackRate > 0 ? `${fallbackRate}%` : '-')}
                   </td>
                   <td className="border border-gray-300 p-2 text-right text-xs">
                     ₹{itemTotal.toFixed(2)}
@@ -366,53 +428,6 @@ export default function InvoicePreview({
           </tbody>
         </table>
       </div>
-
-      {/* Rate-wise GST summary (GST compliant) */}
-      {(() => {
-        const groups = new Map<number, { taxable: number; cgst: number; sgst: number; igst: number; cess: number }>();
-        cartItems.forEach((it: any, i: number) => {
-          const lt = lineTaxes[i];
-          if (!lt || lt.taxRate <= 0) return;
-          const key = Number(lt.taxRate) || 0;
-          const g = groups.get(key) || { taxable: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 };
-          g.taxable += Number((lt as any).taxableAmount ?? 0) || 0;
-          g.cgst += lt.cgst; g.sgst += lt.sgst; g.igst += lt.igst; g.cess += lt.cess;
-          groups.set(key, g);
-        });
-        if (groups.size === 0) return null;
-        const rows = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
-        return (
-          <div className="mb-4">
-            <h3 className="font-bold text-xs mb-2">GST RATE-WISE SUMMARY</h3>
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                <tr className={styles.tableHeader}>
-                  <th className="border border-gray-300 p-1 text-center">RATE</th>
-                  <th className="border border-gray-300 p-1 text-right">TAXABLE</th>
-                  <th className="border border-gray-300 p-1 text-right">CGST</th>
-                  <th className="border border-gray-300 p-1 text-right">SGST</th>
-                  {rows.some(([, v]) => v.igst > 0) && (
-                    <th className="border border-gray-300 p-1 text-right">IGST</th>
-                  )}
-                  <th className="border border-gray-300 p-1 text-right">TOTAL TAX</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(([rate, v]) => (
-                  <tr key={rate}>
-                    <td className="border border-gray-300 p-1 text-center">{rate}%</td>
-                    <td className="border border-gray-300 p-1 text-right">₹{v.taxable.toFixed(2)}</td>
-                    <td className="border border-gray-300 p-1 text-right">₹{v.cgst.toFixed(2)}</td>
-                    <td className="border border-gray-300 p-1 text-right">₹{v.sgst.toFixed(2)}</td>
-                    {rows.some(([, vv]) => vv.igst > 0) && (
-                      <td className="border border-gray-300 p-1 text-right">₹{v.igst.toFixed(2)}</td>
-                    )}
-                    <td className="border border-gray-300 p-1 text-right">₹{(v.cgst + v.sgst + v.igst + v.cess).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         );
       })()}
 
@@ -425,24 +440,51 @@ export default function InvoicePreview({
       )}
 
       {/* Totals Section */}
+      {(() => {
+        // Read the stored per-line discount, never derive it — SUB-TOTAL shows
+        // list price so SUB-TOTAL - DISCOUNT lines up with the taxable net below,
+        // matching the same convention the actual invoice PDF uses.
+        const totalDiscount = cartItems.reduce((s: number, i: any) => s + (Number(i.discount_amount) || 0), 0);
+        const subtotalGross = subtotal + totalDiscount;
+        return (
       <div className="flex justify-end mb-4">
         <div className="w-64">
           {isEnabled('totals_subtotal') && (
             <div className="flex justify-between mb-2">
               <span className="font-bold text-xs">SUB-TOTAL</span>
-              <span className="text-xs">₹{subtotal.toFixed(2)}</span>
+              <span className="text-xs">₹{subtotalGross.toFixed(2)}</span>
             </div>
           )}
-          {isEnabled('totals_tax_breakdown') && (
+          {totalDiscount > 0 && (
+            <div className="flex justify-between mb-2 text-green-700">
+              <span className="font-bold text-xs">DISCOUNT</span>
+              <span className="text-xs">-₹{totalDiscount.toFixed(2)}</span>
+            </div>
+          )}
+          {isEnabled('totals_tax_breakdown') && (() => {
+            // Same rate-suffix convention as Cart's own summary: show the
+            // % only when every line shares one rate, so it's never a
+            // misleading label on a mixed-rate order.
+            const rates = Array.from(new Set(
+              lineTaxes.filter((l: any) => l && l.taxRate > 0).map((l: any) => l.taxRate)
+            ));
+            const uniformRate = rates.length === 1 ? rates[0] : null;
+            const half = uniformRate != null ? +(uniformRate / 2).toFixed(2) : null;
+            return (
             <>
               <div className="flex justify-between mb-2">
-                <span className="font-bold text-xs">SGST</span>
+                <span className="font-bold text-xs">SGST{half != null ? ` @ ${half}%` : ''}</span>
                 <span className="text-xs">₹{sgst.toFixed(2)}</span>
               </div>
               <div className="flex justify-between mb-2">
-                <span className="font-bold text-xs">CGST</span>
+                <span className="font-bold text-xs">CGST{half != null ? ` @ ${half}%` : ''}</span>
                 <span className="text-xs">₹{cgst.toFixed(2)}</span>
               </div>
+              {rates.length > 1 && (
+                <div className="text-[10px] text-gray-500 italic mb-2">
+                  Mixed GST rates: {rates.sort((a: number, b: number) => a - b).map((r: number) => `${r}%`).join(', ')}
+                </div>
+              )}
               {igst > 0 && (
                 <div className="flex justify-between mb-2">
                   <span className="font-bold text-xs">IGST</span>
@@ -456,26 +498,66 @@ export default function InvoicePreview({
                 </div>
               )}
             </>
-          )}
+            );
+          })()}
+          {(() => {
+            // displayTotal is the real final amount handed in by the caller
+            // (Cart or the order); every line above is exact-to-the-paisa —
+            // show that gap explicitly instead of letting the two silently
+            // disagree.
+            const roundOffAmount = displayTotal - total;
+            if (Math.abs(roundOffAmount) < 0.005) return null;
+            const sign = roundOffAmount >= 0 ? '+' : '-';
+            return (
+              <div className="flex justify-between mb-2">
+                <span className="font-bold text-xs">ROUND OFF</span>
+                <span className="text-xs">{sign}₹{Math.abs(roundOffAmount).toFixed(2)}</span>
+              </div>
+            );
+          })()}
           <div className={`${styles.totalBox} p-2 rounded flex justify-center items-center`}>
-            <span className="font-bold text-sm">Total amount: ₹{Math.round(total)}</span>
+            <span className="font-bold text-sm">Total amount: ₹{displayTotal}</span>
+          </div>
+
+          {/* Payment status — read straight from the order, never derived here */}
+          <div className="mt-2 pt-2 border-t border-gray-300">
+            <div className="flex justify-between mb-1">
+              <span className="text-xs text-gray-600">Balance</span>
+              <span className="text-xs font-semibold">
+                {balanceDue != null ? `₹${balanceDue.toFixed(2)}` : `₹0.00`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-gray-600">Payment mode</span>
+              <span className="text-xs font-semibold">
+                {paymentMode ? (PAYMENT_MODE_LABELS[paymentMode] || paymentMode) : "Not yet selected"}
+              </span>
+            </div>
           </div>
 
         </div>
       </div>
+        );
+      })()}
 
       {/* Amount in Words */}
       {isEnabled('totals_amount_in_words') && (
-        <div className="mb-6 p-3 bg-gray-100 rounded">
+        <div className="mb-3 p-2 bg-gray-100 rounded">
           <p className="text-xs">
             <span className="font-bold">Amount in Words:</span> {totalInWords}
           </p>
         </div>
       )}
 
+      {/* CGST Rule 46(o): every tax invoice must state whether tax is payable
+          on reverse charge. Always "No" for a normal forward-charge retail sale. */}
+      <p className="text-[11px] text-gray-500 mb-3">
+        Tax is payable on reverse charge: No
+      </p>
+
       {/* Bank Details and QR Code */}
       {(isEnabled('payment_bank_details') || isEnabled('payment_qr_code')) && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Bank Details */}
           {isEnabled('payment_bank_details') && (
             <div>
@@ -509,10 +591,10 @@ export default function InvoicePreview({
 
       {/* Signature */}
       {isEnabled('footer_signature_area') && (
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end mb-4">
           <div className="text-right">
             <p className="text-xs font-bold mb-1">For {company.name || "Company"}</p>
-            <div className="mt-8 pt-4 border-t border-gray-400">
+            <div className="mt-5 pt-2 border-t border-gray-400">
               <p className="text-xs italic">Authorized Signatory</p>
             </div>
           </div>
