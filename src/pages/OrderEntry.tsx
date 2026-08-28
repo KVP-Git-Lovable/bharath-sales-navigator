@@ -49,6 +49,7 @@ interface Product {
   id: string;
   name: string;
   category: string;
+  category_id?: string | null;
   rate: number;
   unit: string;
   base_unit?: string;
@@ -77,6 +78,7 @@ interface GridProduct {
   id: string;
   name: string;
   category: string;
+  category_id?: string | null;
   rate: number;
   unit: string;
   base_unit?: string;
@@ -720,7 +722,7 @@ export const OrderEntry = () => {
         if (isEmpty) {
           const { data: items, error: itemsError } = await supabase
             .from('order_items')
-            .select('id, product_id, variant_id, product_name, category, rate, unit, quantity, total, hsn_code, uom_id, uom_code, conversion_to_base, original_rate, discount_amount')
+            .select('id, product_id, variant_id, product_name, category, rate, unit, quantity, total, hsn_code, uom_id, uom_code, conversion_to_base, original_rate, discount_amount, products:product_id(category_id)')
             .eq('order_id', editOrderId);
           if (itemsError) {
             console.error('[OrderEntry][edit] failed to load original order_items:', itemsError);
@@ -752,6 +754,7 @@ export const OrderEntry = () => {
               id: cartId,
               name: it.product_name,
               category: it.category || '',
+              category_id: it.products?.category_id ?? liveProduct?.category_id ?? null,
               rate: Number(it.rate) || 0,
               unit: it.unit || 'pcs',
               quantity: Number(it.quantity) || 0,
@@ -1022,6 +1025,7 @@ export const OrderEntry = () => {
             id: p.id,
             name: p.name,
             category: categoryName,
+            category_id: p.category_id ?? null,
             rate: p.rate,
             unit: p.unit,
             base_unit: p.base_unit,
@@ -1863,6 +1867,7 @@ export const OrderEntry = () => {
         id: item.id,
         name: item.selectedItem,
         category: product?.category || "Unknown",
+        category_id: product?.category_id ?? null,
         rate: item.rate,
         unit: product?.unit || "piece",
         quantity: item.quantity,
@@ -1929,6 +1934,7 @@ export const OrderEntry = () => {
         id: item.id,
         name: item.selectedItem,
         category: product?.category || "Unknown",
+        category_id: product?.category_id ?? null,
         rate: item.rate,
         unit: product?.unit || "piece",
         base_unit: product?.base_unit, // Include base_unit for proper invoice calculations
@@ -2720,6 +2726,7 @@ export const OrderEntry = () => {
                               id: `${product.id}_variant_${variant.id}`,
                               name: variant.variant_name,
                               category: product.category,
+                              category_id: product.category_id ?? null,
                               rate: variantPrice,
                               unit: product.unit,
                               quantity: variantQty,

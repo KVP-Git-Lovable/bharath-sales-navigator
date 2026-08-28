@@ -47,6 +47,7 @@ interface CartItem {
   id: string;
   name: string;
   category: string;
+  category_id?: string | null;
   rate: number;
   unit: string;
   base_unit?: string;
@@ -364,7 +365,7 @@ export const Cart = () => {
         if (isEmpty) {
           const { data: items } = await supabase
             .from('order_items')
-            .select('id, product_id, variant_id, product_name, category, rate, unit, quantity, total, hsn_code, uom_id, uom_code, conversion_to_base, original_rate, discount_amount, is_price_edited')
+            .select('id, product_id, variant_id, product_name, category, rate, unit, quantity, total, hsn_code, uom_id, uom_code, conversion_to_base, original_rate, discount_amount, is_price_edited, products:product_id(category_id)')
             .eq('order_id', editOrderId);
           const seeded: CartItem[] = (items || []).map((it: any) => {
             const cartId = it.variant_id
@@ -374,6 +375,7 @@ export const Cart = () => {
               id: cartId,
               name: it.product_name,
               category: it.category || '',
+              category_id: (it as any).products?.category_id ?? null,
               rate: Number(it.rate) || 0,
               unit: it.unit || 'pcs',
               quantity: Number(it.quantity) || 0,
@@ -507,6 +509,7 @@ export const Cart = () => {
         quantity: displayQuantity,
         rate: displayRate,
         name: item.name,
+        category_id: item.category_id ?? null,
         unit: displayUnit
       };
     });

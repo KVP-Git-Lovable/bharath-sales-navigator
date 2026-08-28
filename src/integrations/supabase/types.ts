@@ -11831,7 +11831,10 @@ export type Database = {
           edit_max_edits: number
           edit_require_approval: boolean
           edit_require_reason: boolean
+          edit_visible_in_visit_card: boolean
           edit_who: string
+          entry_price_edit_direction: string
+          entry_price_edit_enabled: boolean
           eod_cutoff_time: string
           eod_timezone: string
           id: number
@@ -11861,7 +11864,10 @@ export type Database = {
           edit_max_edits?: number
           edit_require_approval?: boolean
           edit_require_reason?: boolean
+          edit_visible_in_visit_card?: boolean
           edit_who?: string
+          entry_price_edit_direction?: string
+          entry_price_edit_enabled?: boolean
           eod_cutoff_time?: string
           eod_timezone?: string
           id?: number
@@ -11891,7 +11897,10 @@ export type Database = {
           edit_max_edits?: number
           edit_require_approval?: boolean
           edit_require_reason?: boolean
+          edit_visible_in_visit_card?: boolean
           edit_who?: string
+          entry_price_edit_direction?: string
+          entry_price_edit_enabled?: boolean
           eod_cutoff_time?: string
           eod_timezone?: string
           id?: number
@@ -12124,6 +12133,7 @@ export type Database = {
           is_price_edited: boolean
           order_id: string | null
           original_rate: number | null
+          other_free_product_id: string | null
           product_id: string | null
           product_name: string | null
           quantity: number
@@ -12155,6 +12165,7 @@ export type Database = {
           is_price_edited?: boolean
           order_id?: string | null
           original_rate?: number | null
+          other_free_product_id?: string | null
           product_id?: string | null
           product_name?: string | null
           quantity: number
@@ -12186,6 +12197,7 @@ export type Database = {
           is_price_edited?: boolean
           order_id?: string | null
           original_rate?: number | null
+          other_free_product_id?: string | null
           product_id?: string | null
           product_name?: string | null
           quantity?: number
@@ -12206,6 +12218,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_other_free_product_id_fkey"
+            columns: ["other_free_product_id"]
+            isOneToOne: false
+            referencedRelation: "scheme_free_products"
             referencedColumns: ["id"]
           },
           {
@@ -15734,8 +15753,12 @@ export type Database = {
           end_date: string | null
           exclusion_group: string | null
           free_product_id: string | null
+          free_product_selection_mode: string
+          free_product_source: string
           free_quantity: number | null
           free_quantity_unit: string | null
+          free_target_other_product_ids: string[] | null
+          free_target_product_ids: string[] | null
           id: string
           is_active: boolean | null
           is_first_order_only: boolean | null
@@ -15743,6 +15766,7 @@ export type Database = {
           max_usage_count: number | null
           min_order_value: number | null
           name: string
+          other_free_product_id: string | null
           per_product_discounts: Json | null
           priority: number | null
           product_id: string | null
@@ -15777,8 +15801,12 @@ export type Database = {
           end_date?: string | null
           exclusion_group?: string | null
           free_product_id?: string | null
+          free_product_selection_mode?: string
+          free_product_source?: string
           free_quantity?: number | null
           free_quantity_unit?: string | null
+          free_target_other_product_ids?: string[] | null
+          free_target_product_ids?: string[] | null
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
@@ -15786,6 +15814,7 @@ export type Database = {
           max_usage_count?: number | null
           min_order_value?: number | null
           name: string
+          other_free_product_id?: string | null
           per_product_discounts?: Json | null
           priority?: number | null
           product_id?: string | null
@@ -15820,8 +15849,12 @@ export type Database = {
           end_date?: string | null
           exclusion_group?: string | null
           free_product_id?: string | null
+          free_product_selection_mode?: string
+          free_product_source?: string
           free_quantity?: number | null
           free_quantity_unit?: string | null
+          free_target_other_product_ids?: string[] | null
+          free_target_product_ids?: string[] | null
           id?: string
           is_active?: boolean | null
           is_first_order_only?: boolean | null
@@ -15829,6 +15862,7 @@ export type Database = {
           max_usage_count?: number | null
           min_order_value?: number | null
           name?: string
+          other_free_product_id?: string | null
           per_product_discounts?: Json | null
           priority?: number | null
           product_id?: string | null
@@ -15863,6 +15897,13 @@ export type Database = {
             columns: ["free_product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_schemes_other_free_product_id_fkey"
+            columns: ["other_free_product_id"]
+            isOneToOne: false
+            referencedRelation: "scheme_free_products"
             referencedColumns: ["id"]
           },
           {
@@ -19752,6 +19793,101 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scheme_free_product_stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          movement_type: string
+          notes: string | null
+          order_id: string | null
+          order_item_id: string | null
+          quantity: number
+          running_balance: number
+          scheme_free_product_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type: string
+          notes?: string | null
+          order_id?: string | null
+          order_item_id?: string | null
+          quantity: number
+          running_balance: number
+          scheme_free_product_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type?: string
+          notes?: string | null
+          order_id?: string | null
+          order_item_id?: string | null
+          quantity?: number
+          running_balance?: number
+          scheme_free_product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheme_free_product_stock_movements_scheme_free_product_id_fkey"
+            columns: ["scheme_free_product_id"]
+            isOneToOne: false
+            referencedRelation: "scheme_free_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scheme_free_products: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          hsn_code: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          low_stock_threshold: number | null
+          name: string
+          stock_quantity: number
+          unit: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hsn_code?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          low_stock_threshold?: number | null
+          name: string
+          stock_quantity?: number
+          unit?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hsn_code?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          low_stock_threshold?: number | null
+          name?: string
+          stock_quantity?: number
+          unit?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       scheme_policy_config: {
         Row: {
@@ -24558,6 +24694,10 @@ export type Database = {
       add_carry_forward_to_plan: {
         Args: { p_date: string; p_retailer_ids?: string[]; p_user: string }
         Returns: number
+      }
+      adjust_scheme_free_product_stock: {
+        Args: { p_id: string; p_notes?: string; p_quantity: number }
+        Returns: Json
       }
       admin_deactivate_all_products: { Args: never; Returns: Json }
       allocate_inventory_batches: {

@@ -38,6 +38,8 @@ import { isSchemeConditionMet, schemeHasConditions, SchemeItem, calculateSchemeD
 import { SchemePolicies } from "@/hooks/useSchemePolicies";
 import type { ManualSchemeSelection } from "@/utils/schemeEngine";
 import { ManualPerUnitApplyDialog } from "@/components/ManualPerUnitApplyDialog";
+import { FreeProductChoiceDialog } from "@/components/FreeProductChoiceDialog";
+import { getSchemeProductLabel } from "@/utils/schemeProductLabel";
 
 interface Product {
   id: string;
@@ -45,6 +47,7 @@ interface Product {
   sku: string;
   rate: number;
   unit: string;
+  category_id?: string | null;
 }
 
 interface OrderRow {
@@ -62,6 +65,7 @@ interface OrderEntrySchemesModalProps {
   isOnline: boolean;
   orderRows: OrderRow[];
   products: Product[];
+  otherFreeProducts?: { id: string; name: string }[];
   appliedSchemeIds: string[];
   schemePolicies?: SchemePolicies;
   onApplyScheme: (scheme: ProductScheme, product?: Product, quantity?: number) => void;
@@ -132,6 +136,10 @@ const formatUnit = (unit: string | undefined) => {
 };
 
 const getConditionText = (scheme: ProductScheme) => {
+  if (scheme.scheme_type === 'bundle_combo') {
+    const bundleCount = scheme.bundle_product_ids?.length || 0;
+    return `Bundle of ${bundleCount} products`;
+  }
   if (scheme.condition_quantity && scheme.quantity_condition_type) {
     const unit = formatUnit(scheme.condition_unit);
     return `Buy ${scheme.quantity_condition_type === 'more_than' ? '>' : '≥'} ${scheme.condition_quantity}${unit ? ` ${unit}` : ''}`;
@@ -147,6 +155,15 @@ const getConditionText = (scheme: ProductScheme) => {
 };
 
 const getBenefitText = (scheme: ProductScheme) => {
+  if (scheme.scheme_type === 'bundle_combo') {
+    if (scheme.bundle_discount_percentage) {
+      return `${scheme.bundle_discount_percentage}% off bundle`;
+    }
+    if (scheme.bundle_discount_amount) {
+      return `₹${scheme.bundle_discount_amount} off bundle`;
+    }
+    return 'Bundle discount';
+  }
   if (scheme.discount_percentage) {
     return `${scheme.discount_percentage}% off`;
   }
@@ -155,7 +172,11 @@ const getBenefitText = (scheme: ProductScheme) => {
   }
   if (scheme.free_quantity) {
     const freeUnit = formatUnit(scheme.free_quantity_unit);
-    const freeProductName = scheme.free_product_name || 'item(s)';
+    if (scheme.free_product_selection_mode === 'user_choice') {
+      const poolSize = (scheme.free_target_product_ids?.length || 0) + (scheme.free_target_other_product_ids?.length || 0);
+      return `Get ${scheme.free_quantity}${freeUnit ? ` ${freeUnit}` : ''} free — choose 1 of ${poolSize}`;
+    }
+    const freeProductName = (scheme.free_product_source === 'other' ? scheme.other_free_product_name : scheme.free_product_name) || 'item(s)';
     return `Get ${scheme.free_quantity}${freeUnit ? ` ${freeUnit}` : ''} ${freeProductName} free`;
   }
   return 'Special offer';
@@ -185,6 +206,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
   isOnline,
   orderRows,
   products,
+  otherFreeProducts = [],
   appliedSchemeIds,
   schemePolicies,
   onApplyScheme,
@@ -194,6 +216,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [pickerScheme, setPickerScheme] = useState<ProductScheme | null>(null);
+  const [freeProductPickerScheme, setFreeProductPickerScheme] = useState<ProductScheme | null>(null);
 
   // Check if more schemes can be applied based on policies
   const canApplyMore = useMemo(() => {
@@ -226,27 +249,52 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         return false;
       }
     }
-    
+
+    // Mutually exclusive schemes: can't apply one that shares a non-empty
+    // exclusion_group with a scheme already applied.
+    if (scheme.exclusion_group) {
+      const appliedGroups = appliedSchemeIds
+        .map(id => schemes.find(s => s.id === id)?.exclusion_group)
+        .filter(Boolean);
+      if (appliedGroups.includes(scheme.exclusion_group)) {
+        return false;
+      }
+    }
+
     return true;
   };
 
-  const activeSchemes = useMemo(() => 
+  const activeSchemes = useMemo(() =>
     schemes.filter(s => isSchemeActive(s)), [schemes]);
 
   // Check if a scheme is product-specific or order-wide
   const isOrderWideScheme = (scheme: ProductScheme) => {
-    return !scheme.product_id || scheme.product_name === 'All Products';
+    if (scheme.product_id || scheme.category_id) return false;
+    if (scheme.scheme_type === 'bundle_combo' && scheme.bundle_product_ids && scheme.bundle_product_ids.length > 0) return false;
+    if (scheme.target_product_ids && scheme.target_product_ids.length > 0) return false;
+    return true;
   };
 
-  // Check if product for a scheme is in cart
+  // Check if the product(s) a scheme targets are in cart
   const isProductInCart = (scheme: ProductScheme) => {
+    const orderRowsWithProduct = orderRows.filter(row => row.product);
+    const orderProductIds = orderRowsWithProduct.map(row => row.product!.id);
+
+    if (scheme.scheme_type === 'bundle_combo' && scheme.bundle_product_ids && scheme.bundle_product_ids.length > 0) {
+      return scheme.bundle_product_ids.every(id => orderProductIds.includes(id));
+    }
+
+    if (scheme.target_product_ids && scheme.target_product_ids.length > 0) {
+      return scheme.target_product_ids.some(id => orderProductIds.includes(id));
+    }
+
+    if (scheme.category_id) {
+      return orderRowsWithProduct.some(row => row.product!.category_id === scheme.category_id);
+    }
+
     if (isOrderWideScheme(scheme)) return true;
-    
-    const orderProductIds = orderRows
-      .filter(row => row.product)
-      .map(row => row.product!.id);
-    
-    return scheme.product_id && orderProductIds.includes(scheme.product_id);
+
+    return !!scheme.product_id && orderProductIds.includes(scheme.product_id);
   };
 
   // Build items for scheme calculation
@@ -260,6 +308,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         quantity: row.quantity,
         rate: row.variant?.price ?? row.product!.rate,
         name: row.variant?.variant_name || row.product!.name,
+        category_id: row.product!.category_id ?? null,
         unit: row.product!.unit
       }));
   }, [orderRows]);
@@ -297,6 +346,12 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
     // Manual per-unit schemes open the picker dialog instead of toggling
     if (scheme.scheme_type === 'manual_per_unit_discount') {
       setPickerScheme(scheme);
+      return;
+    }
+
+    // Many-to-many buy X get Y: the buyer must pick their free item before it applies
+    if (scheme.scheme_type === 'buy_x_get_y_free' && scheme.free_product_selection_mode === 'user_choice') {
+      setFreeProductPickerScheme(scheme);
       return;
     }
 
@@ -341,12 +396,14 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
 
   const SchemeCard = ({ scheme, showInAllTab = false }: { scheme: ProductScheme; showInAllTab?: boolean }) => {
     const isApplied = appliedSchemeIds.includes(scheme.id);
+    const productLabel = getSchemeProductLabel(scheme, products);
     const isOrderWide = isOrderWideScheme(scheme);
     const productInCart = isProductInCart(scheme);
     const hasConditions = schemeHasConditions(scheme);
     const conditionMet = schemeItems.length > 0 && isSchemeConditionMet(scheme, schemeItems, subtotal);
     const isPurePercentage = scheme.scheme_type === 'percentage_discount' && !hasConditions;
     const isManualPerUnit = scheme.scheme_type === 'manual_per_unit_discount';
+    const isFreeProductChoicePool = scheme.scheme_type === 'buy_x_get_y_free' && scheme.free_product_selection_mode === 'user_choice';
     const manualSel = manualSelections[scheme.id];
     const manualValueType: 'amount' | 'percentage' =
       (scheme.discount_value_type as 'amount' | 'percentage') === 'percentage' ? 'percentage' : 'amount';
@@ -377,7 +434,7 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                     className={`text-[9px] px-1.5 py-0 flex items-center gap-0.5 ${!productInCart ? 'text-muted-foreground' : ''}`}
                   >
                     <Target className="w-2.5 h-2.5" />
-                    {scheme.product_name}
+                    {productLabel}
                   </Badge>
                 )}
               </div>
@@ -410,8 +467,8 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                       )}
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Target Product:</span>
-                          <span className="font-medium">{scheme.product_name || 'All Products'}</span>
+                          <span className="text-muted-foreground">{scheme.category_id ? 'Category:' : 'Target Product:'}</span>
+                          <span className="font-medium">{productLabel}</span>
                         </div>
                         {scheme.scheme_type === 'buy_x_get_y_free' && (
                           <>
@@ -423,7 +480,11 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Free Product:</span>
-                              <span className="font-medium">{scheme.free_product_name || 'Same product'}</span>
+                              <span className="font-medium">
+                                {scheme.free_product_selection_mode === 'user_choice'
+                                  ? (manualSel?.chosenFreeProductName || `Choose 1 of ${(scheme.free_target_product_ids?.length || 0) + (scheme.free_target_other_product_ids?.length || 0)}`)
+                                  : ((scheme.free_product_source === 'other' ? scheme.other_free_product_name : scheme.free_product_name) || 'Same product')}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Free Quantity:</span>
@@ -506,6 +567,16 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
                     onClick={() => setPickerScheme(scheme)}
                   >
                     Edit
+                  </Button>
+                )}
+                {isFreeProductChoicePool && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-[10px] px-2"
+                    onClick={() => setFreeProductPickerScheme(scheme)}
+                  >
+                    Change
                   </Button>
                 )}
                 <Button
@@ -675,6 +746,26 @@ export const OrderEntrySchemesModal: React.FC<OrderEntrySchemesModalProps> = ({
         toast({
           title: 'Offer Applied',
           description: `${pickerScheme.name} applied to ${selection.itemIds?.length || 1} product${(selection.itemIds?.length || 1) > 1 ? 's' : ''}`,
+        });
+      }}
+    />
+
+    <FreeProductChoiceDialog
+      isOpen={!!freeProductPickerScheme}
+      onClose={() => setFreeProductPickerScheme(null)}
+      scheme={freeProductPickerScheme}
+      products={products}
+      otherFreeProducts={otherFreeProducts}
+      initialSelection={freeProductPickerScheme ? manualSelections[freeProductPickerScheme.id] : undefined}
+      onConfirm={(selection) => {
+        if (!freeProductPickerScheme) return;
+        onSetManualSelection?.(freeProductPickerScheme.id, selection);
+        if (!appliedSchemeIds.includes(freeProductPickerScheme.id)) {
+          onApplyScheme(freeProductPickerScheme);
+        }
+        toast({
+          title: 'Offer Applied',
+          description: `${freeProductPickerScheme.name}: ${selection.chosenFreeProductName} added free`,
         });
       }}
     />
