@@ -151,7 +151,16 @@ const toOrderExportRow = (o: OrderData) => {
     order_ref: o.id.substring(0, 8).toUpperCase(),
     invoice_number_display: o.invoice_number || provisionalInvoiceNumber(o.id),
     invoice_state: o.invoice_number ? 'Saved' : 'Provisional (not yet generated)',
-    order_date: o.created_at ? format(new Date(o.created_at), 'dd/MM/yyyy HH:mm') : '',
+    order_date: (() => {
+      if (!o.created_at) return '';
+      const createdAt = new Date(o.created_at);
+      const orderDay = o.order_date ? new Date(`${o.order_date}T00:00:00`) : createdAt;
+      const display = new Date(
+        orderDay.getFullYear(), orderDay.getMonth(), orderDay.getDate(),
+        createdAt.getHours(), createdAt.getMinutes()
+      );
+      return format(display, 'dd/MM/yyyy HH:mm');
+    })(),
     last_updated: o.updated_at ? format(new Date(o.updated_at), 'dd/MM/yyyy HH:mm') : '',
     is_edited_label: o.is_edited ? 'Yes' : 'No',
     item_count: items.length,
@@ -2207,7 +2216,17 @@ const Operations = () => {
                                           </div>
                                           <div>
                                             <div className="text-xs text-muted-foreground">Order Date & Time</div>
-                                            <div className="text-sm font-medium">{format(new Date(item.created_at), 'PPpp')}</div>
+                                            <div className="text-sm font-medium">
+                                              {(() => {
+                                                const createdAt = new Date(item.created_at);
+                                                const orderDay = item.order_date ? new Date(`${item.order_date}T00:00:00`) : createdAt;
+                                                const display = new Date(
+                                                  orderDay.getFullYear(), orderDay.getMonth(), orderDay.getDate(),
+                                                  createdAt.getHours(), createdAt.getMinutes()
+                                                );
+                                                return format(display, 'PPpp');
+                                              })()}
+                                            </div>
                                           </div>
                                         </div>
                                         <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
