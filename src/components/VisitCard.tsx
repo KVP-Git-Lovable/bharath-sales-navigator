@@ -301,6 +301,7 @@ export const VisitCard = ({
   const { can } = usePermissions();
   const editPolicy = useOrderEditPolicy();
   const canEditPerm = can('order_edit', 'edit');
+  const canCancelPerm = can('action_order_cancel', 'edit');
 
   // Ask the DB per-order whether editing is currently allowed under policy
   // (edit_who / lock point / max edits). Only runs when the policy is on and
@@ -3415,16 +3416,18 @@ export const VisitCard = ({
                         created_at: o.created_at
                       }))} customerPhone={visit.phone} customerName={visit.retailerName} className="w-full" />
                       
-                      {/* Cancel Order Button */}
-                      <Button 
-                        variant="outline"
-                        size="sm"
-                        className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
-                        onClick={() => setShowCancelOrderDialog(true)}
-                      >
-                        <Ban size={14} className="mr-2" />
-                        Cancel Order
-                      </Button>
+                      {/* Cancel Order Button — gated by action_order_cancel */}
+                      {canCancelPerm && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => setShowCancelOrderDialog(true)}
+                        >
+                          <Ban size={14} className="mr-2" />
+                          Cancel Order
+                        </Button>
+                      )}
 
                       {/* Edit Order Button (Phase 2b-3b) — gated by operations_config + can_edit_order RPC */}
                       {editPolicy.edit_enabled && editPolicy.edit_visible_in_visit_card && canEditPerm && (() => {
