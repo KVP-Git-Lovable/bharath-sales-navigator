@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, User, Users } from 'lucide-react';
+import { Loader2, User, Users, Lock, Bell, Briefcase, ShieldCheck, Globe2 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -21,6 +21,7 @@ import { AboutEditMode } from '@/components/profile/about/AboutEditMode';
 import { ProfilePointsBadge } from '@/components/profile/ProfilePointsBadge';
 import { PasswordChangeSection } from '@/components/profile/PasswordChangeSection';
 import { LanguageSettings } from '@/components/profile/LanguageSettings';
+import { CollapsibleSection } from '@/components/profile/CollapsibleSection';
 import { PushNotificationSettings } from '@/components/PushNotificationSettings';
 
 
@@ -207,35 +208,51 @@ const UserProfile = () => {
 
   return (
     <Layout>
-      <div className="p-4">
-        <div className="max-w-6xl mx-auto space-y-6">
+      <div className="p-3 sm:p-4">
+        <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
           {/* Header with Points */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <User className="w-8 h-8 text-primary" />
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">My Profile</h1>
-                <p className="text-muted-foreground">Manage your information and track performance</p>
+          <div className="relative overflow-hidden rounded-3xl border border-violet-100 dark:border-violet-900/40 bg-gradient-to-br from-indigo-50 via-violet-50 to-sky-50 dark:from-indigo-950/40 dark:via-violet-950/30 dark:to-sky-950/30 p-4 sm:p-5 shadow-sm">
+            <div className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-violet-200/40 dark:bg-violet-500/10" />
+            <div className="absolute -left-8 -bottom-14 h-32 w-32 rounded-full bg-sky-200/40 dark:bg-sky-500/10" />
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-2xl bg-white dark:bg-white/10 flex items-center justify-center ring-1 ring-violet-200/70 dark:ring-white/10 shadow-sm">
+                  <User className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">My Profile</h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 max-w-[16rem] sm:max-w-none">
+                    Manage your information and track performance
+                  </p>
+                </div>
+              </div>
+              {/* Points Badge - Clickable to Leaderboard */}
+              <div className="shrink-0 rounded-2xl bg-white/80 dark:bg-white/10 px-1 py-0.5 shadow-sm">
+                <ProfilePointsBadge userId={user.id} />
               </div>
             </div>
-            {/* Points Badge - Clickable to Leaderboard */}
-            <ProfilePointsBadge userId={user.id} />
           </div>
 
         <Tabs defaultValue="about" className="space-y-4">
-          <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
-            <TabsTrigger value="about" className="flex-1 min-w-[80px] text-xs sm:text-sm py-2">
-              <User className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">About</span>
+          <TabsList className="w-full grid grid-cols-2 h-auto gap-1 p-1 rounded-2xl bg-muted/70">
+            <TabsTrigger
+              value="about"
+              className="rounded-xl text-xs sm:text-sm py-2 gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-violet-500 data-[state=active]:text-white data-[state=active]:shadow"
+            >
+              <User className="h-4 w-4" />
+              <span>About</span>
             </TabsTrigger>
-            <TabsTrigger value="social" className="flex-1 min-w-[80px] text-xs sm:text-sm py-2">
-              <Users className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Social</span>
+            <TabsTrigger
+              value="social"
+              className="rounded-xl text-xs sm:text-sm py-2 gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-cyan-500 data-[state=active]:text-white data-[state=active]:shadow"
+            >
+              <Users className="h-4 w-4" />
+              <span>Social</span>
             </TabsTrigger>
           </TabsList>
 
           {/* About Tab */}
-          <TabsContent value="about" className="space-y-6">
+          <TabsContent value="about" className="space-y-4">
             {/* View/Edit Mode Toggle */}
             {isEditMode ? (
               <AboutEditMode
@@ -257,25 +274,70 @@ const UserProfile = () => {
               />
             )}
 
-            {/* Password & Security */}
-            <PasswordChangeSection />
+            <CollapsibleSection
+              title="Language"
+              tone="sky"
+              description="Display language preference"
+              icon={<Globe2 className="h-5 w-5" />}
+            >
+              <LanguageSettings />
+            </CollapsibleSection>
 
-            {/* Language Settings */}
-            <LanguageSettings />
+            <CollapsibleSection
+              title="Password & Security"
+              tone="rose"
+              description="Change your password"
+              icon={<Lock className="h-5 w-5" />}
+            >
+              <PasswordChangeSection />
+            </CollapsibleSection>
 
-            {/* Push Notifications */}
-            <PushNotificationSettings />
+            <CollapsibleSection
+              title="Notifications"
+              tone="amber"
+              description="Push notification preferences"
+              icon={<Bell className="h-5 w-5" />}
+            >
+              <PushNotificationSettings />
+            </CollapsibleSection>
 
+            <CollapsibleSection
+              title="Career & Background"
+              tone="violet"
+              description="Work experience, education and aspirations"
+              icon={<Briefcase className="h-5 w-5" />}
+            >
+              <div className="space-y-4">
+                <WorkExperienceSection />
+                <EducationHistorySection />
+                <AspirationsSection />
+                <OnboardingChecklistSection />
+              </div>
+            </CollapsibleSection>
 
-            {/* Additional Sections - Always in view/edit with their own controls */}
-            <WorkExperienceSection />
-            <EducationHistorySection />
-            <EmergencyContactsSection />
-            <AspirationsSection />
-            <OnboardingChecklistSection />
-            <ProfileAttachments />
-            <FollowersFollowingCard />
-            <UserFeaturesSection />
+            <CollapsibleSection
+              title="Emergency Contacts & Documents"
+              tone="emerald"
+              description="Contacts and uploaded attachments"
+              icon={<ShieldCheck className="h-5 w-5" />}
+            >
+              <div className="space-y-4">
+                <EmergencyContactsSection />
+                <ProfileAttachments />
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection
+              title="Network & Features"
+              tone="sky"
+              description="Followers, following and enabled features"
+              icon={<Users className="h-5 w-5" />}
+            >
+              <div className="space-y-4">
+                <FollowersFollowingCard />
+                <UserFeaturesSection />
+              </div>
+            </CollapsibleSection>
           </TabsContent>
 
           {/* Social/Collaboration Tab */}
