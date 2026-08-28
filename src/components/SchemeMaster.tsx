@@ -148,6 +148,7 @@ const initialSchemeForm = {
   max_discount_per_unit: 0,
   discount_unit: 'kg',
   discount_value_type: 'amount' as 'amount' | 'percentage',
+  discount_gst_mode: null as 'without_gst' | 'with_gst' | null,
 };
 
 export const SchemeMaster = () => {
@@ -410,6 +411,9 @@ export const SchemeMaster = () => {
             discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
               : null,
+            discount_gst_mode: (schemeForm.scheme_type === 'manual_per_unit_discount' && schemeForm.discount_value_type !== 'percentage')
+              ? (schemeForm.discount_gst_mode || null)
+              : null,
           })
           .eq('id', schemeForm.id);
         
@@ -462,6 +466,9 @@ export const SchemeMaster = () => {
               : null,
             discount_value_type: schemeForm.scheme_type === 'manual_per_unit_discount'
               ? (schemeForm.discount_value_type === 'percentage' ? 'percentage' : 'amount')
+              : null,
+            discount_gst_mode: (schemeForm.scheme_type === 'manual_per_unit_discount' && schemeForm.discount_value_type !== 'percentage')
+              ? (schemeForm.discount_gst_mode || null)
               : null,
           })
           .select('id')
@@ -632,6 +639,7 @@ export const SchemeMaster = () => {
       max_discount_per_unit: schemeAny.max_discount_per_unit || 0,
       discount_unit: schemeAny.discount_unit || 'kg',
       discount_value_type: (schemeAny.discount_value_type === 'percentage' ? 'percentage' : 'amount') as 'amount' | 'percentage',
+      discount_gst_mode: (schemeAny.discount_gst_mode === 'with_gst' ? 'with_gst' : schemeAny.discount_gst_mode === 'without_gst' ? 'without_gst' : null) as 'without_gst' | 'with_gst' | null,
     });
     if (otherFreeProducts.length === 0) {
       fetchOtherFreeProducts();
