@@ -2927,7 +2927,7 @@ export const VisitCard = ({
                   }}
                   title="AI Insights - Get personalized visit recommendations"
                 >
-                  <Sparkles size={16} />
+                  <Sparkles size={20} strokeWidth={2.25} />
                 </button>
               </div>
             </div>
