@@ -38,4 +38,27 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Camera: delivery/retailer photos, barcode scanning, profile picture -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- Location: beat/visit GPS tracking, GPS Track tab -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Microphone: voice order entry / voice search -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Storage: invoice PDF downloads, photo uploads. maxSdkVersion=32 because
+         scoped storage on Android 13+ makes these no-ops; READ_MEDIA_IMAGES is
+         the Android 13+ equivalent for reading existing photos. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <!-- Notifications: required at runtime on Android 13+ (local + push notifications) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

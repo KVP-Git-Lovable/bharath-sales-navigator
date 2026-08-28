@@ -2,10 +2,13 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.kvp.salesnavigator',
-  appName: 'SalesNavigator',
+  appName: 'QuickApp',
   webDir: 'dist',
   server: {
-    url: 'https://field-sales-navigator.lovable.app',
+    // field-sales-navigator.lovable.app now redirects here — pointing directly
+    // at the current domain avoids a cross-origin redirect that Capacitor's
+    // WebView hands off to the system browser instead of following in-app.
+    url: 'https://fieldsales.quickapp.ai',
     androidScheme: 'https',
     cleartext: false
   },
