@@ -242,10 +242,15 @@ async function recentBeatsAnswer(
 
 async function pendingCollectionsAnswer(
   supabase: SupabaseClient,
+  userId: string,
 ): Promise<string> {
+  // Explicit own-retailer scope: an org-wide analytics RLS policy makes ALL
+  // retailers readable, so without this filter "your pending collections"
+  // listed the whole company's outstanding amounts.
   const { data, error } = await supabase
     .from("retailers")
     .select("name, pending_amount, phone, beat_name")
+    .eq("user_id", userId)
     .gt("pending_amount", 0)
     .order("pending_amount", { ascending: false })
     .limit(20);
@@ -323,7 +328,31 @@ async function targetsAnswer(
     .gte("period_end", today)
     .order("period_end", { ascending: true });
   if (error) throw error;
-  if (!targets?.length) return `No active targets were found for ${today}.`;
+  if (!targets?.length) {
+    // This org allocates targets through hierarchy_target_allocations rather
+    // than user_period_targets for some users — check there before declaring
+    // "no targets" (own rows only via RLS).
+    const { data: allocations } = await supabase
+      .from("hierarchy_target_allocations")
+      .select("quantity_target, revenue_target, effective_from, effective_to, level")
+      .eq("user_id", userId)
+      .lte("effective_from", today)
+      .or(`effective_to.is.null,effective_to.gte.${today}`)
+      .order("effective_from", { ascending: false })
+      .limit(10);
+    if (allocations?.length) {
+      return [
+        `## Your allocated targets (${today})`,
+        "",
+        "| Effective | Revenue target | Quantity target |",
+        "|---|---:|---:|",
+        ...allocations.map((a: any) =>
+          `| ${String(a.effective_from ?? "").slice(0, 10)} → ${a.effective_to ? String(a.effective_to).slice(0, 10) : "open"} | ₹${formatNumber(a.revenue_target)} | ${formatNumber(a.quantity_target)} |`
+        ),
+      ].join("\n");
+    }
+    return `No active targets were found for ${today}.`;
+  }
 
   const kpiIds = [...new Set(targets.map((target: any) => target.kpi_id).filter(Boolean))];
   const { data: kpis, error: kpiError } = await supabase
@@ -439,7 +468,7 @@ async function dataAnswer(
     case "leave": return leaveBalanceAnswer(supabase, userId, Number(today.slice(0, 4)));
     case "attendance": return attendanceAnswer(supabase, userId, today);
     case "beats": return recentBeatsAnswer(supabase, userId, today);
-    case "collections": return pendingCollectionsAnswer(supabase);
+    case "collections": return pendingCollectionsAnswer(supabase, userId);
     case "visits": return todaysVisitsAnswer(supabase, userId, today);
     case "targets": return targetsAnswer(supabase, userId, today);
     case "products": return productsAnswer(supabase, userId, today);
