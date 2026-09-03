@@ -105,7 +105,21 @@ function typicalLine(unitLines: Record<string, number[]>): { qty: number; unit: 
   if (!best.length) return { qty: 1, unit };
   const sorted = [...best].sort((a, b) => a - b);
   const median = sorted[Math.floor((sorted.length - 1) / 2)];
-  return { qty: Math.max(1, Math.round(median)), unit };
+  return { qty: clampSuggestedQty(Math.max(1, Math.round(median)), unit), unit };
+}
+
+/** Hard ceiling on suggested weight quantities: 5 kg (5000 grams).
+ * Order history carries unit-mismatch garbage from before the order-entry
+ * unit fix (e.g. "100 kg" lines that were really 100 grams, "150000 grams"),
+ * and a per-scope median over few lines lets one such line through as the
+ * suggestion. No real single order goes above a few kg, so anything larger
+ * is data noise, never a pitch. Non-weight units (pieces, boxes) are left
+ * alone — their medians are small and unit-mismatch doesn't inflate them. */
+function clampSuggestedQty(qty: number, unit: string): number {
+  const u = String(unit ?? "").trim().toLowerCase();
+  if (u === "kg" || u === "kgs" || u === "kilogram" || u === "kilograms") return Math.min(qty, 5);
+  if (u === "grams" || u === "gram" || u === "g" || u === "gm" || u === "gms") return Math.min(qty, 5000);
+  return qty;
 }
 
 Deno.serve(async (req) => {
