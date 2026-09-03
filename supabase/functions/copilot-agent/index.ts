@@ -78,6 +78,8 @@ function classifyDataIntent(message: string): DataIntent | null {
   ) {
     return "products";
   }
+  // In this app, price/rate/MRP questions are always about products.
+  if (/\b(price|prices|priced|pricing|rate|rates|cost|mrp)\b/.test(normalized)) return "products";
   return null;
 }
 
@@ -381,25 +383,67 @@ async function productsAnswer(
   supabase: SupabaseClient,
   userId: string,
   today: string,
+  message: string,
 ): Promise<string> {
   const CONFIRMED = new Set(["confirmed", "delivered", "invoiced", "completed", "dispatched", "packed"]);
   const since90 = new Date(new Date(`${today}T00:00:00Z`).getTime() - 90 * 86_400_000)
     .toISOString()
     .slice(0, 10);
 
-  const [{ data: orders, error: ordersError }, { data: master, error: masterError }] = await Promise.all([
-    supabase
-      .from("orders")
-      .select("id, status, order_date")
-      .eq("user_id", userId)
-      .gte("order_date", since90)
-      .lte("order_date", today)
-      .order("order_date", { ascending: false })
-      .limit(2000),
-    supabase.from("products").select("id, name").limit(1000),
-  ]);
+  const [{ data: orders, error: ordersError }, { data: master, error: masterError }, { data: variants }] =
+    await Promise.all([
+      supabase
+        .from("orders")
+        .select("id, status, order_date")
+        .eq("user_id", userId)
+        .gte("order_date", since90)
+        .lte("order_date", today)
+        .order("order_date", { ascending: false })
+        .limit(2000),
+      supabase.from("products").select("id, name, rate, unit, base_unit, gst_percentage, is_active").limit(1000),
+      supabase
+        .from("product_variants")
+        .select("product_id, variant_name, price, base_unit, is_active")
+        .limit(2000),
+    ]);
   if (ordersError) throw ordersError;
   if (masterError) throw masterError;
+
+  // Price/detail lookup for products the user NAMED in their message —
+  // "what is the price of kadak gold" must answer from the master/variant
+  // price, not from the model's imagination. A catalog row matches when at
+  // least two of its name words appear in the message (or its whole
+  // single-word name does), so "KADAK GOLD" finds the "KADAK GOLD BLEND"
+  // variant without dragging in every product containing "gold".
+  const msgLower = ` ${message.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  const nameMatches = (name: string): number => {
+    const words = String(name).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3);
+    if (!words.length) return 0;
+    const hits = words.filter((w) => msgLower.includes(` ${w} `)).length;
+    if (words.length === 1) return hits === 1 && words[0].length >= 4 ? 1 : 0;
+    return hits >= 2 ? hits : 0;
+  };
+  const productById = new Map((master ?? []).map((p: any) => [String(p.id), p]));
+  const matchedLines: string[] = [];
+  (master ?? []).forEach((p: any) => {
+    if (nameMatches(String(p.name ?? "")) > 0) {
+      const unit = p.base_unit || p.unit;
+      matchedLines.push(
+        `- **${p.name}** — price ₹${formatNumber(p.rate)}${unit ? ` per ${unit}` : ""}` +
+          `${p.gst_percentage != null ? `, GST ${formatNumber(p.gst_percentage)}%` : ""}` +
+          `${p.is_active === false ? " (inactive)" : ""}`,
+      );
+    }
+  });
+  (variants ?? []).forEach((v: any) => {
+    if (nameMatches(String(v.variant_name ?? "")) > 0) {
+      const parent: any = productById.get(String(v.product_id));
+      matchedLines.push(
+        `- **${v.variant_name}**${parent?.name ? ` (variant of ${parent.name})` : ""} — price ₹${formatNumber(v.price)}` +
+          `${v.base_unit ? ` per ${v.base_unit}` : ""}${v.is_active === false ? " (inactive)" : ""}`,
+      );
+    }
+  });
 
   const confirmedIds = (orders ?? [])
     .filter((o: any) => CONFIRMED.has(String(o.status ?? "").toLowerCase()))
@@ -436,17 +480,30 @@ async function productsAnswer(
     .filter((n: string) => n && !orderedNames.has(n.toLowerCase()))
     .slice(0, 10);
 
-  if (!ordered.length && !neverOrdered.length) {
+  if (!ordered.length && !neverOrdered.length && !matchedLines.length) {
     return `You have no confirmed orders in the last 90 days and no products are visible in the product master, so there is no product mix to report.`;
   }
 
   const row = (p: Agg, i: number) =>
     `${i + 1}. **${p.name}** — ${p.orderIds.size} order${p.orderIds.size === 1 ? "" : "s"}, ₹${formatNumber(p.value)}`;
-  const parts: string[] = [
+  const parts: string[] = [];
+  if (matchedLines.length) {
+    parts.push(
+      "## Products named in the question (from the product master — authoritative prices)",
+      ...matchedLines,
+      "",
+    );
+  } else if (/\b(price|prices|priced|pricing|rate|rates|cost|mrp)\b/i.test(message)) {
+    parts.push(
+      "No product or variant in the product master matches the name the user asked about — say so plainly and suggest checking the exact product name; do not guess a price.",
+      "",
+    );
+  }
+  parts.push(
     `## Your product order mix (confirmed orders, last 90 days)`,
     "",
     `Products ordered: ${ordered.length}. Confirmed orders analysed: ${confirmedIds.length}.`,
-  ];
+  );
   if (top.length) parts.push("", "**Top ordered (by value):**", ...top.map(row));
   if (least.length) parts.push("", "**Least ordered (fewest orders first):**", ...least.map(row));
   if (neverOrdered.length) {
@@ -463,6 +520,7 @@ async function dataAnswer(
   supabase: SupabaseClient,
   userId: string,
   today: string,
+  message: string,
 ): Promise<string> {
   switch (intent) {
     case "leave": return leaveBalanceAnswer(supabase, userId, Number(today.slice(0, 4)));
@@ -471,7 +529,7 @@ async function dataAnswer(
     case "collections": return pendingCollectionsAnswer(supabase, userId);
     case "visits": return todaysVisitsAnswer(supabase, userId, today);
     case "targets": return targetsAnswer(supabase, userId, today);
-    case "products": return productsAnswer(supabase, userId, today);
+    case "products": return productsAnswer(supabase, userId, today, message);
   }
 }
 
@@ -579,7 +637,7 @@ Deno.serve(async (req) => {
 
       if (intent) {
         try {
-          const dataBlock = await dataAnswer(intent, supabase, userId, today);
+          const dataBlock = await dataAnswer(intent, supabase, userId, today, message);
           diagLog(`intent=${intent} dataBlockChars=${dataBlock.length}`);
           const grounding: ChatMessage = {
             role: "system",
