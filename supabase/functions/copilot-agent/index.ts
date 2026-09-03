@@ -62,7 +62,7 @@ function escapeCell(value: unknown): string {
   return String(value ?? "—").replaceAll("|", "\\|");
 }
 
-type DataIntent = "leave" | "attendance" | "beats" | "collections" | "visits" | "targets";
+type DataIntent = "leave" | "attendance" | "beats" | "collections" | "visits" | "targets" | "products";
 
 function classifyDataIntent(message: string): DataIntent | null {
   const normalized = message.toLowerCase();
@@ -72,6 +72,12 @@ function classifyDataIntent(message: string): DataIntent | null {
   if (/\bpending\b.*\bcollections?\b|\bcollections?\b.*\bpending\b|\boutstanding\b/.test(normalized)) return "collections";
   if (/\b(plan|schedule|prioriti[sz]e)\b.*\bvisits?\b|\btoday'?s? visits?\b/.test(normalized)) return "visits";
   if (/\btargets?\b/.test(normalized)) return "targets";
+  if (
+    /\b(products?|items?|skus?)\b/.test(normalized) &&
+    /\b(order|orders|ordered|ordering|sell|sold|selling|sales|moving|top|least|slow|best|worst)\b/.test(normalized)
+  ) {
+    return "products";
+  }
   return null;
 }
 
@@ -339,6 +345,90 @@ async function targetsAnswer(
   ].join("\n");
 }
 
+/** Product order mix from the signed-in user's own confirmed orders (last
+ * 90 days) plus the product master, so "top/least ordered products" answers
+ * name REAL products with real counts instead of the model improvising. */
+async function productsAnswer(
+  supabase: SupabaseClient,
+  userId: string,
+  today: string,
+): Promise<string> {
+  const CONFIRMED = new Set(["confirmed", "delivered", "invoiced", "completed", "dispatched", "packed"]);
+  const since90 = new Date(new Date(`${today}T00:00:00Z`).getTime() - 90 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  const [{ data: orders, error: ordersError }, { data: master, error: masterError }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("id, status, order_date")
+      .eq("user_id", userId)
+      .gte("order_date", since90)
+      .lte("order_date", today)
+      .order("order_date", { ascending: false })
+      .limit(2000),
+    supabase.from("products").select("id, name").limit(1000),
+  ]);
+  if (ordersError) throw ordersError;
+  if (masterError) throw masterError;
+
+  const confirmedIds = (orders ?? [])
+    .filter((o: any) => CONFIRMED.has(String(o.status ?? "").toLowerCase()))
+    .map((o: any) => String(o.id))
+    .slice(0, 1000);
+
+  interface Agg { name: string; orderIds: Set<string>; lines: number; value: number }
+  const byProduct = new Map<string, Agg>();
+  if (confirmedIds.length) {
+    const { data: items, error: itemsError } = await supabase
+      .from("order_items")
+      .select("order_id, product_name, total")
+      .in("order_id", confirmedIds)
+      .limit(8000);
+    if (itemsError) throw itemsError;
+    (items ?? []).forEach((it: any) => {
+      const name = String(it.product_name ?? "").trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      const agg = byProduct.get(key) ?? { name, orderIds: new Set<string>(), lines: 0, value: 0 };
+      agg.orderIds.add(String(it.order_id));
+      agg.lines += 1;
+      agg.value += Number(it.total ?? 0) || 0;
+      byProduct.set(key, agg);
+    });
+  }
+
+  const ordered = [...byProduct.values()];
+  const top = [...ordered].sort((a, b) => b.value - a.value).slice(0, 5);
+  const least = [...ordered].sort((a, b) => a.orderIds.size - b.orderIds.size || a.value - b.value).slice(0, 5);
+  const orderedNames = new Set(ordered.map((p) => p.name.toLowerCase()));
+  const neverOrdered = (master ?? [])
+    .map((p: any) => String(p.name ?? "").trim())
+    .filter((n: string) => n && !orderedNames.has(n.toLowerCase()))
+    .slice(0, 10);
+
+  if (!ordered.length && !neverOrdered.length) {
+    return `You have no confirmed orders in the last 90 days and no products are visible in the product master, so there is no product mix to report.`;
+  }
+
+  const row = (p: Agg, i: number) =>
+    `${i + 1}. **${p.name}** — ${p.orderIds.size} order${p.orderIds.size === 1 ? "" : "s"}, ₹${formatNumber(p.value)}`;
+  const parts: string[] = [
+    `## Your product order mix (confirmed orders, last 90 days)`,
+    "",
+    `Products ordered: ${ordered.length}. Confirmed orders analysed: ${confirmedIds.length}.`,
+  ];
+  if (top.length) parts.push("", "**Top ordered (by value):**", ...top.map(row));
+  if (least.length) parts.push("", "**Least ordered (fewest orders first):**", ...least.map(row));
+  if (neverOrdered.length) {
+    parts.push(
+      "",
+      `**In the product master but with NO orders from you in this window:** ${neverOrdered.join(", ")}${(master ?? []).length > 1000 ? " (master truncated at 1000)" : ""}`,
+    );
+  }
+  return parts.join("\n");
+}
+
 async function dataAnswer(
   intent: DataIntent,
   supabase: SupabaseClient,
@@ -352,6 +442,7 @@ async function dataAnswer(
     case "collections": return pendingCollectionsAnswer(supabase);
     case "visits": return todaysVisitsAnswer(supabase, userId, today);
     case "targets": return targetsAnswer(supabase, userId, today);
+    case "products": return productsAnswer(supabase, userId, today);
   }
 }
 

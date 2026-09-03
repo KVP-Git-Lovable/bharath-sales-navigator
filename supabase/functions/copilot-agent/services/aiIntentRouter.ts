@@ -10,6 +10,7 @@ export const KNOWN_INTENTS = [
   "collections",
   "visits",
   "targets",
+  "products",
 ] as const;
 
 export type RoutedIntent = (typeof KNOWN_INTENTS)[number];
@@ -25,7 +26,7 @@ const ROUTER_TIMEOUT_MS = 3000;
 const SYSTEM_PROMPT = [
   "You classify a field-sales app user's message into exactly one intent label.",
   'Reply with strict JSON only, exactly: {"intent": "<label>"} — no prose, no markdown, no explanation.',
-  'Allowed labels: "leave", "attendance", "beats", "collections", "visits", "targets", "none".',
+  'Allowed labels: "leave", "attendance", "beats", "collections", "visits", "targets", "products", "none".',
   "Use \"none\" when the message does not clearly match any label.",
   "Examples:",
   'leave — "hw many days leave i have left", "kitni chutti bachi hai"',
@@ -34,6 +35,7 @@ const SYSTEM_PROMPT = [
   'collections — "how much money is still to be collected", "pending outstanding from retailers"',
   'visits — "plan my visits for today", "which shops should i prioritise now"',
   'targets — "am i close to my monthly goal", "sales target achievement"',
+  'products — "which products are least ordered from my side", "top selling items this month", "slow moving skus"',
   'none — "hello", "who won the match", "tell me a joke"',
 ].join("\n");
 
