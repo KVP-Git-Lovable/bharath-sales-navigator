@@ -52,6 +52,95 @@ import { ActivityEventsTable } from "@/components/ActivityEventsTable";
 
 import { ActivityVisitDetail } from "@/components/ActivityVisitDetail";
 import { useActivityVisits } from "@/hooks/useActivityVisits";
+import { useChurnRisk, type ChurnRow } from "@/hooks/useChurnRisk";
+import { useVisitOptimizerInsights, type RouteStop } from "@/hooks/useVisitOptimizerInsights";
+import { useSalesCoachInsights, type CoachRow } from "@/hooks/useSalesCoachInsights";
+import { prefetchPitchSuggestions } from "@/utils/pitchSuggestionsCache";
+import { VisitOptimizerRouteCard } from "@/components/VisitOptimizerRouteCard";
+import type { VisitAiInsight } from "@/components/VisitCard";
+
+// UI display bar only: which detected declines are worth surfacing on a
+// visit card. Unrelated to (and must never alter) the Churn Detector's own
+// calculation — tune the single number here.
+const CHURN_INSIGHT_THRESHOLD = 30;
+// Newly created retailers are excluded from churn nudges for this long.
+const CHURN_INSIGHT_MIN_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
+const inrCompact = (n: number) =>
+  `₹${Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+
+/** Display-only sentences built from the stored agent numbers (same pattern
+ * as the beat-card nudge) — the agents computed the figures, we narrate.
+ * Wording is drawn from small variant pools keyed by retailer id so cards
+ * read personally written rather than uniform; the figures never change. */
+const wordingIndex = (key: string, variants: number) => {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % variants;
+};
+
+function churnInsightLine(r: ChurnRow): string {
+  const drop = `${r.dropPct}% (${inrCompact(r.priorValue)} → ${inrCompact(r.recentValue)})`;
+  // Simple, everyday Indian English — short sentences, no idioms. Wording
+  // only; the figures come from the agent unchanged.
+  const variants = [
+    `Orders from this shop have come down ${drop} in the last 30 days. One good visit today can bring them back!`,
+    `This shop is ordering less now — down ${drop} in 30 days. Please visit and ask what they need!`,
+    `Earlier this shop ordered more. Now orders are down ${drop} in 30 days. A visit today will help!`,
+  ];
+  return variants[wordingIndex(r.retailerId, variants.length)];
+}
+
+function routeInsightLine(s: RouteStop): string {
+  // Prefer the AI-written line stored on the stop by the Visit Optimiser run.
+  if (s.insightLine) return s.insightLine;
+  const parts: string[] = [];
+  parts.push(
+    s.daysSinceLastVisit == null
+      ? "no visit done here yet"
+      : s.daysSinceLastVisit === 0
+        ? "you came here earlier today"
+        : `last visit was ${s.daysSinceLastVisit} day${s.daysSinceLastVisit === 1 ? "" : "s"} ago`,
+  );
+  if (s.pending > 0) parts.push(`${inrCompact(s.pending)} is pending to collect`);
+  if (s.visits > 0) parts.push(`orders come on ${s.productivityPct}% of your visits`);
+  const detail = parts.join(", ");
+  // Simple, everyday Indian English — short sentences, no idioms. A wide
+  // pool (with the stop number mixed into the hash key) keeps neighbouring
+  // cards from repeating the same opener — wording only, the figures and
+  // stop order come from the agent unchanged.
+  const variants = [
+    `This shop is stop #${s.sequence} on today's route — ${detail}. Do visit today!`,
+    `Today's plan puts this shop at #${s.sequence} — ${detail}. Good time to go!`,
+    `Shop #${s.sequence} on your route today — ${detail}. Please do visit!`,
+    `Visit this shop at #${s.sequence} today — ${detail}. It will help your day!`,
+    `On today's route this shop comes at #${s.sequence} — ${detail}. Go when you are near!`,
+    `Stop #${s.sequence} for today — ${detail}. A short visit is enough!`,
+    `Today this shop is at #${s.sequence} on your list — ${detail}. Do go once!`,
+    `Route says #${s.sequence} for this shop — ${detail}. Visit and take the order!`,
+  ];
+  return variants[wordingIndex(`${s.retailerId}-${s.sequence}`, variants.length)];
+}
+
+function coachInsightLine(r: CoachRow): string {
+  const sold = inrCompact(r.orderValue);
+  const lead = r.topProduct ?? "";
+  const gaps = (r.gapProducts ?? []).slice(0, 2);
+  const gapText = gaps.join(" or ");
+  // Simple, everyday Indian English — short sentences, no idioms. Wording
+  // only; the figures come from the agent unchanged.
+  const variants = gaps.length
+    ? [
+        `This shop bought ${sold} of goods in the last 30 days${lead ? `, mostly ${lead}` : ""}. They have not tried ${gapText} yet — show it today!`,
+        `Good shop — ${sold} of orders in one month${lead ? ` (${lead} sells the most here)` : ""}. Today, try showing ${gapText} also!`,
+        `${sold} of orders in the last 30 days${lead ? `, mostly ${lead}` : ""}. ${gapText} is not in their shop yet — do suggest it!`,
+      ]
+    : [
+        `Very good shop — ${sold} of orders in the last 30 days, and they already buy all your top products. Keep them happy!`,
+        `${sold} of orders here in just 30 days, with all your top products. A thank-you visit will be nice!`,
+      ];
+  return variants[wordingIndex(r.retailerId, variants.length)];
+}
 
 interface Visit {
   id: string;
@@ -71,6 +160,8 @@ interface Visit {
   orderValue?: number;
   noOrderReason?: "over-stocked" | "owner-not-available" | "store-closed" | "permanently-closed";
   distributor?: string;
+  /** One AI insight line for this retailer, from the stored agent runs. */
+  aiInsight?: VisitAiInsight;
 }
 const mockVisits: Visit[] = [{
   id: "1",
@@ -345,6 +436,79 @@ export const MyVisits = () => {
     items: [],
   });
 
+  // Stored Churn Detector result, consumed AS-IS via useChurnRisk (its own
+  // policy governs any first run — this page never triggers the agent itself).
+  const { result: churnResult } = useChurnRisk();
+  const churnByRetailer = useMemo(() => {
+    const map = new Map<string, ChurnRow>();
+    (churnResult?.rows ?? []).forEach((r) => {
+      if (r.retailerId) map.set(String(r.retailerId), r);
+    });
+    return map;
+  }, [churnResult]);
+
+  // Visit Optimiser (today's scored stops + newcomer pitch lines) and Sales
+  // Coach (per-retailer 30d product mix), consumed from their stored runs
+  // (display only — the hooks own any run policy, this page never triggers).
+  // When viewing self on today, the FULL displayed retailer set is passed
+  // (all retailers of the day's planned beats, not just those with visit
+  // rows) so the optimiser routes everything the list shows and refreshes
+  // as soon as a retailer/beat is added to or removed from the day's plan.
+  const expectedRouteRetailerIds = useMemo(() => {
+    if (!isViewingSelf || selectedDate !== getLocalTodayDate()) return null;
+    // The COMPLETE displayed set, uncapped — the optimizer's candidate-set
+    // invariant is that it routes every retailer on this list.
+    return [...new Set(optimizedRetailers.map((r: any) => String(r.id)).filter(Boolean))].sort();
+  }, [isViewingSelf, selectedDate, optimizedRetailers]);
+  const {
+    newRetailers: newcomerRows,
+    stops: routeStops,
+    totalKm: routeTotalKm,
+    routeNote,
+    loading: routeLoading,
+  } = useVisitOptimizerInsights(expectedRouteRetailerIds);
+  const { rows: coachRows } = useSalesCoachInsights();
+
+  // "Suggest Route" state: when applied, the retailer list is re-arranged
+  // into the Visit Optimiser's stop order (display-only — nothing is written
+  // to the database). Remembered per day for this session.
+  const [routeApplied, setRouteApplied] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(`visit_route_applied_${getLocalTodayDate()}`) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const applyRouteOrder = useCallback((on: boolean) => {
+    setRouteApplied(on);
+    try {
+      const key = `visit_route_applied_${getLocalTodayDate()}`;
+      if (on) sessionStorage.setItem(key, "1");
+      else sessionStorage.removeItem(key);
+    } catch { /* ignore */ }
+  }, []);
+  const newcomerByRetailer = useMemo(() => {
+    const map = new Map<string, string>();
+    newcomerRows.forEach((n) => {
+      if (n.retailerId && n.line) map.set(String(n.retailerId), n.line);
+    });
+    return map;
+  }, [newcomerRows]);
+  const stopByRetailer = useMemo(() => {
+    const map = new Map<string, RouteStop>();
+    routeStops.forEach((s) => {
+      if (s.retailerId) map.set(String(s.retailerId), s);
+    });
+    return map;
+  }, [routeStops]);
+  const coachByRetailer = useMemo(() => {
+    const map = new Map<string, CoachRow>();
+    coachRows.forEach((r) => {
+      if (r.retailerId) map.set(String(r.retailerId), r);
+    });
+    return map;
+  }, [coachRows]);
+
   // Process retailers from optimized data - single source of truth
   const retailers = useMemo(() => {
     // SAFETY: Never return [] if we previously had retailers.
@@ -421,7 +585,31 @@ export const MyVisits = () => {
       } else {
         status = 'planned';
       }
-      
+
+      // Churn nudge (display only): retailer flagged by the stored Churn
+      // Detector run, drop at/above the UI threshold, and not newly created.
+      // One AI insight per card, most specific first: new retailer (AI pitch
+      // line) → churn nudge → today's Visit Optimiser stop → Sales Coach
+      // product-mix tip. All lines derive from the stored agent runs.
+      const rid = String(retailer.id);
+      const churnRow = churnByRetailer.get(rid);
+      const isNewRetailer =
+        retailer.created_at &&
+        Date.now() - new Date(retailer.created_at).getTime() < CHURN_INSIGHT_MIN_AGE_MS;
+      const newcomerLine = newcomerByRetailer.get(rid);
+      // Stop ranks are day-specific — only meaningful when viewing today.
+      const stop = selectedDate === getLocalTodayDate() ? stopByRetailer.get(rid) : undefined;
+      const coach = coachByRetailer.get(rid);
+      const aiInsight: VisitAiInsight | undefined = newcomerLine
+        ? { kind: "new", line: newcomerLine }
+        : churnRow && churnRow.dropPct >= CHURN_INSIGHT_THRESHOLD && !isNewRetailer
+          ? { kind: "churn", line: churnInsightLine(churnRow) }
+          : stop
+            ? { kind: "route", line: routeInsightLine(stop) }
+            : coach
+              ? { kind: "coach", line: coachInsightLine(coach) }
+              : undefined;
+
       return {
         id: retailer.id,
         retailerId: retailer.id,
@@ -433,6 +621,7 @@ export const MyVisits = () => {
         status,
         visitType: visit?.visit_type || 'Regular Visit',
         createdAt: retailer.created_at || undefined,
+        aiInsight,
         visitId: visit?.id,
         hasOrder,
         orderValue: totalOrderValue,
@@ -458,7 +647,17 @@ export const MyVisits = () => {
       prevRetailersRef.current = { user: selectedViewUserId, date: selectedDate, items: transformedRetailers };
     });
     return transformedRetailers;
-  }, [optimizedRetailers, optimizedVisits, optimizedOrders, selectedDate, selectedViewUserId]);
+  }, [optimizedRetailers, optimizedVisits, optimizedOrders, selectedDate, selectedViewUserId, churnByRetailer, newcomerByRetailer, stopByRetailer, coachByRetailer]);
+
+  // Warm the AI Pitch Suggestions cache for the day's retailers as soon as
+  // they appear in the visits list, so the Order Entry card renders
+  // instantly instead of loading on open. Best-effort background work —
+  // same endpoint, same cache the card uses, no logic change server-side.
+  useEffect(() => {
+    if (!isViewingSelf || !user?.id) return;
+    const ids = retailers.map((r: any) => String(r.id)).filter(Boolean);
+    if (ids.length) void prefetchPitchSuggestions(ids);
+  }, [retailers, isViewingSelf, user?.id]);
 
   // REMOVED: Don't clear retailers/beats on date change - causes flickering
   // The smart update in useVisitsDataOptimized handles this now
@@ -1268,7 +1467,15 @@ export const MyVisits = () => {
     });
 
     // Apply sorting
+    const routeSortActive = routeApplied && selectedDate === getLocalTodayDate();
     return filtered.sort((a, b) => {
+      // Suggested route applied: follow the Visit Optimiser stop order.
+      // Retailers the run doesn't cover keep their place after the route.
+      if (routeSortActive) {
+        const as = stopByRetailer.get(String(a.retailerId || a.id))?.sequence ?? Infinity;
+        const bs = stopByRetailer.get(String(b.retailerId || b.id))?.sequence ?? Infinity;
+        if (as !== bs) return as - bs;
+      }
       if (sortOrder === 'recent') {
         // Primary sort: use retailer createdAt from database (most reliable)
         const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -1323,7 +1530,7 @@ export const MyVisits = () => {
         return nameB.localeCompare(nameA);
       }
     });
-  }, [allVisits, searchTerm, statusFilter, filters, retailerStats, sortOrder]);
+  }, [allVisits, searchTerm, statusFilter, filters, retailerStats, sortOrder, routeApplied, selectedDate, stopByRetailer]);
   const visitsForSelectedDate = retailers;
 
   // Use progressStats from the optimized hook for accurate counts
@@ -1555,6 +1762,25 @@ export const MyVisits = () => {
             })()}
           </CardContent>
         </Card>
+
+        {/* AI Visit Optimizer — suggested route from the stored agent run.
+            Stop ranks are day-specific, so only shown when viewing today. */}
+        {isViewingSelf && selectedDate === getLocalTodayDate() && (
+          <VisitOptimizerRouteCard
+            stops={routeStops}
+            totalKm={routeTotalKm}
+            routeNote={routeNote}
+            loading={routeLoading}
+            applied={routeApplied}
+            onSuggestRoute={() => {
+              applyRouteOrder(true);
+              toast.success("Route applied", {
+                description: "Retailers are now arranged in the AI-suggested visiting order.",
+              });
+            }}
+            onReset={() => applyRouteOrder(false)}
+          />
+        )}
 
         {/* Progress Card - filtered by permission */}
         {showTodaysProgress && <Card className="shadow-card bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">

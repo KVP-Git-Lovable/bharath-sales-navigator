@@ -53,3 +53,21 @@ verify_jwt = false
 
 [functions.send-invoice-sms]
 verify_jwt = false
+
+[functions.copilot-agent]
+verify_jwt = true
+
+[functions.copilot-visit-actions]
+verify_jwt = true
+
+[functions.madad-help-call]
+verify_jwt = false
+
+[functions.ai-workflow-run]
+verify_jwt = true
+
+[functions.ai-pitch-suggestions]
+verify_jwt = true
+
+[functions.ai-agent-builder]
+verify_jwt = true

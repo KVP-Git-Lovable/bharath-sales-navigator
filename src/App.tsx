@@ -67,6 +67,12 @@ import { BharathBeveragesCaseStudy } from "./pages/website/blogs/BharathBeverage
 import ChoosingDMSGuideBlog from "./pages/website/blogs/ChoosingDMSGuideBlog";
 import Index from "./pages/Index";
 import Copilot from "./pages/Copilot";
+import { AiModuleShell } from "./modules/quickapp-ai/components/AiModuleShell";
+import { RoutePermissionGuard } from "./components/auth/RoutePermissionGuard";
+import AiChatPage from "./modules/quickapp-ai/pages/AiChatPage";
+import AiWorkflowsPage from "./modules/quickapp-ai/pages/AiWorkflowsPage";
+import AiInsightsPage from "./modules/quickapp-ai/pages/AiInsightsPage";
+import SahayaPage from "./modules/quickapp-ai/pages/SahayaPage";
 import { MyVisits } from "./pages/MyVisits";
 import { OrderEntry } from "./pages/OrderEntry";
 import CounterSales from "./pages/CounterSales";
@@ -512,8 +518,16 @@ const AppContent = () => {
         <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
         <Route path="/copilot" element={<ProtectedRoute><Copilot /></ProtectedRoute>} />
         <Route path="/copilot/:threadId" element={<ProtectedRoute><Copilot /></ProtectedRoute>} />
-        
-        
+        <Route path="/quickapp-ai" element={<ProtectedRoute><RoutePermissionGuard permissionPrefix="module_quickapp_ai" moduleName="QuickApp AI"><AiModuleShell /></RoutePermissionGuard></ProtectedRoute>}>
+          <Route index element={<Navigate to="/quickapp-ai/chat" replace />} />
+          <Route path="chat" element={<AiChatPage />} />
+          <Route path="chat/:threadId" element={<AiChatPage />} />
+          <Route path="workflows" element={<AiWorkflowsPage />} />
+          <Route path="insights" element={<AiInsightsPage />} />
+          <Route path="sahaya" element={<SahayaPage />} />
+        </Route>
+
+
         <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
         <Route path="/notifications/history" element={<ProtectedRoute><NotificationHistory /></ProtectedRoute>} />

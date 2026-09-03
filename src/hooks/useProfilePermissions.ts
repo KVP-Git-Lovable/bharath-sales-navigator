@@ -95,7 +95,7 @@ Object.entries(ADMIN_MODULE_PERMISSION_MAP).forEach(([feature, path]) => {
 export const useProfilePermissions = () => {
   const { user } = useAuth();
 
-  const { data: permissions = [], isLoading, isPlaceholderData } = useQuery({
+  const { data: permissions = [], isLoading, isFetching, isPlaceholderData, refetch } = useQuery({
     queryKey: ['profile-permissions', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -120,17 +120,31 @@ export const useProfilePermissions = () => {
           return cached ?? [];
         }
 
-        const { data: perms, error: permsError } = await supabase
-          .from('profile_object_permissions')
-          .select('object_name, can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all')
-          .eq('profile_id', profilePerms.profile_id);
+        // PostgREST caps a single select at 1000 rows. Admin profiles exceed that,
+        // which silently dropped recently-added grants (e.g. module_quickapp_ai).
+        // Page through the full set explicitly.
+        const PAGE = 1000;
+        const all: ProfilePermission[] = [];
+        for (let from = 0; ; from += PAGE) {
+          const { data: page, error: permsError } = await supabase
+            .from('profile_object_permissions')
+            .select('object_name, can_read, can_create, can_edit, can_delete, can_view_all, can_modify_all')
+            .eq('profile_id', profilePerms.profile_id)
+            .order('object_name', { ascending: true })
+            .range(from, from + PAGE - 1);
 
-        if (permsError) {
-          console.error('[Permissions] perms failed, using cache:', permsError);
-          return cached ?? [];
+          if (permsError) {
+            console.error('[Permissions] perms failed, using cache:', permsError);
+            return cached ?? [];
+          }
+
+          const rows = (page || []) as ProfilePermission[];
+          all.push(...rows);
+          if (rows.length < PAGE) break;
         }
 
-        const result = (perms || []) as ProfilePermission[];
+        const result = all;
+
 
         console.info('[Permissions] Loaded', result.length, 'permissions for profile', profilePerms.profile_id);
 
@@ -153,10 +167,12 @@ export const useProfilePermissions = () => {
       const cached = getCachedPermissions(user.id);
       return cached ? (cached as ProfilePermission[]) : undefined;
     },
-    staleTime: 30 * 60 * 1000,    // 30 min — background refresh only
+    staleTime: 2 * 60 * 1000,     // 2 min — permission grants must land quickly
     gcTime: 60 * 60 * 1000,       // keep in memory for 1 hour
     refetchOnWindowFocus: false,   // don't re-fetch on tab switch
-    refetchOnMount: false,         // cached data is sufficient on mount
+    // Always revalidate on mount: cached (placeholder) permissions can predate a
+    // newly granted module and would otherwise deny access until the cache expires.
+    refetchOnMount: 'always',
   });
 
   // Dev-mode: validate that all UI permission keys exist in DB
@@ -231,6 +247,8 @@ export const useProfilePermissions = () => {
   return {
     permissions,
     isLoading,
+    isFetching,
+    refetch,
     isPlaceholderData, // useful for debugging: true = showing cached data
     hasAnyAdminPermission,
     hasPermission,
