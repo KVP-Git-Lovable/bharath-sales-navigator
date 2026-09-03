@@ -445,6 +445,108 @@ async function aiOrderStops<
   }
 }
 
+// Shared per-line validation for AI-written stop lines (see aiOrderStops):
+// a line may only describe its own stop, must carry at least one number
+// (every stated fact is numeric), and must not narrate the route sequence.
+// Invalid lines are blanked so the client's deterministic fallback shows —
+// cards never display wrong-store or content-free wording.
+const STOP_LINE_GENERIC_WORDS = new Set([
+  "store", "stores", "shop", "shoppe", "mart", "marts", "super", "market",
+  "supermarket", "retailer", "retailers", "traders", "trading", "general",
+  "departmental", "department", "medicals", "medical", "agencies", "agency",
+  "kirana", "enterprises", "provision", "provisions", "bazar", "bazaar",
+]);
+const stopNameWords = (n: string) =>
+  String(n).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP_LINE_GENERIC_WORDS.has(w));
+const STOP_LINE_ROUTE_TALK = /\b(next|then|afterwards|after that|start with|finish with|end with|head to|follow up)\b/i;
+
+/** Fill insightLine on stops that still lack one, in small batches.
+ *
+ * The ordering call (aiOrderStops) only runs for days of 2–20 stops, and even
+ * then the model can return fewer lines than stops — larger days used to fall
+ * back to template wording on EVERY card, which reads repetitive when many
+ * stops share the same sparse facts. This step is wording only: each line is
+ * written from that stop's stated facts alone, validated deterministically,
+ * and any failure simply leaves the client fallback in place — the run never
+ * fails because of it. */
+async function aiFillStopLines(
+  stops: Array<{
+    name: string;
+    score: number;
+    orders: number;
+    visits: number;
+    pending: number;
+    productivityPct: number;
+    daysSinceLastVisit?: number | null;
+    typicalOrderTime?: string | null;
+    insightLine?: string;
+  }>,
+  apiKey: string,
+): Promise<void> {
+  const BATCH = 8;
+  const MAX_STOPS = 60;
+  const missing = stops.filter((s) => !s.insightLine).slice(0, MAX_STOPS);
+  for (let i = 0; i < missing.length; i += BATCH) {
+    const batch = missing.slice(i, i + BATCH);
+    try {
+      const facts = batch
+        .map((s, k) =>
+          `${k + 1}. ${s.name} — ` +
+          `${s.daysSinceLastVisit == null ? "never visited yet" : `last visit ${s.daysSinceLastVisit} days ago`}, ` +
+          `pending ${inr(s.pending)}, ${s.orders} orders in ${s.visits} visits (${s.productivityPct}% strike rate), ` +
+          `score ${s.score}` +
+          `${s.typicalOrderTime ? `, usually orders around ${s.typicalOrderTime}` : ""}`,
+        )
+        .join("\n");
+      const messages: ChatMessage[] = [
+        {
+          role: "system",
+          content:
+            "You write one warm, personalised line for EACH numbered store below, for a field salesperson's visit card. " +
+            "lines[0] describes store 1, lines[1] describes store 2, and so on. Each line must be about that one store ONLY: " +
+            "never mention any other store's name, and never describe a route sequence (no 'next', 'then', 'start with', " +
+            "'finish with', 'head to'). Each line MUST include at least two of that store's stated facts WITH their numbers " +
+            "(last visit, pending amount, strike rate or typical order time — never invented details), plus one small concrete " +
+            "suggestion, an exclamation mark where it feels natural, under 32 words. STYLE: simple, everyday Indian English a " +
+            "field salesperson understands at first read — short sentences, common words only, no idioms or fancy phrases " +
+            "(avoid wording like 'pencilled in', 'swing by', 'make it count'). " +
+            "CRITICAL: vary the wording — no two lines may open with the same words, and never open with " +
+            '"AI Visit Optimiser", "This stop", or the store name pattern repeated across lines. ' +
+            'Return STRICT JSON only: {"lines":["<line for store 1>", ...]} — one line per store, no markdown, no extra keys.',
+        },
+        { role: "user", content: `STORES\n---\n${facts}\n---\nWrite the lines.` },
+      ];
+      const stream = await streamChat({ apiKey, messages });
+      const drain = (async () => {
+        const reader = stream.tokens.getReader();
+        while (true) {
+          const { done } = await reader.read();
+          if (done) return;
+        }
+      })();
+      const [text] = await Promise.all([stream.fullText, drain]);
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) continue;
+      const parsed = JSON.parse(match[0]);
+      const aiLines: unknown[] = Array.isArray(parsed?.lines) ? parsed.lines : [];
+      batch.forEach((s, k) => {
+        let line = typeof aiLines[k] === "string" ? String(aiLines[k]).trim().slice(0, 240) : "";
+        if (line) {
+          const lowerLine = line.toLowerCase();
+          const own = new Set(stopNameWords(s.name));
+          const mentionsOtherStop = stops.some(
+            (b) => b !== s && stopNameWords(b.name).some((w) => !own.has(w) && lowerLine.includes(w)),
+          );
+          if (mentionsOtherStop || !/\d/.test(line) || STOP_LINE_ROUTE_TALK.test(line)) line = "";
+        }
+        if (line) s.insightLine = line;
+      });
+    } catch (err) {
+      console.error("[ai-workflow-run] AI stop line batch failed:", err);
+    }
+  }
+}
+
 /** Visit Optimiser — deterministic stop scoring on today's planned visits.
  * History window: last 30 days of visits and orders. */
 async function runVisitOptimiser(supabase: any, userId: string) {
@@ -702,6 +804,13 @@ async function runVisitOptimiser(supabase: any, userId: string) {
   // Every stop carries insightLine (possibly "") so consumers can detect the
   // wording-capable schema; "" means the client uses its fallback wording.
   finalStops = finalStops.map((s) => ({ ...s, insightLine: (s as any).insightLine ?? "" }));
+  // Batched wording pass for every stop the ordering call didn't cover —
+  // days over 20 stops skip aiOrderStops entirely, and even covered days can
+  // come back with missing lines (see aiFillStopLines).
+  if (orderApiKey && finalStops.length) {
+    await aiFillStopLines(finalStops, orderApiKey);
+    finalStops = finalStops.map((s) => ({ ...s, insightLine: (s as any).insightLine ?? "" }));
+  }
   let finalKm = Math.round(totalKm * 10) / 10;
   if (aiAccepted) {
     let km = 0;
@@ -860,9 +969,11 @@ async function runBeatPlanner(supabase: any, userId: string) {
       newRetailers: b.newRetailers,
     }))
     .sort((a, b) => a.coveragePct - b.coveragePct || b.retailers - a.retailers)
-    // Stored rows feed the per-beat card one-liners, so keep more than the
-    // narration needs; the facts block below stays at 12.
-    .slice(0, 40);
+    // Stored rows feed the per-beat card one-liners on EVERY beat card, so
+    // they must cover the user's whole beat list — a low cap left better-
+    // covered beats without their nudge; the narration facts block below
+    // stays at 12 regardless.
+    .slice(0, 500);
 
   const totalRetailers = (retailers ?? []).length;
 
