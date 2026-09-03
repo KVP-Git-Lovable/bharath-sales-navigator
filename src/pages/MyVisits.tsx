@@ -94,7 +94,14 @@ function churnInsightLine(r: ChurnRow): string {
 function routeInsightLine(s: RouteStop): string {
   // Prefer the AI-written line stored on the stop by the Visit Optimiser run.
   if (s.insightLine) return s.insightLine;
+  // Deterministic fallback: lead with the store's real business figures —
+  // order value, dues, visit recency — so even without an AI line the card
+  // says something useful; the stop rank is only a trailing nudge.
   const parts: string[] = [];
+  if ((s.orderValue30d ?? 0) > 0) {
+    parts.push(`${inrCompact(s.orderValue30d!)} of orders in the last 30 days`);
+  }
+  if (s.pending > 0) parts.push(`${inrCompact(s.pending)} is pending to collect`);
   parts.push(
     s.daysSinceLastVisit == null
       ? "no visit done here yet"
@@ -102,22 +109,24 @@ function routeInsightLine(s: RouteStop): string {
         ? "you came here earlier today"
         : `last visit was ${s.daysSinceLastVisit} day${s.daysSinceLastVisit === 1 ? "" : "s"} ago`,
   );
-  if (s.pending > 0) parts.push(`${inrCompact(s.pending)} is pending to collect`);
-  if (s.visits > 0) parts.push(`orders come on ${s.productivityPct}% of your visits`);
-  const detail = parts.join(", ");
+  if (s.visits > 0 && s.productivityPct > 0) {
+    parts.push(`orders come on ${s.productivityPct}% of your visits`);
+  }
+  if (s.typicalOrderTime) parts.push(`they usually order around ${s.typicalOrderTime}`);
+  const detail = parts.slice(0, 3).join(", ");
   // Simple, everyday Indian English — short sentences, no idioms. A wide
   // pool (with the stop number mixed into the hash key) keeps neighbouring
   // cards from repeating the same opener — wording only, the figures and
   // stop order come from the agent unchanged.
   const variants = [
-    `This shop is stop #${s.sequence} on today's route — ${detail}. Do visit today!`,
-    `Today's plan puts this shop at #${s.sequence} — ${detail}. Good time to go!`,
-    `Shop #${s.sequence} on your route today — ${detail}. Please do visit!`,
-    `Visit this shop at #${s.sequence} today — ${detail}. It will help your day!`,
-    `On today's route this shop comes at #${s.sequence} — ${detail}. Go when you are near!`,
-    `Stop #${s.sequence} for today — ${detail}. A short visit is enough!`,
-    `Today this shop is at #${s.sequence} on your list — ${detail}. Do go once!`,
-    `Route says #${s.sequence} for this shop — ${detail}. Visit and take the order!`,
+    `${detail} — it is stop #${s.sequence} on today's route. Do visit today!`,
+    `This shop has ${detail}. Today's plan puts it at #${s.sequence} — good time to go!`,
+    `${detail}. It comes at #${s.sequence} on your route today — please do visit!`,
+    `${detail} for this shop. Visit it at #${s.sequence} today — it will help your day!`,
+    `${detail} — go when you are near, it is #${s.sequence} on today's route!`,
+    `${detail}. A short visit is enough — it is stop #${s.sequence} for today!`,
+    `This shop shows ${detail}. It is #${s.sequence} on your list today — do go once!`,
+    `${detail}. Route says #${s.sequence} for this shop — visit and take the order!`,
   ];
   return variants[wordingIndex(`${s.retailerId}-${s.sequence}`, variants.length)];
 }

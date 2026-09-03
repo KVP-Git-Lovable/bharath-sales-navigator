@@ -39,6 +39,8 @@ export interface RouteStop {
   visits: number;
   orders: number;
   productivityPct: number;
+  /** Confirmed order value from this store in the last 30 days (₹, rounded); absent on old runs. */
+  orderValue30d?: number;
   /** Median hour of day this store places orders (IST); absent on old runs. */
   typicalOrderHour?: number | null;
   /** Display label for typicalOrderHour, e.g. "10 AM". */
@@ -106,6 +108,9 @@ const isFresh = (run: LatestRun | null): boolean => {
   if (stops.length === 0) return false;
   if (!("typicalOrderHour" in stops[0])) return false;
   if (!("insightLine" in stops[0])) return false;
+  // Runs from before the rich-wording schema (no per-stop order value) are
+  // regenerated so their cards get the informative lines.
+  if (!("orderValue30d" in stops[0])) return false;
   if (!("routeNote" in res)) return false;
   const today = new Date().toISOString().slice(0, 10);
   if (res.date !== today && res.date !== localToday()) return false;

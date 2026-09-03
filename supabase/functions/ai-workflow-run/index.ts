@@ -460,89 +460,147 @@ const stopNameWords = (n: string) =>
   String(n).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP_LINE_GENERIC_WORDS.has(w));
 const STOP_LINE_ROUTE_TALK = /\b(next|then|afterwards|after that|start with|finish with|end with|head to|follow up)\b/i;
 
-/** Fill insightLine on stops that still lack one, in small batches.
- *
- * The ordering call (aiOrderStops) only runs for days of 2–20 stops, and even
- * then the model can return fewer lines than stops — larger days used to fall
- * back to template wording on EVERY card, which reads repetitive when many
- * stops share the same sparse facts. This step is wording only: each line is
- * written from that stop's stated facts alone, validated deterministically,
- * and any failure simply leaves the client fallback in place — the run never
- * fails because of it. */
-async function aiFillStopLines(
-  stops: Array<{
-    name: string;
-    score: number;
-    orders: number;
-    visits: number;
-    pending: number;
-    productivityPct: number;
-    daysSinceLastVisit?: number | null;
-    typicalOrderTime?: string | null;
-    insightLine?: string;
-  }>,
+interface StopLineFacts {
+  name: string;
+  orders: number;
+  visits: number;
+  pending: number;
+  productivityPct: number;
+  orderValue30d?: number;
+  daysSinceLastVisit?: number | null;
+  typicalOrderTime?: string | null;
+  insightLine?: string;
+}
+
+/** Every number a stop's line is ALLOWED to contain: exactly the figures the
+ * facts state (plain and Indian comma-grouped forms), plus the 30-day window
+ * itself. Any other digit-token in a line means the model invented a figure
+ * and the line is discarded. */
+function stopNumberWhitelist(s: StopLineFacts): Set<string> {
+  const set = new Set<string>();
+  const add = (n: number | null | undefined) => {
+    if (n == null || !Number.isFinite(Number(n))) return;
+    const r = Math.round(Number(n));
+    set.add(String(r));
+    set.add(r.toLocaleString("en-IN"));
+  };
+  add(s.pending);
+  add(s.orderValue30d);
+  add(s.daysSinceLastVisit);
+  add(s.productivityPct);
+  add(s.orders);
+  add(s.visits);
+  add(30); // the history window ("last 30 days")
+  const hour = s.typicalOrderTime?.match(/\d{1,2}/)?.[0];
+  if (hour) set.add(String(Number(hour)));
+  return set;
+}
+
+/** Deterministic acceptance check for one AI-written stop line. Returns ""
+ * (= use fallback) unless the line quotes only whitelisted figures, carries
+ * at least two of them, names no other stop, and isn't jargon/route talk. */
+function validateStopLine(
+  candidate: string,
+  s: StopLineFacts,
+  allStops: StopLineFacts[],
+): string {
+  const line = candidate.trim().slice(0, 240);
+  if (!line || line.split(/\s+/).length < 8) return "";
+  if (/\bscore\b/i.test(line) || STOP_LINE_ROUTE_TALK.test(line)) return "";
+  const lowerLine = line.toLowerCase();
+  const own = new Set(stopNameWords(s.name));
+  const mentionsOtherStop = allStops.some(
+    (b) => b !== s && stopNameWords(b.name).some((w) => !own.has(w) && lowerLine.includes(w)),
+  );
+  if (mentionsOtherStop) return "";
+  const whitelist = stopNumberWhitelist(s);
+  const tokens = line.match(/\d[\d,]*/g) ?? [];
+  let matched = 0;
+  for (const raw of tokens) {
+    const token = raw.replace(/,+$/, "");
+    const plain = token.replace(/,/g, "");
+    if (whitelist.has(token) || whitelist.has(plain)) matched++;
+    else return ""; // a figure the facts never stated — invented, discard
+  }
+  return matched >= 2 ? line : "";
+}
+
+async function generateStopLineBatch(
+  batch: StopLineFacts[],
+  allStops: StopLineFacts[],
   apiKey: string,
 ): Promise<void> {
-  const BATCH = 8;
-  const MAX_STOPS = 60;
-  const missing = stops.filter((s) => !s.insightLine).slice(0, MAX_STOPS);
-  for (let i = 0; i < missing.length; i += BATCH) {
-    const batch = missing.slice(i, i + BATCH);
-    try {
-      const facts = batch
-        .map((s, k) =>
-          `${k + 1}. ${s.name} — ` +
-          `${s.daysSinceLastVisit == null ? "never visited yet" : `last visit ${s.daysSinceLastVisit} days ago`}, ` +
-          `pending ${inr(s.pending)}, ${s.orders} orders in ${s.visits} visits (${s.productivityPct}% strike rate), ` +
-          `score ${s.score}` +
-          `${s.typicalOrderTime ? `, usually orders around ${s.typicalOrderTime}` : ""}`,
-        )
-        .join("\n");
-      const messages: ChatMessage[] = [
-        {
-          role: "system",
-          content:
-            "You write one warm, personalised line for EACH numbered store below, for a field salesperson's visit card. " +
-            "lines[0] describes store 1, lines[1] describes store 2, and so on. Each line must be about that one store ONLY: " +
-            "never mention any other store's name, and never describe a route sequence (no 'next', 'then', 'start with', " +
-            "'finish with', 'head to'). Each line MUST include at least two of that store's stated facts WITH their numbers " +
-            "(last visit, pending amount, strike rate or typical order time — never invented details), plus one small concrete " +
-            "suggestion, an exclamation mark where it feels natural, under 32 words. STYLE: simple, everyday Indian English a " +
-            "field salesperson understands at first read — short sentences, common words only, no idioms or fancy phrases " +
-            "(avoid wording like 'pencilled in', 'swing by', 'make it count'). " +
-            "CRITICAL: vary the wording — no two lines may open with the same words, and never open with " +
-            '"AI Visit Optimiser", "This stop", or the store name pattern repeated across lines. ' +
-            'Return STRICT JSON only: {"lines":["<line for store 1>", ...]} — one line per store, no markdown, no extra keys.',
-        },
-        { role: "user", content: `STORES\n---\n${facts}\n---\nWrite the lines.` },
+  const facts = batch
+    .map((s, k) => {
+      const parts = [
+        s.daysSinceLastVisit == null
+          ? "never visited yet"
+          : `last visit ${s.daysSinceLastVisit} days ago`,
+        `pending ${inr(s.pending)}`,
+        `${inr(s.orderValue30d ?? 0)} of orders in the last 30 days`,
+        `${s.orders} orders from ${s.visits} visits (${s.productivityPct}% strike rate)`,
       ];
-      const stream = await streamChat({ apiKey, messages });
-      const drain = (async () => {
-        const reader = stream.tokens.getReader();
-        while (true) {
-          const { done } = await reader.read();
-          if (done) return;
-        }
-      })();
-      const [text] = await Promise.all([stream.fullText, drain]);
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) continue;
-      const parsed = JSON.parse(match[0]);
-      const aiLines: unknown[] = Array.isArray(parsed?.lines) ? parsed.lines : [];
-      batch.forEach((s, k) => {
-        let line = typeof aiLines[k] === "string" ? String(aiLines[k]).trim().slice(0, 240) : "";
-        if (line) {
-          const lowerLine = line.toLowerCase();
-          const own = new Set(stopNameWords(s.name));
-          const mentionsOtherStop = stops.some(
-            (b) => b !== s && stopNameWords(b.name).some((w) => !own.has(w) && lowerLine.includes(w)),
-          );
-          if (mentionsOtherStop || !/\d/.test(line) || STOP_LINE_ROUTE_TALK.test(line)) line = "";
-        }
-        if (line) s.insightLine = line;
-      });
-    } catch (err) {
-      console.error("[ai-workflow-run] AI stop line batch failed:", err);
+      if (s.typicalOrderTime) parts.push(`usually orders around ${s.typicalOrderTime}`);
+      return `${k + 1}. ${s.name} — ${parts.join(", ")}`;
+    })
+    .join("\n");
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content:
+        "You write one warm, personalised sentence for EACH numbered store below, shown on a field salesperson's visit card. " +
+        "lines[0] describes store 1, lines[1] describes store 2, and so on. Each line must be about that one store ONLY: " +
+        "never mention any other store's name, and never describe a route sequence (no 'next', 'then', 'start with', " +
+        "'finish with', 'head to'). " +
+        "CONTENT RULES: weave in at least TWO of that store's stated figures EXACTLY as written (pending amount, order value, " +
+        "last-visit days, strike rate, or typical order time), then end with one small concrete suggestion. NEVER state any " +
+        "number that is not in the store's facts, and NEVER mention the word 'score' or any internal metric. Under 35 words. " +
+        "STYLE: warm, full sentences in simple everyday Indian English — no telegram-style fragments, no idioms, no fancy " +
+        "phrases (avoid 'pencilled in', 'swing by', 'make it count'). Good examples of the expected style: " +
+        '"This shop gave ₹4,300 of orders in the last 30 days, but ₹660 is still pending — do collect it on today\'s visit!" and ' +
+        '"It has been 13 days since your last visit here, and they usually order around 11 AM — reach early and take the order!". ' +
+        "CRITICAL: vary the wording — no two lines may open with the same words. " +
+        'Return STRICT JSON only: {"lines":["<line for store 1>", ...]} — one line per store, no markdown, no extra keys.',
+    },
+    { role: "user", content: `STORES\n---\n${facts}\n---\nWrite the lines.` },
+  ];
+  const stream = await streamChat({ apiKey, messages });
+  const drain = (async () => {
+    const reader = stream.tokens.getReader();
+    while (true) {
+      const { done } = await reader.read();
+      if (done) return;
+    }
+  })();
+  const [text] = await Promise.all([stream.fullText, drain]);
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return;
+  const parsed = JSON.parse(match[0]);
+  const aiLines: unknown[] = Array.isArray(parsed?.lines) ? parsed.lines : [];
+  batch.forEach((s, k) => {
+    const line = typeof aiLines[k] === "string" ? validateStopLine(String(aiLines[k]), s, allStops) : "";
+    if (line) s.insightLine = line;
+  });
+}
+
+/** Fill insightLine on stops that still lack one, in small batches, for ANY
+ * stop count. This step is wording only: each line is written from that
+ * stop's stated facts alone, validated deterministically (whitelisted
+ * figures only), and re-attempted once for stops whose batch failed or whose
+ * line was rejected. Anything still missing keeps the client's deterministic
+ * fallback wording — the run never fails because of this step. */
+async function aiFillStopLines(stops: StopLineFacts[], apiKey: string): Promise<void> {
+  const BATCH = 6;
+  const MAX_STOPS = 60;
+  for (let pass = 0; pass < 2; pass++) {
+    const missing = stops.filter((s) => !s.insightLine).slice(0, MAX_STOPS);
+    if (!missing.length) return;
+    for (let i = 0; i < missing.length; i += BATCH) {
+      try {
+        await generateStopLineBatch(missing.slice(i, i + BATCH), stops, apiKey);
+      } catch (err) {
+        console.error("[ai-workflow-run] AI stop line batch failed:", err);
+      }
     }
   }
 }
@@ -738,6 +796,7 @@ async function runVisitOptimiser(supabase: any, userId: string) {
       visits,
       orders,
       productivityPct: Math.round(productivity * 100),
+      orderValue30d: Math.round(num(orderValue.get(rid))),
       score: Math.round(score * 10) / 10,
       typicalOrderHour: tHour,
       typicalOrderTime: tHour != null ? hourLabel(tHour) : null,
