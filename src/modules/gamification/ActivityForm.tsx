@@ -20,7 +20,7 @@ import { EligibilityPicker } from "./EligibilityPicker";
 import { useActivityTiers, useFocusedProductCount, useGamSettings, useTargetKpis } from "./hooks";
 
 interface Condition { field: string; operator: string; value: any }
-interface Tier { id?: string; threshold_pct: number; points: number }
+interface Tier { id?: string; threshold_pct: number | ""; points: number | "" }
 
 interface Props {
   open: boolean;
@@ -35,7 +35,7 @@ export function ActivityForm({ open, onOpenChange, programId, category, activity
   const { data: settings } = useGamSettings();
   const { data: kpis = [] } = useTargetKpis();
   const { data: focusedCount = 0 } = useFocusedProductCount();
-  const { data: existingTiers = [] } = useActivityTiers(activity?.id);
+  const { data: existingTiers } = useActivityTiers(activity?.id);
 
   const isTiered = category === "targets";
   const [saving, setSaving] = useState(false);
@@ -72,10 +72,14 @@ export function ActivityForm({ open, onOpenChange, programId, category, activity
     setConditions(Array.isArray(a.conditions_json) ? a.conditions_json : []);
   }, [open, activity, category, settings?.default_award_mode]);
 
+  // Seed only when the dialog opens or the saved tiers arrive. `existingTiers`
+  // is undefined (stable) until fetched; a `= []` default here would be a new
+  // array every render and reset the editor on every keystroke.
   useEffect(() => {
+    if (!open) return;
     setTiers(
-      existingTiers.length
-        ? existingTiers.map((t: any) => ({ id: t.id, threshold_pct: t.threshold_pct, points: Number(t.points) }))
+      existingTiers?.length
+        ? existingTiers.map((t: any) => ({ id: t.id, threshold_pct: Number(t.threshold_pct), points: Number(t.points) }))
         : [{ threshold_pct: 80, points: 5 }],
     );
   }, [existingTiers, open]);
@@ -92,6 +96,24 @@ export function ActivityForm({ open, onOpenChange, programId, category, activity
     }
     if (isTiered && !form.kpi_id) {
       return toast.error("Choose a KPI from the Targets module");
+    }
+    let tierRows: { threshold_pct: number; points: number }[] = [];
+    if (isTiered) {
+      if (tiers.length === 0) return toast.error("Add at least one tier");
+      for (const t of tiers) {
+        const pct = Number(t.threshold_pct);
+        const pts = Number(t.points);
+        if (t.threshold_pct === "" || !Number.isFinite(pct) || pct < 1 || pct > 500) {
+          return toast.error("Each tier needs an achievement % between 1 and 500");
+        }
+        if (t.points === "" || !Number.isFinite(pts) || pts <= 0) {
+          return toast.error("Each tier needs points greater than 0");
+        }
+        tierRows.push({ threshold_pct: pct, points: pts });
+      }
+      const pcts = tierRows.map((r) => r.threshold_pct);
+      if (new Set(pcts).size !== pcts.length) return toast.error("Two tiers have the same achievement %");
+      tierRows = tierRows.sort((a, b) => a.threshold_pct - b.threshold_pct);
     }
 
     setSaving(true);
@@ -144,9 +166,7 @@ export function ActivityForm({ open, onOpenChange, programId, category, activity
         setSaving(false);
         return toast.error(`Activity saved, but couldn't clear old tiers: ${delErr.message}`);
       }
-      const rows = tiers
-        .filter((t) => t.threshold_pct !== null && t.threshold_pct !== undefined)
-        .map((t, i) => ({ action_id: actionId, threshold_pct: Number(t.threshold_pct), points: Number(t.points) || 0, sort: i }));
+      const rows = tierRows.map((t, i) => ({ action_id: actionId, threshold_pct: t.threshold_pct, points: t.points, sort: i }));
       if (rows.length) {
         const { error: tierErr } = await supabase.from("activity_tiers").insert(rows);
         if (tierErr) {
@@ -306,12 +326,12 @@ export function ActivityForm({ open, onOpenChange, programId, category, activity
                       <div key={i} className="flex items-center gap-2">
                         <Input
                           type="number" className="w-28" value={t.threshold_pct}
-                          onChange={(e) => setTiers(tiers.map((x, xi) => xi === i ? { ...x, threshold_pct: Number(e.target.value) } : x))}
+                          onChange={(e) => setTiers(tiers.map((x, xi) => xi === i ? { ...x, threshold_pct: e.target.value === "" ? "" : Number(e.target.value) } : x))}
                         />
                         <span className="text-sm text-muted-foreground">% →</span>
                         <Input
                           type="number" className="w-28" value={t.points}
-                          onChange={(e) => setTiers(tiers.map((x, xi) => xi === i ? { ...x, points: Number(e.target.value) } : x))}
+                          onChange={(e) => setTiers(tiers.map((x, xi) => xi === i ? { ...x, points: e.target.value === "" ? "" : Number(e.target.value) } : x))}
                         />
                         <span className="text-sm text-muted-foreground">points</span>
                         <Button type="button" variant="ghost" size="icon" onClick={() => setTiers(tiers.filter((_, xi) => xi !== i))}>
