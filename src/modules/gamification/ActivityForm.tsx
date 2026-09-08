@@ -139,11 +139,22 @@ export function ActivityForm({ open, onOpenChange, programId, category, activity
     }
 
     if (isTiered && actionId) {
-      await supabase.from("activity_tiers").delete().eq("action_id", actionId);
+      const { error: delErr } = await supabase.from("activity_tiers").delete().eq("action_id", actionId);
+      if (delErr) {
+        setSaving(false);
+        return toast.error(`Activity saved, but couldn't clear old tiers: ${delErr.message}`);
+      }
       const rows = tiers
         .filter((t) => t.threshold_pct !== null && t.threshold_pct !== undefined)
         .map((t, i) => ({ action_id: actionId, threshold_pct: Number(t.threshold_pct), points: Number(t.points) || 0, sort: i }));
-      if (rows.length) await supabase.from("activity_tiers").insert(rows);
+      if (rows.length) {
+        const { error: tierErr } = await supabase.from("activity_tiers").insert(rows);
+        if (tierErr) {
+          setSaving(false);
+          qc.invalidateQueries({ queryKey: ["gam-activities"] });
+          return toast.error(`Activity saved, but tiers were NOT saved: ${tierErr.message}`);
+        }
+      }
     }
 
     setSaving(false);

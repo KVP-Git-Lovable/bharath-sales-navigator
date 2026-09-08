@@ -61,23 +61,28 @@ export const KPIConfigTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kpi-definitions'] });
+      // Gamification's Activity form reads the same table under its own
+      // query key (gam-target-kpis) -- without this it keeps showing
+      // whatever KPI list was cached before this edit.
+      queryClient.invalidateQueries({ queryKey: ['gam-target-kpis'] });
       toast({ title: "KPI updated successfully" });
     },
   });
 
   const updateWeightagesMutation = useMutation({
     mutationFn: async () => {
-      const updates = Object.entries(weightages).map(([id, weightage]) => 
+      const updates = Object.entries(weightages).map(([id, weightage]) =>
         supabase
           .from('target_kpi_definitions')
           .update({ weightage })
           .eq('id', id)
       );
-      
+
       await Promise.all(updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kpi-definitions'] });
+      queryClient.invalidateQueries({ queryKey: ['gam-target-kpis'] });
       toast({ title: "Weightages updated successfully" });
     },
   });
