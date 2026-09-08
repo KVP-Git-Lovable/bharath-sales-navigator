@@ -578,6 +578,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_agents: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string
+          id: string
+          key: string
+          name: string
+          sort_order: number
+          status: Database["public"]["Enums"]["ai_agent_status"]
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          key: string
+          name: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["ai_agent_status"]
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          key?: string
+          name?: string
+          sort_order?: number
+          status?: Database["public"]["Enums"]["ai_agent_status"]
+        }
+        Relationships: []
+      }
       ai_autonomous_actions: {
         Row: {
           action_data: Json | null
@@ -838,6 +871,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ai_workflows: {
+        Row: {
+          config: Json
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       analytics_likes: {
         Row: {
@@ -3304,6 +3370,250 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      copilot_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          is_archived: boolean
+          is_pinned: boolean
+          last_message_at: string
+          metadata: Json
+          model: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          last_message_at?: string
+          metadata?: Json
+          model?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          last_message_at?: string
+          metadata?: Json
+          model?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      copilot_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          message_id: string
+          rating: number
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          message_id: string
+          rating: number
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          message_id?: string
+          rating?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copilot_feedback_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "copilot_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      copilot_messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          latency_ms: number | null
+          model: string | null
+          parts: Json
+          role: string
+          token_count: number | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          latency_ms?: number | null
+          model?: string | null
+          parts?: Json
+          role: string
+          token_count?: number | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          latency_ms?: number | null
+          model?: string | null
+          parts?: Json
+          role?: string
+          token_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copilot_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "copilot_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      copilot_tool_audit: {
+        Row: {
+          approved_at: string | null
+          args: Json
+          conversation_id: string | null
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          message_id: string | null
+          result: Json | null
+          status: string
+          tool_name: string
+          user_id: string
+          was_write: boolean
+        }
+        Insert: {
+          approved_at?: string | null
+          args?: Json
+          conversation_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          message_id?: string | null
+          result?: Json | null
+          status?: string
+          tool_name: string
+          user_id: string
+          was_write?: boolean
+        }
+        Update: {
+          approved_at?: string | null
+          args?: Json
+          conversation_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          message_id?: string | null
+          result?: Json | null
+          status?: string
+          tool_name?: string
+          user_id?: string
+          was_write?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "copilot_tool_audit_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "copilot_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "copilot_tool_audit_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "copilot_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      copilot_user_memory: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          updated_at: string
+          user_id: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          updated_at?: string
+          user_id: string
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          updated_at?: string
+          user_id?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      copilot_user_quotas: {
+        Row: {
+          created_at: string
+          daily_token_limit: number
+          daily_tool_call_limit: number
+          quota_reset_at: string
+          tokens_used_today: number
+          tool_calls_today: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_token_limit?: number
+          daily_tool_call_limit?: number
+          quota_reset_at?: string
+          tokens_used_today?: number
+          tool_calls_today?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_token_limit?: number
+          daily_tool_call_limit?: number
+          quota_reset_at?: string
+          tokens_used_today?: number
+          tool_calls_today?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       counter_customers: {
         Row: {
@@ -7432,6 +7742,7 @@ export type Database = {
           product_id: string
           source: string
           user_id: string
+          variant_id: string | null
           visit_id: string | null
         }
         Insert: {
@@ -7449,6 +7760,7 @@ export type Database = {
           product_id: string
           source?: string
           user_id: string
+          variant_id?: string | null
           visit_id?: string | null
         }
         Update: {
@@ -7466,6 +7778,7 @@ export type Database = {
           product_id?: string
           source?: string
           user_id?: string
+          variant_id?: string | null
           visit_id?: string | null
         }
         Relationships: [
@@ -15687,6 +16000,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      product_price_change_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_rate: number | null
+          old_rate: number | null
+          product_id: string
+          product_name: string | null
+          sku: string | null
+          unlocked_via_reauth: boolean
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_rate?: number | null
+          old_rate?: number | null
+          product_id: string
+          product_name?: string | null
+          sku?: string | null
+          unlocked_via_reauth?: boolean
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_rate?: number | null
+          old_rate?: number | null
+          product_id?: string
+          product_name?: string | null
+          sku?: string | null
+          unlocked_via_reauth?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_price_change_log_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_price_list: {
         Row: {
@@ -24463,6 +24820,66 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_executions: {
+        Row: {
+          agent_id: string | null
+          completed_at: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          result: Json | null
+          stage: Database["public"]["Enums"]["workflow_stage"]
+          started_at: string
+          status: Database["public"]["Enums"]["workflow_exec_status"]
+          triggered_by: string | null
+          workflow_id: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          result?: Json | null
+          stage?: Database["public"]["Enums"]["workflow_stage"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_exec_status"]
+          triggered_by?: string | null
+          workflow_id?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          result?: Json | null
+          stage?: Database["public"]["Enums"]["workflow_stage"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_exec_status"]
+          triggered_by?: string | null
+          workflow_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_executions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_executions_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "ai_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_steps: {
         Row: {
           approver_role: string | null
@@ -24956,6 +25373,10 @@ export type Database = {
           owner_user_id: string
           phone: string
         }[]
+      }
+      gam_award_daily_visit_tiers: {
+        Args: { p_dry_run?: boolean; p_user_id: string; p_visit_date: string }
+        Returns: number
       }
       gam_award_event: {
         Args: {
@@ -25968,6 +26389,7 @@ export type Database = {
       }
     }
     Enums: {
+      ai_agent_status: "prototype" | "coming_soon" | "live"
       app_role: "admin" | "user"
       approval_status: "pending" | "approved" | "rejected"
       branding_status:
@@ -26009,6 +26431,13 @@ export type Database = {
         | "rejected"
         | "active"
         | "inactive"
+      workflow_exec_status: "running" | "success" | "failed"
+      workflow_stage:
+        | "workflow"
+        | "validation"
+        | "simulation"
+        | "production"
+        | "monitoring"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -26024,12 +26453,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -26053,11 +26482,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -26078,11 +26507,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -26103,11 +26532,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -26120,11 +26549,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -26136,6 +26565,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_agent_status: ["prototype", "coming_soon", "live"],
       app_role: ["admin", "user"],
       approval_status: ["pending", "approved", "rejected"],
       branding_status: [
@@ -26181,6 +26611,14 @@ export const Constants = {
         "rejected",
         "active",
         "inactive",
+      ],
+      workflow_exec_status: ["running", "success", "failed"],
+      workflow_stage: [
+        "workflow",
+        "validation",
+        "simulation",
+        "production",
+        "monitoring",
       ],
     },
   },
