@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, getMonth, getYear, getDaysInMonth, getDay } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, subDays, subWeeks, subMonths, subQuarters, getMonth, getYear, getDaysInMonth, getDay, format } from 'date-fns';
+
+// Mirrors public.order_line_kg() in the database — keep the two in sync.
+const lineToKg = (quantity: number, unit?: string | null): number => {
+  const u = (unit || '').toLowerCase().replace(/\./g, '').trim();
+  if (['kg', 'kilogram', 'kilograms', 'l', 'ltr', 'liter', 'liters', 'litre', 'litres'].includes(u)) return quantity;
+  if (['g', 'gm', 'gram', 'grams', 'ml', 'milliliter', 'milliliters', 'millilitre', 'millilitres'].includes(u)) return quantity / 1000;
+  return 0;
+};
 
 export type TargetPeriod = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'last_week' | 'last_month' | 'last_quarter';
 export type TargetBasis = 'revenue' | 'quantity';
@@ -123,6 +131,8 @@ export function useUserTargetProgress(
   // Create stable date strings for dependency
   const startStr = useMemo(() => dateRange.start.toISOString(), [dateRange.start.getTime()]);
   const endStr = useMemo(() => dateRange.end.toISOString(), [dateRange.end.getTime()]);
+  const startDateStr = useMemo(() => format(dateRange.start, 'yyyy-MM-dd'), [dateRange.start.getTime()]);
+  const endDateStr = useMemo(() => format(dateRange.end, 'yyyy-MM-dd'), [dateRange.end.getTime()]);
 
   useEffect(() => {
     if (!userId) {
@@ -266,30 +276,35 @@ export function useUserTargetProgress(
           setTarget(calculatedTarget);
         }
 
-        // Fetch actual performance - optimized single query approach
+        // Actuals are keyed on order_date (the business date, same as Today's
+        // Summary and the period-target functions), not on created_at — a
+        // backdated order belongs to the day it was placed for.
+        const dateFrom = startDateStr;
+        const dateTo = endDateStr;
         if (basis === 'revenue') {
           const { data: ordersData } = await supabase
             .from('orders')
             .select('total_amount')
             .eq('user_id', userId)
-            .gte('created_at', startStr)
-            .lte('created_at', endStr);
+            .gte('order_date', dateFrom)
+            .lte('order_date', dateTo);
 
           const totalRevenue = ordersData?.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0) || 0;
           setActual(totalRevenue);
         } else {
-          // Sum quantities AS-IS in the unit they were captured in. Targets are now
-          // configured per the product master unit (Piece), so no KG/grams conversion.
+          // Lines are captured in mixed units (KG and grams on the same day is
+          // common). Normalise every line to KG before summing; pieces are not
+          // a weight and are excluded, matching Today's Summary.
           const { data: ordersData } = await supabase
             .from('orders')
-            .select('id, order_items!order_items_order_id_fkey(quantity)')
+            .select('id, order_items!order_items_order_id_fkey(quantity, unit)')
             .eq('user_id', userId)
-            .gte('created_at', startStr)
-            .lte('created_at', endStr);
+            .gte('order_date', dateFrom)
+            .lte('order_date', dateTo);
 
           const totalQuantity = ordersData?.reduce((sum, order) => {
             const orderQty = (order.order_items as any[])?.reduce(
-              (itemSum, item) => itemSum + (Number(item.quantity) || 0),
+              (itemSum, item) => itemSum + lineToKg(Number(item.quantity) || 0, item.unit),
               0
             ) || 0;
             return sum + orderQty;

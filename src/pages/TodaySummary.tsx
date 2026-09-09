@@ -1047,9 +1047,15 @@ export const TodaySummary = () => {
         const { qty, unit } = getItemDisplayQtyUnit(item);
         totalByUnit.set(unit, (totalByUnit.get(unit) || 0) + qty);
       });
-      const totalKgSoldFormatted = Array.from(totalByUnit.entries())
+      const perUnitText = Array.from(totalByUnit.entries())
         .map(([unit, qty]) => `${formatQty(qty)} ${unit}`)
-        .join(', ') || '0 KG';
+        .join(', ');
+      // When the day mixes KG and grams, also show the combined weight so the
+      // card agrees with the Target widget's single KG figure.
+      const weightUnitsPresent = ['KG', 'Grams'].filter((u) => (totalByUnit.get(u) || 0) > 0).length;
+      const combinedKg = (totalByUnit.get('KG') || 0) + (totalByUnit.get('Grams') || 0) / 1000;
+      const totalKgSoldFormatted =
+        (perUnitText && weightUnitsPresent > 1 ? `${perUnitText} = ${formatQty(combinedKg)} KG` : perUnitText) || '0 KG';
       totalItemsCount = Array.from(totalByUnit.values()).reduce((sum, qty) => sum + qty, 0);
 
       // Calculate distance from van_stock (start_km to end_km)
