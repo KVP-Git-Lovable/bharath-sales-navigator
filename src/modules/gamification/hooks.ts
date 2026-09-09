@@ -250,3 +250,71 @@ export const useFocusedProductCount = () =>
       return count ?? 0;
     },
   });
+
+export interface PointsYtdBreakdown {
+  total: number;
+  awards: number;
+  byMonth: { key: string; label: string; points: number; awards: number }[];
+  byProgram: { gameId: string | null; points: number; awards: number }[];
+  topUsers: { userId: string | null; points: number; awards: number }[];
+}
+
+const bump = <K,>(m: Map<K, { points: number; awards: number }>, k: K, p: number) => {
+  const cur = m.get(k) ?? { points: 0, awards: 0 };
+  cur.points += p;
+  cur.awards += 1;
+  m.set(k, cur);
+};
+
+export const usePointsYtdBreakdown = (enabled = true) =>
+  useQuery({
+    queryKey: ["gam-points-ytd-breakdown"],
+    enabled,
+    queryFn: async (): Promise<PointsYtdBreakdown> => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const start = new Date(year, 0, 1).toISOString();
+      const PAGE_SIZE = 1000;
+      const MAX_PAGES = 100;
+      const byMonth = new Map<string, { points: number; awards: number }>();
+      const byProgram = new Map<string | null, { points: number; awards: number }>();
+      const byUser = new Map<string | null, { points: number; awards: number }>();
+      let total = 0;
+      let awards = 0;
+
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const from = page * PAGE_SIZE;
+        const { data, error } = await supabase
+          .from("gamification_points")
+          .select("points, earned_at, user_id, game_id")
+          .gte("earned_at", start)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        const rows = data ?? [];
+        for (const r of rows as any[]) {
+          const p = Number(r.points || 0);
+          total += p;
+          awards += 1;
+          bump(byMonth, String(r.earned_at ?? "").slice(0, 7), p);
+          bump(byProgram, r.game_id ?? null, p);
+          bump(byUser, r.user_id ?? null, p);
+        }
+        if (rows.length < PAGE_SIZE) break;
+      }
+
+      const months = Array.from({ length: now.getMonth() + 1 }, (_, i) => {
+        const key = `${year}-${String(i + 1).padStart(2, "0")}`;
+        const m = byMonth.get(key) ?? { points: 0, awards: 0 };
+        return { key, label: new Date(year, i, 1).toLocaleDateString(undefined, { month: "short" }), ...m };
+      });
+      const desc = (a: { points: number }, b: { points: number }) => b.points - a.points;
+
+      return {
+        total,
+        awards,
+        byMonth: months,
+        byProgram: [...byProgram.entries()].map(([gameId, v]) => ({ gameId, ...v })).sort(desc),
+        topUsers: [...byUser.entries()].map(([userId, v]) => ({ userId, ...v })).sort(desc).slice(0, 8),
+      };
+    },
+  });

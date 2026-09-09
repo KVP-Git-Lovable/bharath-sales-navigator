@@ -39,7 +39,7 @@ export default function GamificationAdmin() {
             content scrolls underneath it without showing through a transparent band. */}
         <div className="mx-auto w-full max-w-[1600px] flex flex-col">
           <div className="mb-3">
-            <GamificationHero />
+            <GamificationHero onOpenSettings={() => setConfigOpen(true)} />
           </div>
 
           <GamificationTabs
